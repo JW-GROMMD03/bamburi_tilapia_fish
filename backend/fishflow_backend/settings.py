@@ -80,7 +80,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # ============ CORS SETTINGS ============
 # Allow your Render frontend and local development
 CORS_ALLOWED_ORIGINS = [
-    'https://bamburi-tilapia-frontend.onrender.com',
+    'https://bamburi-tilapia-fish-frontend.onrender.com',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'http://localhost:5500',
@@ -125,6 +125,6 @@ if not DEBUG:
     
     # CSRF trusted origins
     CSRF_TRUSTED_ORIGINS = [
-        'https://bamburi-tilapia-backend.onrender.com',
-        'https://bamburi-tilapia-frontend.onrender.com',
+        'https://bamburi-tilapia-fish.onrender.com',
+        'https://bamburi-tilapia-fish-frontend.onrender.com',
     ]
