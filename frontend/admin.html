@@ -2409,7 +2409,7 @@ function initAnalytics() {
 }
 
 
-// ============ QR SCANNER - UPDATED FOR DELETION PROCESSING ============
+// ============ QR SCANNER - COMPLETE UPDATED FUNCTION ============
 
 async function startScanner() {
     if (scannerRunning) {
@@ -2453,14 +2453,14 @@ async function startScanner() {
                 
                 lastScannedCode = decodedText;
                 
-                // ============ CHECK IF THIS IS A DELETION QR CODE ============
+                // Check if this is a deletion QR code from cashier
                 if (decodedText.startsWith('CLEAR-') || 
                     decodedText.startsWith('ITEMS-') ||
                     decodedText.startsWith('REMOVE-ITEM-') ||
                     decodedText.startsWith('RECEIPT-') ||
                     decodedText.startsWith('HOLD-')) {
                     
-                    // This is a deletion request from cashier
+                    // Show processing message
                     document.getElementById('scanResult').innerHTML = `
                         <div style="background: #fef3c7; padding: 12px; border-radius: 10px;">
                             <strong>🗑️ Deletion Request Detected!</strong><br>
@@ -2468,7 +2468,7 @@ async function startScanner() {
                         </div>
                     `;
                     
-                    // Process the deletion
+                    // Save as approved deletion to trash
                     try {
                         const response = await fetch(`${API_URL}/trash/`, {
                             method: 'POST',
@@ -2479,12 +2479,12 @@ async function startScanner() {
                             body: JSON.stringify({
                                 item_type: 'qr_delete_approved',
                                 description: `Admin approved deletion: ${decodedText}`,
-                                data: { 
+                                data: JSON.stringify({
                                     qr_code: decodedText,
                                     scanned_at: new Date().toISOString(),
                                     scanned_by: currentUser?.id || 'admin',
                                     approved: true
-                                }
+                                })
                             })
                         });
                         
@@ -2492,20 +2492,27 @@ async function startScanner() {
                             document.getElementById('scanResult').innerHTML = `
                                 <div style="background: #dcfce7; padding: 12px; border-radius: 10px;">
                                     <strong>✅ Deletion Approved!</strong><br>
-                                    <span style="font-size: 12px;">Cashier items will be removed</span>
+                                    <span style="font-size: 12px;">Cashier items will be cleared</span>
                                 </div>
                             `;
-                            toast('✅ Deletion approved! Cashier items cleared.');
+                            toast('✅ Deletion approved! Cashier can now clear items.');
                         } else {
                             document.getElementById('scanResult').innerHTML = `
                                 <div style="background: #fee2e2; padding: 12px; border-radius: 10px;">
-                                    <strong>❌ Deletion Failed</strong><br>
-                                    <span style="font-size: 12px;">Could not process deletion</span>
+                                    <strong>❌ Failed to Process</strong><br>
+                                    <span style="font-size: 12px;">Please try scanning again</span>
                                 </div>
                             `;
+                            toast('❌ Failed to approve deletion');
                         }
                     } catch (err) {
-                        console.log('Delete processing error:', err);
+                        console.log('Delete approval error:', err);
+                        document.getElementById('scanResult').innerHTML = `
+                            <div style="background: #fee2e2; padding: 12px; border-radius: 10px;">
+                                <strong>❌ Connection Error</strong><br>
+                                <span style="font-size: 12px;">Check backend connection</span>
+                            </div>
+                        `;
                     }
                     
                 } else {
@@ -2518,7 +2525,7 @@ async function startScanner() {
                     `;
                     toast('📷 QR Code scanned');
                     
-                    // Save to trash for audit
+                    // Save regular scan to trash for audit
                     try {
                         await fetch(`${API_URL}/trash/`, {
                             method: 'POST',
@@ -2529,10 +2536,10 @@ async function startScanner() {
                             body: JSON.stringify({
                                 item_type: 'qr_scan',
                                 description: decodedText,
-                                data: { 
+                                data: JSON.stringify({ 
                                     scanned_at: new Date().toISOString(),
                                     scanned_by: currentUser?.id || 'unknown'
-                                }
+                                })
                             })
                         });
                     } catch (err) {
@@ -2540,16 +2547,16 @@ async function startScanner() {
                     }
                 }
                 
-                // Reset after 3 seconds
+                // Reset after 3 seconds for next scan
                 scanTimeout = setTimeout(() => {
                     lastScannedCode = null;
                     scanTimeout = null;
                 }, 3000);
                 
-                // Auto-restart scanner
+                // Auto-restart scanner display
                 setTimeout(() => {
                     if (scannerRunning && qrScanner) {
-                        document.getElementById('scanResult').innerHTML = '📷 Waiting for next QR code...';
+                        document.getElementById('scanResult').innerHTML = '📷 Scanner ready - Point at cashier QR code to approve deletion.';
                     }
                 }, 2000);
             },
@@ -2561,8 +2568,9 @@ async function startScanner() {
         ).then(() => {
             scannerRunning = true;
             document.getElementById('scanResult').innerHTML = '📷 Scanner ready - Point at cashier QR code to approve deletion.';
-            toast('📷 Scanner started');
+            toast('📷 Scanner started successfully');
             
+            // Auto-zoom after camera starts
             setTimeout(() => {
                 if (qrScanner && qrScanner.getVideoElement) {
                     const video = qrScanner.getVideoElement();
@@ -2605,7 +2613,6 @@ function stopScanner() {
     }
 }
 
-// Clean up scanner on page unload
 window.addEventListener('beforeunload', () => {
     if (qrScanner && scannerRunning) {
         qrScanner.stop().catch(console.error);

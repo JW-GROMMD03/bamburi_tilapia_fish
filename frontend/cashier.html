@@ -555,6 +555,9 @@ function updateSel() {
     currentTotal = selItems.reduce(function(s, i) { return s + i.price * i.qty; }, 0);
   }
   document.getElementById('selectionTotal').textContent = currentTotal.toLocaleString();
+  
+  // Save selection to localStorage
+  saveSelection();
 }
 
 // ============ HOLD ORDERS ============
@@ -858,15 +861,48 @@ async function confirmPayment() {
     shift: user.shift
   });
   
-  if (r) {
+if (r) {
     selItems = [];
     updateSel();
+    localStorage.removeItem('fishflow_selection'); // Clear saved selection
     closePayment();
     showToast('✅ Sale: ' + currentTotal.toLocaleString() + '/=');
     await updateDashboard();
     await renderBills();
-  } else {
+} else {
     showToast('❌ Failed to save sale');
+  }
+}
+
+// Add this function near the other check functions
+async function checkForAdminApproval() {
+  if (!pendingDeleteRequest) return;
+  
+  try {
+    // Check trash for our deletion request approved by admin
+    var response = await fetch(API_BASE + '/trash/', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    
+    if (!response.ok) return;
+    
+    var trashItems = await response.json();
+    
+    // Look for our QR code approved by admin
+    for (var i = 0; i < trashItems.length; i++) {
+      var item = trashItems[i];
+      if (item.item_type === 'qr_delete_approved' && 
+          item.description && 
+          item.description.includes(pendingDeleteRequest.id)) {
+        
+        // Admin approved! Execute the deletion
+        console.log('✅ Admin approved deletion!');
+        executePendingDelete();
+        return;
+      }
+    }
+  } catch (e) {
+    // Silent fail
   }
 }
 
@@ -1226,6 +1262,30 @@ document.querySelectorAll('.nav-item').forEach(function(b) {
   b.addEventListener('click', function() { switchPanel(b.dataset.panel); });
 });
 
+
+// Add these functions after updateSel()
+
+function saveSelection() {
+  if (selItems.length > 0) {
+    localStorage.setItem('fishflow_selection', JSON.stringify(selItems));
+  } else {
+    localStorage.removeItem('fishflow_selection');
+  }
+}
+
+function restoreSelection() {
+  var saved = localStorage.getItem('fishflow_selection');
+  if (saved) {
+    try {
+      selItems = JSON.parse(saved);
+      updateSel();
+      console.log('✅ Restored previous selection');
+    } catch(e) {
+      localStorage.removeItem('fishflow_selection');
+    }
+  }
+}
+
 // ============ PERIODIC CHECKS ============
 setInterval(checkShiftLock, 30000);
 checkShiftLock();
@@ -1250,10 +1310,12 @@ setInterval(async function() {
   } catch (e) {}
 }, 60000);
 
-// ============ INIT ============
 async function init() {
   document.getElementById('topDate').textContent = getToday();
   
+  // Restore previous selection
+  restoreSelection();
+
   // Load menu from database
   await loadMenuItemsFromAdmin();
   
@@ -1294,7 +1356,7 @@ async function init() {
     }
   }, 60000);
   
-  // Check for QR scan results
+  // Check for QR scan results AND admin approvals (single interval)
   setInterval(function() {
     if (pendingDeleteRequest && document.getElementById('qrPopup').classList.contains('active')) {
       var urlParams = new URLSearchParams(window.location.search);
@@ -1304,7 +1366,9 @@ async function init() {
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     }
-  }, 500);
+    // Check backend for admin approval
+    checkForAdminApproval();
+  }, 2000);
   
   // Cleanup
   window.addEventListener('beforeunload', function() {

@@ -1142,3 +1142,68 @@ def get_profile(request):
     except Exception as e:
         print(f"Get profile error: {str(e)}")
         return Response({'error': str(e)}, status=401)
+    
+    
+    
+    
+@api_view(['POST'])
+def approve_qr_delete(request):
+    """Admin approves a QR deletion request - cashier can poll this"""
+    try:
+        data = request.data
+        qr_code = data.get('qr_code', '')
+        
+        # Save to trash as approved
+        trash_item = {
+            'item_type': 'qr_delete_approved',
+            'description': f'Admin approved: {qr_code}',
+            'data': json.dumps({
+                'qr_code': qr_code,
+                'approved': True,
+                'approved_by': data.get('scanned_by', 'admin'),
+                'approved_at': datetime.now().isoformat()
+            }),
+            'trashed_at': datetime.now().isoformat()
+        }
+        SupabaseDB.save_trash(trash_item)
+        
+        return Response({
+            'success': True,
+            'message': 'Deletion approved',
+            'qr_code': qr_code
+        })
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
+
+
+@api_view(['GET'])
+def check_pending_approvals(request):
+    """Cashier polls this to check if admin approved their deletion"""
+    try:
+        qr_id = request.query_params.get('qr_id', '')
+        
+        if not qr_id:
+            return Response({'approved': False, 'error': 'No QR ID provided'}, status=400)
+        
+        # Check trash for approval
+        trash_items = SupabaseDB.get_trash()
+        
+        for item in (trash_items or []):
+            if item.get('item_type') == 'qr_delete_approved':
+                desc = item.get('description', '')
+                if qr_id in desc:
+                    return Response({
+                        'approved': True,
+                        'qr_code': qr_id,
+                        'message': 'Deletion approved by admin'
+                    })
+        
+        return Response({
+            'approved': False,
+            'qr_code': qr_id,
+            'message': 'Waiting for admin approval'
+        })
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)

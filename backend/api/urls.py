@@ -85,4 +85,8 @@ urlpatterns = [
     path('menu/version/', views.menu_version, name='menu-version'),
     path('menu/items/', views.get_menu_items, name='menu-items-sync'),
     path('menu/refresh/', views.force_menu_refresh, name='menu-refresh'),
+    
+    # QR Delete endpoints
+path('qr/approve/', views.approve_qr_delete, name='qr-approve'),
+path('qr/check/', views.check_pending_approvals, name='qr-check'),
 ]
