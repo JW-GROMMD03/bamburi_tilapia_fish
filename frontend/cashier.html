@@ -225,7 +225,7 @@
 
 <script>
 // ============ CONFIGURATION ============
-const API_BASE = 'https://bamburi-tilapia-fish.onrender.com';
+const API_BASE = 'https://bamburi-tilapia-fish.onrender.com/api';
 const API_URL = API_BASE;
 const token = localStorage.getItem('fishflow_token');
 const user = JSON.parse(localStorage.getItem('fishflow_user') || '{}');
@@ -307,7 +307,8 @@ async function apiCall(endpoint, method, body) {
     };
     if (body) options.body = JSON.stringify(body);
     
-    var r = await fetch(API_BASE + '/' + endpoint, options);
+    var cleanEndpoint = endpoint.replace(/^\/+/, '');
+    var r = await fetch(API_BASE + '/' + cleanEndpoint, options);
     
     if (r.status === 401 || r.status === 403) {
       logout();
