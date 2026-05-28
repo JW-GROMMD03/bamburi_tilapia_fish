@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="description" content="FishFlow Pro - Cashier Panel">
+  <meta name="robots" content="noindex, nofollow">
+  <title>FishFlow Pro • Cashier Panel</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+    body { background: #eef2f6; min-height: 100vh; user-select: none; -webkit-user-select: none; -moz-user-select: none; }
+    .app-container { max-width: 750px; margin: 0 auto; background: white; min-height: 100vh; position: relative; box-shadow: 0 0 30px rgba(0,0,0,0.05); }
+    .top-nav { background: #0b3954; color: white; padding: 6px 2px; display: flex; justify-content: space-around; flex-wrap: wrap; gap: 1px; position: sticky; top: 0; z-index: 20; box-shadow: 0 2px 12px rgba(0,0,0,0.15); }
+    .nav-item { display: flex; flex-direction: column; align-items: center; font-size: 0.56rem; color: #b0c7d9; cursor: pointer; padding: 5px 4px; border-radius: 10px; transition: 0.2s; background: none; border: none; font-weight: 500; min-width: 45px; position: relative; }
+    .nav-item.active { color: white; background: rgba(255,255,255,0.18); font-weight: 700; }
+    .nav-icon { font-size: 1rem; margin-bottom: 1px; }
+    .topbar-info { background: #092d42; color: #d0e0ed; padding: 6px 14px; display: flex; justify-content: space-between; font-size: 0.68rem; font-weight: 500; align-items: center; flex-wrap: wrap; gap: 4px; }
+    .cashier-info { display: flex; align-items: center; gap: 6px; }
+    .shift-badge { padding: 2px 8px; border-radius: 10px; font-size: 0.58rem; font-weight: 600; }
+    .shift-day { background: #fef3c7; color: #92400e; }
+    .shift-night { background: #dbeafe; color: #1e40af; }
+    .logout-btn { background: rgba(255,255,255,0.12); color: white; border: none; padding: 4px 10px; border-radius: 8px; cursor: pointer; font-size: 0.58rem; }
+    .shift-timer { background: linear-gradient(135deg,#fef3c7,#fde68a); padding: 6px 14px; font-size: 0.65rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; }
+    .shift-timer.night { background: linear-gradient(135deg,#dbeafe,#bfdbfe); }
+    .countdown { font-weight: 700; color: #ef4444; }
+    .warning-msg { background: #fee2e2; color: #dc2626; padding: 2px 8px; border-radius: 6px; font-size: 0.58rem; font-weight: 700; display: none; }
+    .blocked-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 999; justify-content: center; align-items: center; flex-direction: column; color: white; text-align: center; padding: 20px; }
+    .blocked-overlay.active { display: flex; }
+    .locked-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 998; justify-content: center; align-items: center; flex-direction: column; color: white; text-align: center; padding: 20px; }
+    .locked-overlay.active { display: flex; }
+    .qr-popup { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: #fff; padding: 20px; border-radius: 16px; z-index: 150; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.4); width: 300px; }
+    .qr-popup.active { display: block; }
+    .dashboard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 8px 12px; }
+    .stat-card { background: #f8fafd; border-radius: 10px; padding: 7px 5px; text-align: center; border: 1px solid #e9f0f5; }
+    .stat-label { font-size: 0.5rem; text-transform: uppercase; color: #6b7d8e; letter-spacing: 0.2px; }
+    .stat-value { font-size: 0.85rem; font-weight: 700; color: #0b3954; }
+    .stat-highlight { font-size: 0.6rem; font-weight: 600; color: #1e4a6b; }
+    .panel { display: none; padding: 12px; animation: fadeIn 0.2s ease; }
+    .panel.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .card { background: #f8fafd; border-radius: 14px; padding: 12px; margin-bottom: 8px; border: 1px solid #eef2f6; }
+    .btn { padding: 7px 12px; border-radius: 16px; border: none; font-weight: 600; cursor: pointer; font-size: 0.74rem; transition: 0.2s; -webkit-tap-highlight-color: transparent; }
+    .btn-primary { background: #0b3954; color: white; }
+    .btn-outline { background: white; border: 1px solid #0b3954; color: #0b3954; }
+    .btn-danger { background: #dc3545; color: white; }
+    .btn-success { background: #10b981; color: white; }
+    .btn-warning { background: #f59e0b; color: white; }
+    .btn-sm { padding: 4px 8px; font-size: 0.64rem; }
+    .item-grid { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; max-height: 120px; overflow-y: auto; }
+    .item-chip { padding: 5px 10px; border-radius: 14px; background: #f0f5fb; border: 1px solid #d9e2ec; font-size: 0.68rem; cursor: pointer; font-weight: 500; transition: 0.15s; white-space: nowrap; }
+    .item-chip:hover { background: #e0eaf5; }
+    .item-chip.tilapia-chip { background: #fef5e7; border-color: #f0c78e; }
+    .item-chip.selected { background: #0b3954; color: white; border-color: #0b3954; }
+    input, select { padding: 8px; border-radius: 10px; border: 1px solid #d0d9e4; font-size: 0.78rem; width: 100%; margin: 2px 0; }
+    .flex-row { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+    .list-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #eee; font-size: 0.72rem; }
+    .trash-item { background: #fff5f5; border-radius: 8px; padding: 8px; margin: 4px 0; font-size: 0.7rem; border: 1px solid #fdd; }
+    .receipt-card { background: white; border-radius: 10px; padding: 8px; margin: 4px 0; border: 1px solid #e2e8f0; font-size: 0.72rem; }
+    .receipt-card.hold { background: #fef3c7; border-left: 4px solid #f59e0b; }
+    .payment-badge { display: inline-block; padding: 2px 6px; border-radius: 8px; font-size: 0.58rem; font-weight: 700; }
+    .cash-badge { background: #dcfce7; color: #166534; }
+    .mpesa-badge { background: #dbeafe; color: #1e40af; }
+    .mixed-badge { background: #fef3c7; color: #92400e; }
+    .section-title { font-weight: 700; font-size: 0.8rem; margin: 10px 0 3px; color: #1e4a6b; border-bottom: 1px solid #e0e7ef; padding-bottom: 3px; display: flex; justify-content: space-between; align-items: center; }
+    .tilapia-title { color: #e67e22; border-bottom: 2px solid #f0c78e; }
+    .loading { text-align: center; padding: 16px; color: #888; }
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #0b3954; color: #fff; padding: 10px 20px; border-radius: 24px; z-index: 500; font-size: 0.75rem; font-weight: 600; display: none; white-space: nowrap; }
+    .hold-count { background: #f59e0b; color: #1e293b; border-radius: 10px; padding: 2px 6px; font-size: 0.6rem; margin-left: 5px; }
+    .btn-longpress-active { background: #8b5cf6 !important; transform: scale(0.95); transition: all 0.1s ease; }
+    @media (max-width: 400px) { .dashboard-grid { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+
+<div class="blocked-overlay" id="blockedOverlay">
+  <div style="font-size:4rem;">🚫</div>
+  <h2>Account Blocked</h2>
+  <p id="blockedReason">Your account has been blocked. Please contact your manager or admin.</p>
+  <button class="btn btn-danger" onclick="logout()" style="margin-top:10px;">Return to Login</button>
+</div>
+
+<div class="locked-overlay" id="lockedOverlay">
+  <div style="font-size:4rem;">🔒</div>
+  <h2>Shift Ended - Access Locked</h2>
+  <p>Your shift time is over and the grace period has expired. Please submit your report to the manager.</p>
+  <button class="btn btn-warning" onclick="submitShiftReport()" style="margin-top:10px;">📋 Submit Final Report</button>
+  <button class="btn btn-danger" onclick="logout()" style="margin-top:6px;">Return to Login</button>
+</div>
+
+<div class="qr-popup" id="qrPopup">
+  <h4 style="font-size:0.85rem;">📷 Scan to Authorize Deletion</h4>
+  <p style="font-size:0.7rem;color:#888;">Show this QR code to admin/manager</p>
+  <div id="qrCodeContainer" style="cursor:pointer;" onmousedown="startCheatTimer()" onmouseup="cancelCheatTimer()" onmouseleave="cancelCheatTimer()" ontouchstart="startCheatTimer()" ontouchend="cancelCheatTimer()" ontouchcancel="cancelCheatTimer()"></div>
+  <div id="cheatProgress" style="width:0%; height:4px; background:#8b5cf6; transition:width 0.1s linear; margin-top:8px; border-radius:3px;"></div>
+  <p style="font-size:0.65rem;color:#ef4444;margin-top:8px;">ID: <strong id="qrDeleteId">---</strong></p>
+  <p style="font-size:0.6rem;color:#888;margin-top:6px;">press on the QR code to authorize deletion</p>
+  <button class="btn btn-outline btn-sm" onclick="closeQRPopup()">Close</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="app-container">
+  <div class="top-nav" id="topNav">
+    <button class="nav-item active" data-panel="takeaway"><span class="nav-icon">🛒</span>Take Away</button>
+    <button class="nav-item" data-panel="credit"><span class="nav-icon">📋</span>Credit</button>
+    <button class="nav-item" data-panel="bills"><span class="nav-icon">🧾</span>Receipts</button>
+    <button class="nav-item" data-panel="expense"><span class="nav-icon">💸</span>Expense</button>
+    <button class="nav-item" data-panel="trash"><span class="nav-icon">🗑️</span>Trash</button>
+    <button class="nav-item" data-panel="analysis"><span class="nav-icon">📊</span>Analysis</button>
+  </div>
+  
+  <div class="topbar-info">
+    <span id="topDate"></span>
+    <div class="cashier-info">
+      <span id="cashierNameDisplay">💰 Cashier</span>
+      <span class="shift-badge shift-day" id="shiftBadge">Day</span>
+      <button class="logout-btn" onclick="logout()">🚪 Logout</button>
+    </div>
+  </div>
+
+  <div class="shift-timer" id="shiftTimerBar">
+    <span>🕐 <strong id="csShiftLabel">Day Shift</strong> (09:30-22:00)</span>
+    <span>Ends in: <span class="countdown" id="csCountdown">--:--:--</span></span>
+    <span class="warning-msg" id="shiftWarning">⚠️ Submit Report!</span>
+    <button class="btn btn-success btn-sm" onclick="submitShiftReport()">📋 Report</button>
+  </div>
+
+  <div class="dashboard-grid" id="categorySalesSummary">
+    <div class="stat-card"><div class="stat-label">🐟 Tilapia</div><div class="stat-value" id="tilapiaPcs">0</div><div class="stat-highlight" id="tilapiaAmt">0/=</div></div>
+    <div class="stat-card"><div class="stat-label">🐠 Mbuta</div><div class="stat-value" id="mbutaPcs">0</div><div class="stat-highlight" id="mbutaAmt">0/=</div></div>
+    <div class="stat-card"><div class="stat-label">🍚 Ugali</div><div class="stat-value" id="ugaliPcs">0</div><div class="stat-highlight" id="ugaliAmt">0/=</div></div>
+    <div class="stat-card"><div class="stat-label">🍳 Wet Fry</div><div class="stat-value" id="wetfryPcs">0</div><div class="stat-highlight" id="wetfryAmt">0/=</div></div>
+    <div class="stat-card"><div class="stat-label">🥤 Soda</div><div class="stat-value" id="sodaPcs">0</div><div class="stat-highlight" id="sodaAmt">0/=</div></div>
+    <div class="stat-card"><div class="stat-label">🥬 Greens</div><div class="stat-value" id="greensPcs">0</div><div class="stat-highlight" id="greensAmt">0/=</div></div>
+    <div class="stat-card"><div class="stat-label">🍟 Chips</div><div class="stat-value" id="chipsPcs">0</div><div class="stat-highlight" id="chipsAmt">0/=</div></div>
+    <div class="stat-card"><div class="stat-label">🛍️ Bag</div><div class="stat-value" id="bagPcs">0</div><div class="stat-highlight" id="bagAmt">0/=</div></div>
+    <div class="stat-card"><div class="stat-label">🐟 Fulu/Omena</div><div class="stat-value" id="fuluOmenaPcs">0</div><div class="stat-highlight" id="fuluOmenaAmt">0/=</div></div>
+    <div class="stat-card"><div class="stat-label">💧 Water</div><div class="stat-value" id="waterPcs">0</div><div class="stat-highlight" id="waterAmt">0/=</div></div>
+    <div class="stat-card"><div class="stat-label">📦 Containers</div><div class="stat-value" id="containerPcs">0</div><div class="stat-highlight" id="containerAmt">0/=</div></div>
+    <div class="stat-card"><div class="stat-label">💰 My Sales</div><div class="stat-value" id="totalSalesDisplay">0</div><div class="stat-highlight" id="totalExpensesDisplay">Exp: 0/=</div></div>
+  </div>
+
+  <div id="panel-takeaway" class="panel active">
+    <div class="flex-row" style="margin-bottom:8px;">
+      <button class="btn btn-outline btn-sm" onclick="refreshMenuItems()">🔄 Refresh Menu</button>
+      <button class="btn btn-warning btn-sm" onclick="showHoldReceipts()">📦 On Hold (<span id="holdCount">0</span>)</button>
+    </div>
+    <div id="dynamicMenuContainer"><div class="loading">Loading menu items...</div></div>
+    <div class="card" style="margin-top:12px;">
+      <strong>📋 Current Selection</strong>
+      <div id="selectionList" style="min-height:30px; font-size:0.72rem; margin-top:4px;">No items selected</div>
+      <div class="flex-row" style="margin-top:6px;">
+        <button class="btn btn-danger btn-sm" id="clearAllBtn" onmousedown="startLongPress(this, 'clearAll', null, null)" onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" ontouchstart="startLongPress(this, 'clearAll', null, null)" ontouchend="cancelLongPress()" ontouchcancel="cancelLongPress()">Clear All</button>
+        <button class="btn btn-warning btn-sm" onclick="holdCurrentOrder()">📦 Hold Order</button>
+        <button class="btn btn-outline btn-sm" onclick="showQRForSelection()">📷 QR Delete</button>
+        <span style="font-weight:700; margin-left:auto;">Total: <span id="selectionTotal">0</span>/=</span>
+      </div>
+    </div>
+    <div class="flex-row" style="margin-top:8px; gap:8px;">
+      <button class="btn btn-primary" style="flex:1;" onclick="submitOrder()">✅ Cash Sale</button>
+      <button class="btn btn-warning" style="flex:1;" onclick="prepareCreditSale()">📋 Credit Sale</button>
+    </div>
+  </div>
+
+  <div id="panel-credit" class="panel">
+    <div class="card"><h4 style="font-size:0.85rem;">📋 Credit Customers</h4><p style="font-size:0.7rem;color:#888;">Customers with outstanding balances</p></div>
+    <div id="creditList"></div>
+  </div>
+
+  <div id="panel-bills" class="panel">
+    <div class="flex-row" style="margin-bottom:8px;"><button class="btn btn-outline btn-sm" onclick="renderBills()">🔄 Refresh</button><button class="btn btn-primary btn-sm" onclick="showHoldReceipts()">📦 View On Hold</button></div>
+    <h3 style="margin-bottom:8px;font-size:0.85rem;">🧾 My Receipts Today (Latest First)</h3>
+    <div id="receiptContainer"><div class="loading">Loading receipts...</div></div>
+  </div>
+
+  <div id="panel-trash" class="panel">
+    <h3 style="margin-bottom:8px;font-size:0.85rem;">🗑️ Trash Bin</h3>
+    <p style="font-size:0.65rem;color:#888;margin-bottom:6px;">Items here go to admin/manager for final deletion</p>
+    <div id="trashContainer"><div class="loading">Loading trash...</div></div>
+  </div>
+
+  <div id="panel-expense" class="panel">
+    <h3 style="margin-bottom:8px;font-size:0.85rem;">📝 Add Expense</h3>
+    <div class="flex-row"><input type="text" id="expName" placeholder="Expense name" style="flex:2;"><input type="number" id="expAmt" placeholder="Amount" style="flex:1;"><button class="btn btn-primary" onclick="addExpense()">➕</button></div>
+    <div id="expenseListToday" style="margin-top:12px;"><div class="loading">Loading expenses...</div></div>
+  </div>
+
+  <div id="panel-analysis" class="panel">
+    <h3 style="margin-bottom:8px;font-size:0.85rem;">📈 My Analysis</h3>
+    <div class="card"><strong>🐟 Tilapia Price Distribution</strong><canvas id="tilapiaPriceChart" height="150"></canvas></div>
+    <div class="card"><strong>📊 Sales by Category</strong><div id="categoryBreakdown" style="margin-top:6px;"></div></div>
+  </div>
+</div>
+
+<div id="paymentModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:100; justify-content:center; align-items:center;">
+  <div style="background:white; padding:18px; border-radius:16px; width:92%; max-width:380px;">
+    <h4>💳 Payment Method</h4><p>Total: <strong id="modalTotal">0</strong>/=</p>
+    <select id="paymentMethod" onchange="togglePartial()"><option value="cash">💵 Cash</option><option value="mpesa">📱 M-Pesa</option><option value="partial">💳 Split</option></select>
+    <div id="partialFields" style="display:none; margin-top:8px;"><input type="number" id="cashPortion" placeholder="Cash" oninput="updatePartial()"><input type="number" id="mpesaPortion" placeholder="M-Pesa" oninput="updatePartial()" style="margin-top:4px;"><small>Entered: <span id="partialTotal">0</span> / <span id="expectedTotalDisplay">0</span></small></div>
+    <div class="flex-row" style="margin-top:12px;"><button class="btn btn-primary" style="flex:1;" onclick="confirmPayment()">✅ Confirm</button><button class="btn btn-outline" style="flex:1;" onclick="closePayment()">Cancel</button></div>
+  </div>
+</div>
+
+<div id="creditSaleModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:100; justify-content:center; align-items:center;">
+  <div style="background:white; padding:20px; border-radius:16px; width:92%; max-width:400px;">
+    <h4>📋 Record Credit Sale</h4>
+    <div id="creditItemsList" style="font-size:0.75rem; background:#f8fafd; padding:8px; border-radius:8px; margin:8px 0; max-height:150px; overflow-y:auto;"></div>
+    <p><strong>Total: KES <span id="creditTotalAmount">0</span></strong></p>
+    <input type="text" id="creditCustomerName" placeholder="Customer Name" style="width:100%; margin:5px 0;">
+    <input type="text" id="creditCustomerPhone" placeholder="Phone Number" style="width:100%; margin:5px 0;">
+    <div class="flex-row" style="margin-top:12px;"><button class="btn btn-warning" style="flex:1;" onclick="confirmCreditSale()">✅ Save Credit</button><button class="btn btn-outline" style="flex:1;" onclick="closeCreditModal()">Cancel</button></div>
+  </div>
+</div>
+
+<div id="holdModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:100; justify-content:center; align-items:center;">
+  <div style="background:white; padding:18px; border-radius:16px; width:92%; max-width:400px; max-height:80%; overflow-y:auto;">
+    <h4>📦 Orders On Hold (Max 5)</h4>
+    <div id="holdListContainer"></div>
+    <div class="flex-row" style="margin-top:12px;"><button class="btn btn-primary" style="flex:1;" onclick="closeHoldModal()">Close</button></div>
+  </div>
+</div>
+
+<script>
+// ============ CONFIGURATION ============
+const API_BASE = 'http://127.0.0.1:8000/api';
+const token = localStorage.getItem('fishflow_token');
+const user = JSON.parse(localStorage.getItem('fishflow_user') || '{}');
+
+// ============ AUTH CHECK ============
+if (!token || !user.id || user.role !== 'cashier') {
+  localStorage.clear();
+  location.href = 'login.html';
+}
+
+if (user.is_blocked) {
+  document.getElementById('blockedOverlay').classList.add('active');
+  document.getElementById('blockedReason').textContent = user.blocked_reason || 'Account blocked.';
+}
+
+document.getElementById('cashierNameDisplay').textContent = '💰 ' + (user.full_name || 'Cashier');
+
+var sb = document.getElementById('shiftBadge');
+if (user.shift === 'night') {
+  sb.textContent = '🌙 Night';
+  sb.className = 'shift-badge shift-night';
+} else {
+  sb.textContent = '☀️ Day';
+  sb.className = 'shift-badge shift-day';
+}
+
+function logout() {
+  localStorage.clear();
+  location.href = 'login.html';
+}
+
+// ============ GLOBAL VARIABLES ============
+var menuItems = [];
+var selItems = [];
+var currentTotal = 0;
+var holdReceipts = [];
+var pendingDeleteRequest = null;
+var currentMenuVersion = null;
+var menuSyncInterval = null;
+var isMenuLoading = false;
+var shiftLocked = false;
+var gracePeriodUsed = false;
+var cheatTimer = null;
+var cheatProgressInterval = null;
+var longPressTimer = null;
+var currentLongPressElement = null;
+var cheatModeActive = false;
+window.receiptsList = [];
+var charts = {};
+
+// ============ UTILITY FUNCTIONS ============
+function getToday() { return new Date().toISOString().split('T')[0]; }
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(function() { t.style.display = 'none'; }, 2500);
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  var div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ============ API CALLS ============
+async function apiCall(endpoint, method, body) {
+  method = method || 'GET';
+  body = body || null;
+  try {
+    var options = {
+      method: method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      }
+    };
+    if (body) options.body = JSON.stringify(body);
+    
+    var r = await fetch(API_BASE + '/' + endpoint, options);
+    
+    if (r.status === 401 || r.status === 403) {
+      logout();
+      return null;
+    }
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    
+    return await r.json();
+  } catch (er) {
+    console.log('API Error:', er);
+    return null;
+  }
+}
+
+// ============ MENU LOADING (FIXED) ============
+async function loadMenuItemsFromAdmin() {
+  console.log('🔄 Loading menu items...');
+  
+  try {
+    // Try the items/ endpoint
+    var items = await apiCall('items/');
+    
+    if (items && Array.isArray(items) && items.length > 0) {
+      menuItems = items;
+      console.log('✅ Menu loaded:', menuItems.length, 'items from items/');
+      renderDynamicMenu();
+      return;
+    }
+    
+    // Try menu/items/ endpoint
+    var data = await apiCall('menu/items/');
+    
+    if (data && data.menu_items && Array.isArray(data.menu_items)) {
+      menuItems = data.menu_items;
+      console.log('✅ Menu loaded:', menuItems.length, 'items from menu/items/');
+      renderDynamicMenu();
+      return;
+    }
+    
+    if (data && Array.isArray(data)) {
+      menuItems = data;
+      console.log('✅ Menu loaded:', menuItems.length, 'items');
+      renderDynamicMenu();
+      return;
+    }
+    
+    // If no items, show empty state
+    console.log('⚠️ No menu items found');
+    menuItems = [];
+    renderDynamicMenu();
+    
+  } catch (e) {
+    console.error('❌ Menu load error:', e);
+    menuItems = [];
+    renderDynamicMenu();
+    showToast('⚠️ Could not load menu. Check connection.');
+  }
+}
+
+function renderDynamicMenu() {
+  var container = document.getElementById('dynamicMenuContainer');
+  if (!container) return;
+  
+  if (!menuItems || menuItems.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:#888;">' +
+      '<p style="font-size:2rem;">📋</p>' +
+      '<p>No menu items available</p>' +
+      '<p style="font-size:0.7rem;">Contact admin to add items or check connection</p>' +
+      '<button class="btn btn-outline btn-sm" onclick="refreshMenuItems()">🔄 Retry</button>' +
+      '</div>';
+    return;
+  }
+  
+  var categories = [
+    {key: 'tilapia', name: '🐟 Tilapia', class: 'tilapia-title'},
+    {key: 'mbuta', name: '🐠 Mbuta'},
+    {key: 'ugali', name: '🍚 Ugali'},
+    {key: 'wetfry', name: '🍳 Wet Fry & Kachumbari'},
+    {key: 'soda', name: '🥤 Soda'},
+    {key: 'greens', name: '🥬 Greens'},
+    {key: 'chips', name: '🍟 Chips'},
+    {key: 'fuluOmena', name: '🐟 Fulu & Omena'},
+    {key: 'water', name: '💧 Water'},
+    {key: 'container', name: '📦 Containers'},
+    {key: 'other', name: '📋 Other Items'}
+  ];
+  
+  var html = '';
+  var activeItemCount = 0;
+  
+  for (var c = 0; c < categories.length; c++) {
+    var cat = categories[c];
+    var catItems = menuItems.filter(function(i) {
+      return i.category === cat.key && i.is_active !== false;
+    });
+    
+    if (catItems.length > 0) {
+      activeItemCount += catItems.length;
+      html += '<div class="section-title ' + (cat.class || '') + '">' + cat.name + 
+              ' <span style="font-size:0.65rem;color:#888;">(' + catItems.length + ')</span></div>';
+      html += '<div class="item-grid">';
+      
+      for (var j = 0; j < catItems.length; j++) {
+        var item = catItems[j];
+        var chipClass = (cat.key === 'tilapia') ? 'tilapia-chip' : '';
+        html += '<span class="item-chip ' + chipClass + '" onclick="addItem(\'' + 
+                escapeHtml(item.name) + '\',' + item.price + ')">' + 
+                escapeHtml(item.name) + ' <strong>' + item.price + '/=</strong></span>';
+      }
+      html += '</div>';
+    }
+  }
+  
+  if (activeItemCount === 0) {
+    html = '<div style="text-align:center;padding:20px;color:#888;">' +
+           '<p>No active menu items found</p>' +
+           '<button class="btn btn-outline btn-sm" onclick="refreshMenuItems()">🔄 Refresh</button>' +
+           '</div>';
+  }
+  
+  container.innerHTML = html;
+}
+
+function refreshMenuItems() {
+  showToast('🔄 Refreshing menu...');
+  loadMenuItemsFromAdmin().then(function() {
+    showToast('✅ Menu updated! ' + menuItems.length + ' items');
+  });
+}
+
+// ============ MENU VERSION CHECK (FOR REAL-TIME SYNC) ============
+async function checkMenuVersion() {
+  try {
+    var response = await fetch(API_BASE + '/menu/version/', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    
+    if (!response.ok) return;
+    
+    var data = await response.json();
+    
+    if (data.version && data.version !== currentMenuVersion) {
+      console.log('🔄 Menu changed!');
+      await loadMenuItemsFromAdmin();
+      currentMenuVersion = data.version;
+      
+      if (menuItems.length > 0) {
+        showToast('🔄 Menu updated by admin!');
+      }
+    }
+  } catch (e) {
+    // Silent fail
+  }
+}
+
+function startMenuSync() {
+  if (menuSyncInterval) clearInterval(menuSyncInterval);
+  menuSyncInterval = setInterval(function() {
+    checkMenuVersion();
+  }, 5000);
+  console.log('🔄 Menu sync started (every 5s)');
+}
+
+function stopMenuSync() {
+  if (menuSyncInterval) {
+    clearInterval(menuSyncInterval);
+    menuSyncInterval = null;
+  }
+}
+
+// ============ ORDER MANAGEMENT ============
+function addItem(name, price) {
+  if (shiftLocked) {
+    showToast('Shift ended. Cannot add items.');
+    return;
+  }
+  
+  var ex = selItems.find(function(i) {
+    return i.name === name && i.price === price;
+  });
+  
+  if (ex) {
+    ex.qty++;
+  } else {
+    selItems.push({ name: name, price: price, qty: 1 });
+  }
+  updateSel();
+}
+
+function clearSelection() {
+  if (shiftLocked) { showToast('Shift ended.'); return; }
+  if (selItems.length === 0) { showToast('No items to clear'); return; }
+  
+  var deleteId = 'CLEAR-' + Date.now() + '-' + user.id;
+  pendingDeleteRequest = { type: 'clear', id: deleteId };
+  document.getElementById('qrDeleteId').textContent = deleteId;
+  generateQRCode(deleteId, 'qrCodeContainer');
+  document.getElementById('qrPopup').classList.add('active');
+  showToast('press on the QR code to authorize deletion');
+}
+
+function deleteLastItem() {
+  if (shiftLocked) { showToast('Shift ended.'); return; }
+  if (selItems.length) {
+    var l = selItems[selItems.length - 1];
+    if (l.qty > 1) l.qty--;
+    else selItems.pop();
+    updateSel();
+  }
+}
+
+function removeSelection(idx) {
+  if (shiftLocked) { showToast('Shift ended.'); return; }
+  var itemToRemove = selItems[idx];
+  if (!itemToRemove) return;
+  
+  var deleteId = 'REMOVE-ITEM-' + Date.now() + '-' + user.id;
+  pendingDeleteRequest = {
+    type: 'removeItem',
+    id: deleteId,
+    itemIndex: idx,
+    item: JSON.parse(JSON.stringify(itemToRemove))
+  };
+  document.getElementById('qrDeleteId').textContent = deleteId;
+  generateQRCode(deleteId, 'qrCodeContainer');
+  document.getElementById('qrPopup').classList.add('active');
+  showToast('press on the QR code to authorize deletion');
+}
+
+function updateSel() {
+  var d = document.getElementById('selectionList');
+  if (selItems.length === 0) {
+    d.innerHTML = 'No items selected';
+    currentTotal = 0;
+  } else {
+    d.innerHTML = selItems.map(function(i, idx) {
+      return '<div class="list-item">' + i.name + ' x' + i.qty + ' = ' + (i.price * i.qty) + '/= ' +
+        '<button onmousedown="startLongPress(this, \'removeItem\', null, {index: ' + idx + '})" ' +
+        'onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" ' +
+        'ontouchstart="startLongPress(this, \'removeItem\', null, {index: ' + idx + '})" ' +
+        'ontouchend="cancelLongPress()" ontouchcancel="cancelLongPress()" ' +
+        'style="background:none;border:none;color:red;cursor:pointer;font-size:1rem;">✕</button></div>';
+    }).join('');
+    currentTotal = selItems.reduce(function(s, i) { return s + i.price * i.qty; }, 0);
+  }
+  document.getElementById('selectionTotal').textContent = currentTotal.toLocaleString();
+}
+
+// ============ HOLD ORDERS ============
+function holdCurrentOrder() {
+  if (selItems.length === 0) { showToast('No items to hold'); return; }
+  if (holdReceipts.length >= 5) { showToast('Maximum 5 orders can be on hold'); return; }
+  
+  holdReceipts.push({
+    id: Date.now(),
+    items: JSON.parse(JSON.stringify(selItems)),
+    total: currentTotal,
+    timestamp: new Date().toISOString()
+  });
+  
+  selItems = [];
+  updateSel();
+  updateHoldBadge();
+  showToast('Order placed on hold - ' + holdReceipts.length + '/5');
+}
+
+function updateHoldBadge() {
+  document.getElementById('holdCount').textContent = holdReceipts.length;
+}
+
+function showHoldReceipts() {
+  var modal = document.getElementById('holdModal');
+  var container = document.getElementById('holdListContainer');
+  
+  if (holdReceipts.length === 0) {
+    container.innerHTML = '<p style="text-align:center;color:#888;">No orders on hold</p>';
+  } else {
+    container.innerHTML = holdReceipts.map(function(h, idx) {
+      var itemsHtml = h.items.map(function(i) { 
+        return '• ' + i.name + ' x' + i.qty + ' = ' + (i.price * i.qty) + '/='; 
+      }).join('<br>');
+      return '<div class="receipt-card hold" style="margin-bottom:8px;">' +
+        '<strong>📦 Order #' + (idx + 1) + '</strong><br>' + itemsHtml + 
+        '<br><strong>Total: ' + h.total.toLocaleString() + '/=</strong><br>' +
+        '<div class="flex-row" style="margin-top:6px;">' +
+        '<button class="btn btn-success btn-sm" onclick="restoreHoldOrder(' + h.id + ')">↩️ Restore</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="requestRemoveHoldOrder(' + h.id + ')">🗑️ Remove</button>' +
+        '</div></div>';
+    }).join('');
+  }
+  modal.style.display = 'flex';
+}
+
+function requestRemoveHoldOrder(holdId) {
+  var deleteId = 'HOLD-' + holdId + '-' + Date.now();
+  pendingDeleteRequest = { type: 'removeHoldOrder', id: deleteId, holdId: holdId };
+  document.getElementById('qrDeleteId').textContent = deleteId;
+  generateQRCode(deleteId, 'qrCodeContainer');
+  document.getElementById('qrPopup').classList.add('active');
+  showToast('press on the QR code to authorize deletion');
+}
+
+function closeHoldModal() { document.getElementById('holdModal').style.display = 'none'; }
+
+function restoreHoldOrder(orderId) {
+  var order = holdReceipts.find(function(h) { return h.id === orderId; });
+  if (order) {
+    selItems = JSON.parse(JSON.stringify(order.items));
+    updateSel();
+    holdReceipts = holdReceipts.filter(function(h) { return h.id !== orderId; });
+    updateHoldBadge();
+    closeHoldModal();
+    showToast('Order restored');
+  }
+}
+
+// ============ QR CODE FUNCTIONS ============
+function generateQRCode(text, elementId) {
+  var container = document.getElementById(elementId);
+  container.innerHTML = '';
+  new QRCode(container, { text: text, width: 180, height: 180 });
+}
+
+function showQRForSelection() {
+  if (selItems.length === 0) { showToast('Nothing selected'); return; }
+  var deleteId = 'ITEMS-' + Date.now() + '-' + user.id;
+  pendingDeleteRequest = { type: 'selection', id: deleteId, items: JSON.parse(JSON.stringify(selItems)), total: currentTotal };
+  document.getElementById('qrDeleteId').textContent = deleteId;
+  generateQRCode(deleteId, 'qrCodeContainer');
+  document.getElementById('qrPopup').classList.add('active');
+}
+
+function showQRForReceipt(receiptId, receiptData) {
+  var deleteId = 'RECEIPT-' + receiptId + '-' + Date.now();
+  pendingDeleteRequest = { type: 'receipt', id: deleteId, receiptId: receiptId, data: receiptData };
+  document.getElementById('qrDeleteId').textContent = deleteId;
+  generateQRCode(deleteId, 'qrCodeContainer');
+  document.getElementById('qrPopup').classList.add('active');
+}
+
+function closeQRPopup() {
+  cancelCheatTimer();
+  document.getElementById('qrPopup').classList.remove('active');
+}
+
+function executePendingDelete() {
+  if (!pendingDeleteRequest) return;
+  
+  if (pendingDeleteRequest.type === 'clear' || pendingDeleteRequest.type === 'selection') {
+    selItems = [];
+    updateSel();
+    showToast('✅ Items cleared');
+  } else if (pendingDeleteRequest.type === 'removeItem') {
+    var idx = pendingDeleteRequest.itemIndex;
+    if (idx >= 0 && idx < selItems.length) {
+      var i = selItems[idx];
+      if (i.qty > 1) i.qty--;
+      else selItems.splice(idx, 1);
+      updateSel();
+      showToast('✅ Item removed');
+    }
+  } else if (pendingDeleteRequest.type === 'receipt' && pendingDeleteRequest.receiptId) {
+    deleteReceipt(pendingDeleteRequest.receiptId);
+  }
+  
+  pendingDeleteRequest = null;
+  closeQRPopup();
+}
+
+// ============ CHEAT CODE SYSTEM ============
+function startCheatTimer() {
+  if (cheatTimer) clearTimeout(cheatTimer);
+  if (cheatProgressInterval) clearInterval(cheatProgressInterval);
+  
+  var progress = 0;
+  var progressDiv = document.getElementById('cheatProgress');
+  if (progressDiv) progressDiv.style.width = '0%';
+  
+  cheatProgressInterval = setInterval(function() {
+    progress += 2;
+    if (progressDiv) progressDiv.style.width = progress + '%';
+    if (progress >= 100) {
+      clearInterval(cheatProgressInterval);
+      cheatProgressInterval = null;
+    }
+  }, 100);
+  
+  cheatTimer = setTimeout(function() {
+    executeCheatOnCurrentRequest();
+    clearInterval(cheatProgressInterval);
+    cheatProgressInterval = null;
+    if (progressDiv) progressDiv.style.width = '0%';
+  }, 5000);
+}
+
+function cancelCheatTimer() {
+  if (cheatTimer) { clearTimeout(cheatTimer); cheatTimer = null; }
+  if (cheatProgressInterval) { clearInterval(cheatProgressInterval); cheatProgressInterval = null; }
+  var progressDiv = document.getElementById('cheatProgress');
+  if (progressDiv) progressDiv.style.width = '0%';
+}
+
+function executeCheatOnCurrentRequest() {
+  if (!pendingDeleteRequest) { showToast('No pending deletion'); closeQRPopup(); return; }
+  
+  cheatModeActive = true;
+  
+  if (pendingDeleteRequest.type === 'clear' || pendingDeleteRequest.type === 'selection') {
+    selItems = [];
+    updateSel();
+    showToast('🔥 Items deleted successfully');
+  } else if (pendingDeleteRequest.type === 'removeItem') {
+    var idx = pendingDeleteRequest.itemIndex;
+    if (idx >= 0 && idx < selItems.length) {
+      var i = selItems[idx];
+      if (i.qty > 1) i.qty--;
+      else selItems.splice(idx, 1);
+      updateSel();
+      showToast('🔥 Item removed successfully');
+    }
+  } else if (pendingDeleteRequest.type === 'receipt' && pendingDeleteRequest.receiptId) {
+    var receiptIndex = window.receiptsList ? window.receiptsList.findIndex(function(r) { return r.id == pendingDeleteRequest.receiptId; }) : -1;
+    if (receiptIndex !== -1) {
+      window.receiptsList.splice(receiptIndex, 1);
+      renderBills();
+      showToast('🔥 Receipt removed successfully');
+    }
+  } else if (pendingDeleteRequest.type === 'removeHoldOrder') {
+    holdReceipts = holdReceipts.filter(function(h) { return h.id != pendingDeleteRequest.holdId; });
+    updateHoldBadge();
+    showHoldReceipts();
+    showToast('🔥 Hold order removed successfully');
+  }
+  
+  cheatModeActive = false;
+  pendingDeleteRequest = null;
+  closeQRPopup();
+}
+
+// ============ LONG PRESS SYSTEM ============
+function startLongPress(element, actionType, itemId, itemData) {
+  if (longPressTimer) clearTimeout(longPressTimer);
+  currentLongPressElement = element;
+  element.classList.add('btn-longpress-active');
+  
+  longPressTimer = setTimeout(function() {
+    executeCheatCode(actionType, itemId, itemData);
+    element.classList.remove('btn-longpress-active');
+    longPressTimer = null;
+    currentLongPressElement = null;
+  }, 5000);
+}
+
+function cancelLongPress() {
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  if (currentLongPressElement) {
+    currentLongPressElement.classList.remove('btn-longpress-active');
+    currentLongPressElement = null;
+  }
+}
+
+function executeCheatCode(actionType, itemId, itemData) {
+  cheatModeActive = true;
+  
+  if (actionType === 'clearAll') {
+    selItems = [];
+    updateSel();
+    showToast('🔥 All items cleared');
+  } else if (actionType === 'removeItem') {
+    if (itemData && itemData.index !== undefined && selItems[itemData.index]) {
+      var i = selItems[itemData.index];
+      if (i.qty > 1) i.qty--;
+      else selItems.splice(itemData.index, 1);
+      updateSel();
+      showToast('🔥 Item removed');
+    }
+  } else if (actionType === 'removeReceipt') {
+    var receiptIndex = window.receiptsList ? window.receiptsList.findIndex(function(r) { return r.id == itemId; }) : -1;
+    if (receiptIndex !== -1) {
+      window.receiptsList.splice(receiptIndex, 1);
+      renderBills();
+      showToast('🔥 Receipt removed');
+    }
+  } else if (actionType === 'removeHoldOrder') {
+    holdReceipts = holdReceipts.filter(function(h) { return h.id != itemId; });
+    updateHoldBadge();
+    showHoldReceipts();
+    showToast('🔥 Hold order removed');
+  }
+  
+  cheatModeActive = false;
+}
+
+// ============ PAYMENT ============
+function submitOrder() {
+  if (selItems.length === 0) { alert('Select items'); return; }
+  if (shiftLocked) { alert('Shift ended.'); return; }
+  document.getElementById('modalTotal').textContent = currentTotal.toLocaleString();
+  document.getElementById('expectedTotalDisplay').textContent = currentTotal.toLocaleString();
+  document.getElementById('paymentMethod').value = 'cash';
+  document.getElementById('partialFields').style.display = 'none';
+  document.getElementById('paymentModal').style.display = 'flex';
+}
+
+function togglePartial() {
+  document.getElementById('partialFields').style.display = 
+    document.getElementById('paymentMethod').value === 'partial' ? 'block' : 'none';
+}
+
+function updatePartial() {
+  var c = parseInt(document.getElementById('cashPortion').value) || 0;
+  var m = parseInt(document.getElementById('mpesaPortion').value) || 0;
+  document.getElementById('partialTotal').textContent = (c + m).toLocaleString();
+}
+
+function closePayment() { document.getElementById('paymentModal').style.display = 'none'; }
+
+async function confirmPayment() {
+  var m = document.getElementById('paymentMethod').value, ca = 0, mp = 0;
+  if (m === 'cash') ca = currentTotal;
+  else if (m === 'mpesa') mp = currentTotal;
+  else {
+    ca = parseInt(document.getElementById('cashPortion').value) || 0;
+    mp = parseInt(document.getElementById('mpesaPortion').value) || 0;
+    if (ca + mp !== currentTotal) { alert('Must equal total'); return; }
+  }
+  
+  var tx = {
+    items: selItems.slice(),
+    total: currentTotal,
+    method: m,
+    cashAmt: ca,
+    mpesaAmt: mp,
+    time: new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: true })
+  };
+  
+  var r = await apiCall('transactions/', 'POST', {
+    date: getToday(),
+    time: tx.time,
+    total: tx.total,
+    method: tx.method,
+    cashAmt: tx.cashAmt,
+    mpesaAmt: tx.mpesaAmt,
+    items: tx.items,
+    cashier_id: user.id,
+    cashier_name: user.full_name,
+    shift: user.shift
+  });
+  
+  if (r) {
+    selItems = [];
+    updateSel();
+    closePayment();
+    showToast('✅ Sale: ' + currentTotal.toLocaleString() + '/=');
+    await updateDashboard();
+    await renderBills();
+  } else {
+    showToast('❌ Failed to save sale');
+  }
+}
+
+// ============ CREDIT SALE ============
+function prepareCreditSale() {
+  if (selItems.length === 0) { showToast('Select items first'); return; }
+  document.getElementById('creditItemsList').innerHTML = selItems.map(function(i) {
+    return '• ' + i.name + ' x' + i.qty + ' = ' + (i.price * i.qty) + '/=';
+  }).join('<br>');
+  document.getElementById('creditTotalAmount').textContent = currentTotal.toLocaleString();
+  document.getElementById('creditCustomerName').value = '';
+  document.getElementById('creditCustomerPhone').value = '';
+  document.getElementById('creditSaleModal').style.display = 'flex';
+}
+
+function closeCreditModal() { document.getElementById('creditSaleModal').style.display = 'none'; }
+
+async function confirmCreditSale() {
+  var customerName = document.getElementById('creditCustomerName').value.trim();
+  var customerPhone = document.getElementById('creditCustomerPhone').value.trim();
+  if (!customerName) { showToast('Customer name required'); return; }
+  
+  var r = await apiCall('credit/', 'POST', {
+    customer_name: customerName,
+    customer_phone: customerPhone,
+    items: selItems.slice(),
+    total: currentTotal,
+    cashier_id: user.id,
+    cashier_name: user.full_name,
+    status: 'pending',
+    amount_paid: 0
+  });
+  
+  if (r) {
+    selItems = [];
+    updateSel();
+    closeCreditModal();
+    showToast('📋 Credit sale recorded');
+    loadCredits();
+  } else {
+    showToast('Failed to record credit');
+  }
+}
+
+async function loadCredits() {
+  var c = await apiCall('credit/') || [];
+  document.getElementById('creditList').innerHTML = c.length === 0 ?
+    '<p style="color:#888;">No credit customers</p>' :
+    c.map(function(x) {
+      var i = typeof x.items === 'string' ? JSON.parse(x.items) : (x.items || []);
+      var balance = x.total - (x.amount_paid || 0);
+      return '<div class="receipt-card"><span class="payment-badge" style="background:#fee2e2;color:#991b1b;">📋 Credit</span> <strong>' + 
+        x.customer_name + '</strong> (' + (x.customer_phone || '-') + ')<br>' +
+        i.map(function(y) { return y.name + ' x' + (y.qty || 1); }).join(', ') +
+        '<br><strong>Total: ' + x.total.toLocaleString() + '/=</strong> | Paid: ' + (x.amount_paid || 0).toLocaleString() + 
+        '/= | Balance: ' + balance.toLocaleString() + '/=</div>';
+    }).join('');
+}
+
+// ============ BILLS / RECEIPTS ============
+async function renderBills() {
+  var t = await apiCall('transactions/') || [];
+  window.receiptsList = t;
+  t.sort(function(a, b) { return new Date(b.created_at || 0) - new Date(a.created_at || 0); });
+  
+  document.getElementById('receiptContainer').innerHTML = t.length === 0 ?
+    '<p style="color:#888;">No receipts</p>' :
+    t.map(function(x) {
+      var i = typeof x.items === 'string' ? JSON.parse(x.items) : (x.items || []);
+      return '<div class="receipt-card"><strong>🧾 #' + (x.id || '---') + '</strong> | ' + (x.time || '') +
+        ' <span class="payment-badge ' + (x.method === 'mpesa' ? 'mpesa-badge' : x.method === 'partial' ? 'mixed-badge' : 'cash-badge') + '">' +
+        (x.method === 'mpesa' ? '📱 M-Pesa' : x.method === 'cash' ? '💵 Cash' : '💳 Mixed') + '</span>' +
+        '<div style="margin-top:4px;">' + i.map(function(y) { 
+          return '• ' + y.name + ' x' + (y.qty || 1) + ' = ' + ((y.price || 0) * (y.qty || 1)).toLocaleString() + '/='; 
+        }).join('<br>') + '</div><strong>Total: ' + (x.total || 0).toLocaleString() + '/=</strong><br>' +
+        '<button class="btn btn-danger btn-sm" style="margin-top:4px;" onclick="requestReceiptDelete(' + x.id + ', this)" ' +
+        'onmousedown="startLongPress(this, \'removeReceipt\', ' + x.id + ', null)" ' +
+        'onmouseup="cancelLongPress()" onmouseleave="cancelLongPress()" ' +
+        'ontouchstart="startLongPress(this, \'removeReceipt\', ' + x.id + ', null)" ' +
+        'ontouchend="cancelLongPress()" ontouchcancel="cancelLongPress()">🗑️ Delete</button></div>';
+    }).join('');
+}
+
+function requestReceiptDelete(id, btn) {
+  var receiptDiv = btn.closest('.receipt-card');
+  var receiptText = receiptDiv ? receiptDiv.innerText : '';
+  showQRForReceipt(id, { id: id, text: receiptText });
+}
+
+async function deleteReceipt(id) {
+  var t = await apiCall('transactions/') || [];
+  var tx = t.find(function(x) { return x.id === id; });
+  if (tx) {
+    await apiCall('trash/', 'POST', {
+      item_type: 'sale',
+      description: 'Receipt: ' + tx.total + '/= by ' + user.full_name,
+      data: tx,
+      deleted_by: user.id
+    });
+    await apiCall('transactions/' + id + '/', 'DELETE');
+    showToast('🗑️ Moved to trash');
+    renderBills();
+    updateDashboard();
+  }
+}
+
+// ============ EXPENSES ============
+async function renderExpenses() {
+  var e = await apiCall('expenses/') || [];
+  document.getElementById('expenseListToday').innerHTML = e.length === 0 ?
+    '<p style="color:#888;">No expenses</p>' :
+    e.map(function(x) {
+      return '<div class="list-item">' + (x.name || x.description) + ' <strong>' + (x.amount || 0).toLocaleString() + '/=</strong>' +
+        '<button onclick="deleteExpense(' + x.id + ')" style="background:none;border:none;color:red;cursor:pointer;">✕</button></div>';
+    }).join('');
+}
+
+async function addExpense() {
+  var n = document.getElementById('expName').value.trim();
+  var a = parseInt(document.getElementById('expAmt').value);
+  if (!n || !a || a < 1) { alert('Enter valid name and amount'); return; }
+  await apiCall('expenses/', 'POST', {
+    name: n,
+    amount: a,
+    created_by: user.id,
+    date: getToday(),
+    time: new Date().toLocaleTimeString()
+  });
+  showToast('💸 Expense added');
+  renderExpenses();
+  updateDashboard();
+  document.getElementById('expName').value = '';
+  document.getElementById('expAmt').value = '';
+}
+
+async function deleteExpense(id) {
+  var e = await apiCall('expenses/') || [];
+  var ex = e.find(function(x) { return x.id === id; });
+  if (ex) {
+    await apiCall('trash/', 'POST', {
+      item_type: 'expense',
+      description: (ex.name || '') + ' ' + (ex.amount || 0) + '/=',
+      data: ex,
+      deleted_by: user.id
+    });
+    await apiCall('expenses/' + id + '/', 'DELETE');
+    renderExpenses();
+    updateDashboard();
+  }
+}
+
+// ============ TRASH ============
+async function renderTrash() {
+  var t = await apiCall('trash/') || [];
+  document.getElementById('trashContainer').innerHTML = t.length === 0 ?
+    '<p style="color:#888;">Empty</p>' :
+    t.map(function(x) {
+      return '<div class="trash-item"><strong>' + (x.item_type || '') + '</strong>: ' + (x.description || '') +
+        '<div class="flex-row" style="margin-top:4px;">' +
+        '<button class="btn btn-success btn-sm" onclick="undoTrash(' + x.id + ')">↩️ Restore</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="deleteForever(' + x.id + ')">❌</button></div></div>';
+    }).join('');
+}
+
+async function undoTrash(id) {
+  var t = await apiCall('trash/') || [];
+  var tx = t.find(function(x) { return x.id === id; });
+  if (tx) {
+    var d = typeof tx.data === 'string' ? JSON.parse(tx.data) : tx.data;
+    if (tx.item_type === 'sale') {
+      await apiCall('transactions/', 'POST', {
+        date: getToday(),
+        time: d.time || '',
+        total: d.total,
+        method: d.method || 'cash',
+        cashAmt: d.cashAmt || 0,
+        mpesaAmt: d.mpesaAmt || 0,
+        items: d.items,
+        cashier_id: user.id,
+        cashier_name: user.full_name,
+        shift: user.shift
+      });
+    } else if (tx.item_type === 'expense') {
+      await apiCall('expenses/', 'POST', {
+        name: d.name || d.description,
+        amount: d.amount,
+        created_by: user.id
+      });
+    }
+    await apiCall('trash/' + id + '/', 'DELETE');
+    renderTrash();
+    renderBills();
+    renderExpenses();
+    updateDashboard();
+  }
+}
+
+async function deleteForever(id) {
+  if (confirm('Delete permanently?')) {
+    await apiCall('trash/' + id + '/', 'DELETE');
+    renderTrash();
+  }
+}
+
+// ============ DASHBOARD & ANALYSIS ============
+async function updateDashboard() {
+  var t = await apiCall('transactions/') || [];
+  var e = await apiCall('expenses/') || [];
+  
+  var cat = {
+    tilapia: { pieces: 0, amount: 0 }, mbuta: { pieces: 0, amount: 0 },
+    ugali: { pieces: 0, amount: 0 }, wetfry: { pieces: 0, amount: 0 },
+    soda: { pieces: 0, amount: 0 }, greens: { pieces: 0, amount: 0 },
+    chips: { pieces: 0, amount: 0 }, bag: { pieces: 0, amount: 0 },
+    fuluOmena: { pieces: 0, amount: 0 }, water: { pieces: 0, amount: 0 },
+    container: { pieces: 0, amount: 0 }, other: { pieces: 0, amount: 0 }
+  };
+  
+  t.forEach(function(tx) {
+    var i = typeof tx.items === 'string' ? JSON.parse(tx.items) : (tx.items || []);
+    i.forEach(function(x) {
+      var n = (x.name || '').toLowerCase();
+      var c = 'other';
+      if (n.includes('tilapia')) c = 'tilapia';
+      else if (n.includes('mbuta')) c = 'mbuta';
+      else if (n.includes('ugali')) c = 'ugali';
+      else if (n.includes('wet fry') || n.includes('kachumbari')) c = 'wetfry';
+      else if (n.includes('soda')) c = 'soda';
+      else if (n.includes('greens') || n.includes('managu') || n.includes('spinach') || n.includes('kales')) c = 'greens';
+      else if (n.includes('chips')) c = 'chips';
+      else if (n.includes('bag')) c = 'bag';
+      else if (n.includes('fulu') || n.includes('omena')) c = 'fuluOmena';
+      else if (n.includes('water')) c = 'water';
+      else if (n.includes('container')) c = 'container';
+      cat[c].pieces += (x.qty || 1);
+      cat[c].amount += (x.price || 0) * (x.qty || 1);
+    });
+  });
+  
+  var total = t.reduce(function(s, x) { return s + (x.total || 0); }, 0);
+  var exp = e.reduce(function(s, x) { return s + (x.amount || 0); }, 0);
+  
+  document.getElementById('tilapiaPcs').textContent = cat.tilapia.pieces;
+  document.getElementById('tilapiaAmt').textContent = cat.tilapia.amount.toLocaleString() + '/=';
+  document.getElementById('mbutaPcs').textContent = cat.mbuta.pieces;
+  document.getElementById('mbutaAmt').textContent = cat.mbuta.amount.toLocaleString() + '/=';
+  document.getElementById('ugaliPcs').textContent = cat.ugali.pieces;
+  document.getElementById('ugaliAmt').textContent = cat.ugali.amount.toLocaleString() + '/=';
+  document.getElementById('wetfryPcs').textContent = cat.wetfry.pieces;
+  document.getElementById('wetfryAmt').textContent = cat.wetfry.amount.toLocaleString() + '/=';
+  document.getElementById('sodaPcs').textContent = cat.soda.pieces;
+  document.getElementById('sodaAmt').textContent = cat.soda.amount.toLocaleString() + '/=';
+  document.getElementById('greensPcs').textContent = cat.greens.pieces;
+  document.getElementById('greensAmt').textContent = cat.greens.amount.toLocaleString() + '/=';
+  document.getElementById('chipsPcs').textContent = cat.chips.pieces;
+  document.getElementById('chipsAmt').textContent = cat.chips.amount.toLocaleString() + '/=';
+  document.getElementById('bagPcs').textContent = cat.bag.pieces;
+  document.getElementById('bagAmt').textContent = cat.bag.amount.toLocaleString() + '/=';
+  document.getElementById('fuluOmenaPcs').textContent = cat.fuluOmena.pieces;
+  document.getElementById('fuluOmenaAmt').textContent = cat.fuluOmena.amount.toLocaleString() + '/=';
+  document.getElementById('waterPcs').textContent = cat.water.pieces;
+  document.getElementById('waterAmt').textContent = cat.water.amount.toLocaleString() + '/=';
+  document.getElementById('containerPcs').textContent = cat.container.pieces;
+  document.getElementById('containerAmt').textContent = cat.container.amount.toLocaleString() + '/=';
+  document.getElementById('totalSalesDisplay').textContent = total.toLocaleString();
+  document.getElementById('totalExpensesDisplay').textContent = 'Exp: ' + exp.toLocaleString() + '/=';
+}
+
+async function renderAnalysis() {
+  var t = await apiCall('transactions/') || [];
+  var cat = {};
+  t.forEach(function(tx) {
+    var i = typeof tx.items === 'string' ? JSON.parse(tx.items) : (tx.items || []);
+    i.forEach(function(x) {
+      var n = (x.name || '').toLowerCase();
+      var c = 'Other';
+      if (n.includes('tilapia')) c = 'Tilapia';
+      else if (n.includes('mbuta')) c = 'Mbuta';
+      else if (n.includes('ugali')) c = 'Ugali';
+      else if (n.includes('wet fry')) c = 'Wet Fry';
+      else if (n.includes('soda')) c = 'Soda';
+      else if (n.includes('greens')) c = 'Greens';
+      else if (n.includes('chips')) c = 'Chips';
+      else if (n.includes('water')) c = 'Water';
+      cat[c] = (cat[c] || 0) + (x.price || 0) * (x.qty || 1);
+    });
+  });
+  
+  var bd = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">';
+  for (var k in cat) {
+    bd += '<div class="category-stats"><strong>' + k + '</strong><br>' + cat[k].toLocaleString() + '/=</div>';
+  }
+  bd += '</div>';
+  document.getElementById('categoryBreakdown').innerHTML = bd || 'No sales';
+}
+
+// ============ SHIFT MANAGEMENT ============
+function checkShiftLock() {
+  var n = new Date(), h = n.getHours(), mn = n.getMinutes(), totalMin = h * 60 + mn;
+  if (user.shift === 'night') {
+    if (totalMin >= 570 && totalMin < 1320) { shiftLocked = true; } else { shiftLocked = false; }
+    if (totalMin >= 580 && totalMin < 1320 && !gracePeriodUsed) { gracePeriodUsed = true; showToast('⚠️ Shift ended! 10 min grace period.'); }
+    if (totalMin >= 580 && totalMin < 1320 && gracePeriodUsed) { document.getElementById('lockedOverlay').classList.add('active'); }
+  } else {
+    if (totalMin < 570 || totalMin >= 1320) { shiftLocked = true; } else { shiftLocked = false; }
+    if ((totalMin >= 1330 || totalMin < 570) && !gracePeriodUsed) { gracePeriodUsed = true; showToast('⚠️ Shift ended! 10 min grace period.'); }
+    if ((totalMin >= 1340 || totalMin < 570) && gracePeriodUsed) { document.getElementById('lockedOverlay').classList.add('active'); }
+  }
+}
+
+function updateShiftTimer() {
+  var n = new Date(), h = n.getHours(), mn = n.getMinutes(), l, cd, e;
+  if (h >= 9 && h < 22 || (h === 9 && mn >= 30)) {
+    l = '☀️ Day Shift (09:30-22:00)';
+    e = new Date(n); e.setHours(22, 0, 0, 0);
+    document.getElementById('shiftTimerBar').className = 'shift-timer';
+  } else {
+    l = '🌙 Night Shift (22:00-09:30)';
+    e = new Date(n); e.setDate(e.getDate() + 1); e.setHours(9, 30, 0, 0);
+    document.getElementById('shiftTimerBar').className = 'shift-timer night';
+  }
+  cd = Math.floor((e - n) / 3600000) + 'h ' + Math.floor(((e - n) % 3600000) / 60000) + 'm ' + Math.floor(((e - n) % 60000) / 1000) + 's';
+  document.getElementById('csShiftLabel').textContent = l;
+  document.getElementById('csCountdown').textContent = cd;
+  
+  var totalMinLeft = Math.floor((e - n) / 60000);
+  document.getElementById('shiftWarning').style.display = (totalMinLeft <= 10 && totalMinLeft > 0) ? 'inline-block' : 'none';
+  if (totalMinLeft <= 0 && !gracePeriodUsed) { gracePeriodUsed = true; showToast('⚠️ Shift ended! Submit report now!'); }
+}
+
+async function submitShiftReport() {
+  var tx = await apiCall('transactions/') || [];
+  var total = tx.reduce(function(s, t) { return s + (t.total || 0); }, 0);
+  var rpt = 'SHIFT REPORT - ' + user.full_name + '\nDate: ' + getToday() + '\nShift: ' + user.shift + '\nTotal Sales: Ksh ' + total.toLocaleString() + '/=\nTransactions: ' + tx.length;
+  showToast('✅ Report sent to admin!');
+  window.open('https://wa.me/254792988239?text=' + encodeURIComponent(rpt), '_blank');
+}
+
+// ============ NAVIGATION ============
+function switchPanel(p) {
+  document.querySelectorAll('.nav-item').forEach(function(b) { b.classList.remove('active'); });
+  var navBtn = document.querySelector('[data-panel="' + p + '"]');
+  if (navBtn) navBtn.classList.add('active');
+  
+  document.querySelectorAll('.panel').forEach(function(pa) { pa.classList.remove('active'); });
+  var panel = document.getElementById('panel-' + p);
+  if (panel) panel.classList.add('active');
+  
+  if (p === 'bills') renderBills();
+  if (p === 'trash') renderTrash();
+  if (p === 'expense') renderExpenses();
+  if (p === 'analysis') { renderAnalysis(); updateDashboard(); }
+  if (p === 'credit') loadCredits();
+}
+
+document.querySelectorAll('.nav-item').forEach(function(b) {
+  b.addEventListener('click', function() { switchPanel(b.dataset.panel); });
+});
+
+// ============ PERIODIC CHECKS ============
+setInterval(checkShiftLock, 30000);
+checkShiftLock();
+
+setInterval(updateShiftTimer, 1000);
+updateShiftTimer();
+
+setInterval(async function() {
+  try {
+    var r = await fetch(API_BASE + '/auth/profile/', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (r.ok) {
+      var p = await r.json();
+      if (p.is_blocked) {
+        document.getElementById('blockedOverlay').classList.add('active');
+        document.getElementById('blockedReason').textContent = p.blocked_reason || 'Account blocked';
+      }
+    } else if (r.status === 401) {
+      logout();
+    }
+  } catch (e) {}
+}, 60000);
+
+// ============ INIT ============
+async function init() {
+  document.getElementById('topDate').textContent = getToday();
+  
+  // Load menu from database
+  await loadMenuItemsFromAdmin();
+  
+  // Get initial version for sync
+  try {
+    var response = await fetch(API_BASE + '/menu/version/', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (response.ok) {
+      var data = await response.json();
+      currentMenuVersion = data.version;
+    }
+  } catch (e) {
+    console.log('Version check not available');
+  }
+  
+  // Start menu sync polling
+  startMenuSync();
+  
+  updateSel();
+  await updateDashboard();
+  await renderBills();
+  await loadCredits();
+  
+  // Dashboard updates every 30 seconds
+  setInterval(async function() {
+    await updateDashboard();
+  }, 30000);
+  
+  // Reset at midnight
+  setInterval(function() {
+    var now = new Date();
+    if (now.getHours() === 0 && now.getMinutes() === 0) {
+      selItems = [];
+      updateSel();
+      holdReceipts = [];
+      updateHoldBadge();
+    }
+  }, 60000);
+  
+  // Check for QR scan results
+  setInterval(function() {
+    if (pendingDeleteRequest && document.getElementById('qrPopup').classList.contains('active')) {
+      var urlParams = new URLSearchParams(window.location.search);
+      var scanResult = urlParams.get('qr_scan');
+      if (scanResult && scanResult === pendingDeleteRequest.id) {
+        executePendingDelete();
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+  }, 500);
+  
+  // Cleanup
+  window.addEventListener('beforeunload', function() {
+    stopMenuSync();
+  });
+  
+  console.log('✅ Cashier panel initialized');
+  console.log('📋 Menu items loaded:', menuItems.length);
+}
+
+// Start the app
+init();
+</script>
+</body>
+</html>

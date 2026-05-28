@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bamburi Tilapia Fish Hotel • Login</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐟</text></svg>">
+    <style>
+        :root {
+            --primary: #0b3954;
+            --primary-dark: #061e2d;
+            --gold: #d4a853;
+            --gold-light: #f0d78c;
+            --danger: #dc3545;
+            --success: #10b981;
+            --bg: #0a1628;
+            --white: #ffffff;
+            --gray: #64748b;
+            --light-gray: #f1f5f9;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #061e2d 0%, #0b3954 40%, #0a2640 70%, #061e2d 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* Animated background particles */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .particle {
+            position: absolute;
+            background: rgba(212, 168, 83, 0.15);
+            border-radius: 50%;
+            animation: floatUp 8s infinite ease-in;
+        }
+        
+        @keyframes floatUp {
+            0% {
+                transform: translateY(100vh) scale(0);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-10vh) scale(1);
+                opacity: 0;
+            }
+        }
+        
+        /* Water ripple effect */
+        body::before {
+            content: '';
+            position: absolute;
+            bottom: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: 
+                radial-gradient(ellipse at 30% 70%, rgba(11, 57, 84, 0.4) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 80%, rgba(212, 168, 83, 0.2) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 60%, rgba(255, 255, 255, 0.05) 0%, transparent 40%);
+            animation: waterMove 15s ease-in-out infinite;
+            z-index: 0;
+        }
+        
+        @keyframes waterMove {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            33% { transform: translateY(-20px) rotate(2deg); }
+            66% { transform: translateY(10px) rotate(-2deg); }
+        }
+        
+        /* Grid overlay */
+        body::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            z-index: 0;
+        }
+        
+        .login-wrapper {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 480px;
+            padding: 20px;
+        }
+        
+        .login-card {
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(30px);
+            border-radius: 28px;
+            padding: 45px 40px;
+            box-shadow: 
+                0 30px 100px rgba(0, 0, 0, 0.5),
+                0 0 0 1px rgba(255, 255, 255, 0.1),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* Gold accent line at top */
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 20%;
+            right: 20%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--gold), var(--gold-light), var(--gold), transparent);
+            border-radius: 0 0 3px 3px;
+        }
+        
+        /* Logo section */
+        .logo-section {
+            text-align: center;
+            margin-bottom: 8px;
+        }
+        
+        .logo-container {
+            display: inline-block;
+            position: relative;
+            margin-bottom: 10px;
+        }
+        
+        .logo-circle {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), #0d4f75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 
+                0 10px 30px rgba(11, 57, 84, 0.3),
+                0 0 0 6px rgba(212, 168, 83, 0.2),
+                0 0 0 12px rgba(212, 168, 83, 0.1);
+            animation: logoPulse 3s ease-in-out infinite;
+            position: relative;
+        }
+        
+        @keyframes logoPulse {
+            0%, 100% { box-shadow: 0 10px 30px rgba(11, 57, 84, 0.3), 0 0 0 6px rgba(212, 168, 83, 0.2), 0 0 0 12px rgba(212, 168, 83, 0.1); }
+            50% { box-shadow: 0 15px 40px rgba(11, 57, 84, 0.4), 0 0 0 10px rgba(212, 168, 83, 0.3), 0 0 0 18px rgba(212, 168, 83, 0.15); }
+        }
+        
+        .logo-icon {
+            font-size: 2.8rem;
+            animation: fishSwim 2s ease-in-out infinite;
+        }
+        
+        @keyframes fishSwim {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(3px); }
+        }
+        
+        .logo-badge {
+            position: absolute;
+            bottom: -5px;
+            right: -5px;
+            background: var(--gold);
+            color: var(--primary-dark);
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 700;
+            box-shadow: 0 3px 10px rgba(212, 168, 83, 0.5);
+        }
+        
+        .hotel-name {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--primary);
+            margin-top: 5px;
+            letter-spacing: -0.3px;
+        }
+        
+        .hotel-name .gold {
+            color: var(--gold);
+        }
+        
+        .system-name {
+            font-size: 0.8rem;
+            color: var(--gray);
+            font-weight: 500;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        
+        .tagline {
+            font-size: 0.82rem;
+            color: #888;
+            margin-bottom: 28px;
+            font-style: italic;
+        }
+        
+        /* Role selector */
+        .role-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            background: var(--light-gray);
+            border-radius: 16px;
+            padding: 6px;
+        }
+        
+        .role-option {
+            flex: 1;
+            padding: 14px 12px;
+            text-align: center;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: none;
+            background: transparent;
+            color: #888;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .role-option::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .role-option:active::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        .role-option.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transform: scale(1.02);
+        }
+        
+        .role-option:hover:not(.active) {
+            color: var(--primary);
+            background: rgba(255, 255, 255, 0.5);
+        }
+        
+        .role-icon {
+            font-size: 1.5rem;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .role-label {
+            font-size: 0.75rem;
+            color: inherit;
+        }
+        
+        /* Form */
+        .form-group {
+            margin-bottom: 18px;
+            position: relative;
+        }
+        
+        .form-group label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #444;
+            margin-bottom: 7px;
+            letter-spacing: 0.3px;
+        }
+        
+        .input-wrapper {
+            position: relative;
+        }
+        
+        .input-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.1rem;
+            color: #aaa;
+            transition: color 0.3s;
+            z-index: 2;
+            pointer-events: none;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 14px 15px 14px 42px;
+            border: 2px solid #e2e8f0;
+            border-radius: 14px;
+            font-size: 0.95rem;
+            transition: all 0.3s;
+            background: #f8fafd;
+            color: #333;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(11, 57, 84, 0.08);
+            background: white;
+        }
+        
+        .form-group input:focus ~ .input-icon,
+        .form-group input:focus + .input-icon {
+            color: var(--primary);
+        }
+        
+        /* Show password toggle */
+        .toggle-password {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            color: #aaa;
+            padding: 5px;
+            z-index: 2;
+        }
+        
+        .toggle-password:hover {
+            color: var(--primary);
+        }
+        
+        /* Login button */
+        .btn-login {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, var(--primary) 0%, #0d4f75 50%, var(--primary-dark) 100%);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-top: 10px;
+            letter-spacing: 0.5px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-login::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .btn-login:hover::before {
+            left: 100%;
+        }
+        
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 40px rgba(11, 57, 84, 0.4);
+        }
+        
+        .btn-login:active {
+            transform: translateY(0);
+        }
+        
+        .btn-login:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-login .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-right: 8px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .btn-login.loading .spinner {
+            display: inline-block;
+        }
+        
+        .btn-login.loading .btn-text {
+            display: inline;
+        }
+        
+        /* Messages */
+        .message-box {
+            text-align: center;
+            padding: 14px;
+            border-radius: 12px;
+            margin-top: 15px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: none;
+            animation: slideDown 0.3s ease;
+        }
+        
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .error-msg {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+        
+        .success-msg {
+            background: #f0fdf4;
+            color: #16a34a;
+            border: 1px solid #bbf7d0;
+        }
+        
+        /* Footer */
+        .footer-section {
+            text-align: center;
+            margin-top: 22px;
+            padding-top: 18px;
+            border-top: 1px solid #eee;
+        }
+        
+        .footer-links {
+            font-size: 0.85rem;
+            color: #666;
+        }
+        
+        .footer-links a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s;
+        }
+        
+        .footer-links a:hover {
+            color: var(--gold);
+            text-decoration: underline;
+        }
+        
+        .footer-info {
+            margin-top: 10px;
+            font-size: 0.7rem;
+            color: #aaa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+        
+        .footer-info span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 500px) {
+            .login-card {
+                padding: 30px 22px;
+                border-radius: 22px;
+            }
+            .logo-circle {
+                width: 70px;
+                height: 70px;
+            }
+            .logo-icon {
+                font-size: 2.2rem;
+            }
+            .hotel-name {
+                font-size: 1.2rem;
+            }
+            .role-option {
+                padding: 10px 8px;
+                font-size: 0.78rem;
+            }
+            .form-group input {
+                padding: 12px 12px 12px 38px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Animated particles -->
+    <div class="particles" id="particles"></div>
+    
+    <div class="login-wrapper">
+        <div class="login-card">
+            <!-- Logo Section -->
+            <div class="logo-section">
+                <div class="logo-container">
+                    <div class="logo-circle">
+                        <span class="logo-icon">🐟</span>
+                    </div>
+                    <div class="logo-badge">B</div>
+                </div>
+                <div class="system-name">FishFlow Pro</div>
+                <h1 class="hotel-name">
+                    Bamburi <span class="gold">Tilapia</span> Fish Hotel
+                </h1>
+                <p class="tagline">🍽️ Fresh from the waters, served with excellence</p>
+            </div>
+            
+            <!-- Role Selector (Admin & Cashier only) -->
+            <div class="role-selector" id="roleSelector">
+                <button class="role-option active" data-role="cashier" onclick="selectRole('cashier', this)">
+                    <span class="role-icon">💰</span>
+                    <span class="role-label">Cashier</span>
+                </button>
+                <button class="role-option" data-role="admin" onclick="selectRole('admin', this)">
+                    <span class="role-icon">👑</span>
+                    <span class="role-label">Admin</span>
+                </button>
+            </div>
+            
+            <!-- Login Form -->
+            <div class="form-group">
+                <label>📧 Email Address</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">✉️</span>
+                    <input type="email" id="email" placeholder="Enter your email address" autocomplete="email">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>🔒 Password</label>
+                <div class="input-wrapper">
+                    <span class="input-icon">🔑</span>
+                    <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password">
+                    <button class="toggle-password" onclick="togglePassword()" title="Show/Hide Password">👁️</button>
+                </div>
+            </div>
+            
+            <button class="btn-login" id="loginBtn" onclick="handleLogin()">
+                <span class="spinner"></span>
+                <span class="btn-text">🔐 Sign In to Dashboard</span>
+            </button>
+            
+            <div class="message-box error-msg" id="errorMsg"></div>
+            <div class="message-box success-msg" id="successMsg"></div>
+            
+            <!-- Footer -->
+            <div class="footer-section">
+                <div class="footer-links">
+                    <p>Need access? <a href="#">Contact Administrator</a></p>
+                </div>
+                <div class="footer-info">
+                    <span>🔒 Secure Login</span>
+                    <span>•</span>
+                    <span>🏨 Bamburi Tilapia</span>
+                    <span>•</span>
+                    <span>v2.0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============ CONFIGURATION ============
+        const API = 'http://127.0.0.1:8000/api';
+        let selectedRole = 'cashier';
+        
+        // ============ CREATE PARTICLES ============
+        function createParticles() {
+            const container = document.getElementById('particles');
+            const particleCount = 30;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                
+                const size = Math.random() * 4 + 2;
+                const left = Math.random() * 100;
+                const delay = Math.random() * 8;
+                const duration = Math.random() * 8 + 8;
+                
+                particle.style.cssText = `
+                    width: ${size}px;
+                    height: ${size}px;
+                    left: ${left}%;
+                    animation-delay: ${delay}s;
+                    animation-duration: ${duration}s;
+                `;
+                
+                container.appendChild(particle);
+            }
+        }
+        
+        // ============ ROLE SELECTION ============
+        function selectRole(role, element) {
+            selectedRole = role;
+            document.querySelectorAll('.role-option').forEach(btn => btn.classList.remove('active'));
+            element.classList.add('active');
+            
+            // Subtle animation on selection
+            element.style.transform = 'scale(0.95)';
+            setTimeout(() => { element.style.transform = 'scale(1.02)'; }, 150);
+        }
+        
+        // ============ TOGGLE PASSWORD ============
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const toggleBtn = document.querySelector('.toggle-password');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleBtn.textContent = '🙈';
+            } else {
+                passwordInput.type = 'password';
+                toggleBtn.textContent = '👁️';
+            }
+        }
+        
+        // ============ HANDLE LOGIN ============
+        async function handleLogin() {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('errorMsg');
+            const successDiv = document.getElementById('successMsg');
+            const btn = document.getElementById('loginBtn');
+            
+            // Hide messages
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+            
+            // Validate
+            if (!email) {
+                showError('Please enter your email address');
+                document.getElementById('email').focus();
+                return;
+            }
+            if (!password) {
+                showError('Please enter your password');
+                document.getElementById('password').focus();
+                return;
+            }
+            if (password.length < 6) {
+                showError('Password must be at least 6 characters');
+                return;
+            }
+            
+            // Show loading
+            btn.classList.add('loading');
+            btn.querySelector('.btn-text').textContent = 'Authenticating...';
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch(`${API}/auth/login/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        email, 
+                        password, 
+                        role: selectedRole 
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.access_token) {
+                    // Store tokens
+                    localStorage.setItem('fishflow_token', data.access_token);
+                    if (data.refresh_token) {
+                        localStorage.setItem('fishflow_refresh', data.refresh_token);
+                    }
+                    
+                    // Fetch user profile
+                    let profile = data.user || {};
+                    
+                    if (!profile.role) {
+                        try {
+                            const profileResponse = await fetch(`${API}/auth/profile/`, {
+                                headers: { 'Authorization': `Bearer ${data.access_token}` }
+                            });
+                            if (profileResponse.ok) {
+                                profile = await profileResponse.json();
+                            }
+                        } catch (e) {
+                            console.log('Profile fetch failed, using login data');
+                        }
+                    }
+                    
+                    // Store user data
+                    localStorage.setItem('fishflow_user', JSON.stringify(profile));
+                    
+                    // Verify role
+                    const userRole = profile.role || data.user?.role || 'cashier';
+                    
+                    if (userRole !== selectedRole && userRole !== 'admin') {
+                        showError(`This account is registered as <strong>${userRole}</strong>. Please select the correct role.`);
+                        btn.classList.remove('loading');
+                        btn.querySelector('.btn-text').textContent = '🔐 Sign In to Dashboard';
+                        btn.disabled = false;
+                        return;
+                    }
+                    
+                    // Success!
+                    showSuccess(`Welcome back! Redirecting to ${userRole} dashboard...`);
+                    
+                    // Redirect based on role
+                    setTimeout(() => {
+                        if (userRole === 'admin') {
+                            window.location.href = 'admin.html';
+                        } else {
+                            window.location.href = 'cashier.html';
+                        }
+                    }, 1000);
+                    
+                } else {
+                    const errorMsg = data.error || data.message || 'Invalid email or password';
+                    showError(errorMsg);
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showError('Connection failed. Please check your internet connection and try again.');
+            } finally {
+                btn.classList.remove('loading');
+                btn.querySelector('.btn-text').textContent = '🔐 Sign In to Dashboard';
+                btn.disabled = false;
+            }
+        }
+        
+        // ============ UI HELPERS ============
+        function showError(msg) {
+            const div = document.getElementById('errorMsg');
+            div.innerHTML = '❌ ' + msg;
+            div.style.display = 'block';
+            div.style.animation = 'none';
+            div.offsetHeight; // Trigger reflow
+            div.style.animation = 'slideDown 0.3s ease';
+            
+            // Hide success
+            document.getElementById('successMsg').style.display = 'none';
+        }
+        
+        function showSuccess(msg) {
+            const div = document.getElementById('successMsg');
+            div.innerHTML = '✅ ' + msg;
+            div.style.display = 'block';
+            div.style.animation = 'none';
+            div.offsetHeight;
+            div.style.animation = 'slideDown 0.3s ease';
+            
+            // Hide error
+            document.getElementById('errorMsg').style.display = 'none';
+        }
+        
+        // ============ EVENT LISTENERS ============
+        // Enter key to submit
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleLogin();
+            }
+        });
+        
+        // Auto-focus email on load
+        window.addEventListener('load', function() {
+            document.getElementById('email').focus();
+            createParticles();
+        });
+        
+        // Check if already logged in
+        (function checkExistingSession() {
+            const token = localStorage.getItem('fishflow_token');
+            const user = JSON.parse(localStorage.getItem('fishflow_user') || '{}');
+            
+            if (token && user.role) {
+                // User is already logged in, redirect them
+                const redirect = user.role === 'admin' ? 'admin.html' : 'cashier.html';
+                
+                // Show a quick message
+                const successDiv = document.getElementById('successMsg');
+                successDiv.innerHTML = '✅ Already logged in. Redirecting...';
+                successDiv.style.display = 'block';
+                
+                setTimeout(() => {
+                    window.location.href = redirect;
+                }, 500);
+            }
+        })();
+    </script>
+</body>
+</html>

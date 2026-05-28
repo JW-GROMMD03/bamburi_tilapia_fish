@@ -1,0 +1,3006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FishFlow Pro • Enterprise Dashboard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Inter,Segoe UI,sans-serif;
+}
+
+:root{
+--bg:#f4f7fb;
+--card:#fff;
+--sidebar:#0f172a;
+--primary:#0f172a;
+--accent:#f59e0b;
+--success:#10b981;
+--danger:#ef4444;
+--warning:#f59e0b;
+--text:#111827;
+--muted:#64748b;
+--border:#e5e7eb;
+--shadow:0 10px 30px rgba(0,0,0,.08);
+--radius:20px;
+}
+
+body{
+background:var(--bg);
+overflow:hidden;
+display:flex;
+height:100vh;
+color:var(--text);
+}
+
+/* LOGIN CONTAINER */
+.login-container{
+position:fixed;
+top:0;
+left:0;
+right:0;
+bottom:0;
+background:linear-gradient(135deg,#0f172a,#1e293b);
+display:flex;
+align-items:center;
+justify-content:center;
+z-index:2000;
+}
+
+.login-box{
+background:white;
+padding:40px;
+border-radius:24px;
+width:380px;
+text-align:center;
+}
+
+.login-box h2{
+margin-bottom:20px;
+color:var(--primary);
+}
+
+.login-box input{
+width:100%;
+padding:12px;
+margin:10px 0;
+border-radius:10px;
+border:1px solid #ccc;
+}
+
+.login-box button{
+width:100%;
+padding:12px;
+margin-top:20px;
+background:var(--primary);
+color:white;
+border:none;
+border-radius:10px;
+cursor:pointer;
+font-weight:bold;
+}
+
+/* SIDEBAR */
+.sidebar{
+position:fixed;
+top:0;
+left:-280px;
+width:270px;
+height:100%;
+background:var(--sidebar);
+color:white;
+padding:20px;
+transition:.3s;
+z-index:999;
+overflow-y:auto;
+}
+
+.sidebar.active{
+left:0;
+}
+
+.logo{
+font-size:25px;
+font-weight:800;
+color:var(--accent);
+margin-bottom:25px;
+}
+
+.nav-btn{
+width:100%;
+border:none;
+background:none;
+color:white;
+padding:15px;
+margin-bottom:10px;
+border-radius:14px;
+text-align:left;
+cursor:pointer;
+transition:.3s;
+font-size:15px;
+}
+
+.nav-btn:hover,
+.nav-btn.active{
+background:rgba(255,255,255,.1);
+}
+
+/* OVERLAY */
+.overlay{
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.4);
+display:none;
+z-index:998;
+}
+
+.overlay.active{
+display:block;
+}
+
+/* MAIN */
+.main{
+flex:1;
+display:flex;
+flex-direction:column;
+width:100%;
+overflow:hidden;
+}
+
+.topbar{
+height:75px;
+background:white;
+display:flex;
+align-items:center;
+justify-content:space-between;
+padding:0 25px;
+box-shadow:0 2px 10px rgba(0,0,0,.05);
+z-index:100;
+}
+
+.left-top{
+display:flex;
+align-items:center;
+gap:15px;
+}
+
+.menu-btn{
+width:45px;
+height:45px;
+border:none;
+border-radius:12px;
+background:var(--primary);
+color:white;
+font-size:20px;
+cursor:pointer;
+}
+
+.user-box{
+display:flex;
+align-items:center;
+gap:12px;
+}
+
+.avatar{
+width:45px;
+height:45px;
+border-radius:50%;
+background:var(--primary);
+display:flex;
+align-items:center;
+justify-content:center;
+color:white;
+font-weight:bold;
+}
+
+/* Profile Styles */
+#profileAvatar {
+  cursor: pointer;
+  transition: transform 0.3s;
+}
+
+#profileAvatar:hover {
+  transform: scale(1.05);
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.form-control {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+  transition: all 0.3s;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.1);
+}
+
+.content{
+flex:1;
+overflow-y:auto;
+padding:25px;
+}
+
+/* CARDS */
+.cards{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+gap:20px;
+margin-bottom:25px;
+}
+
+.card{
+background:white;
+padding:25px;
+border-radius:var(--radius);
+box-shadow:var(--shadow);
+transition:.3s;
+cursor:pointer;
+}
+
+.card:hover{
+transform:translateY(-4px);
+}
+
+.card h3{
+font-size:14px;
+color:var(--muted);
+margin-bottom:10px;
+}
+
+.card p{
+font-size:32px;
+font-weight:800;
+}
+
+/* PANELS */
+.panel{
+display:none;
+animation:fade .3s ease;
+}
+
+.panel.active{
+display:block;
+}
+
+@keyframes fade{
+from{
+opacity:0;
+transform:translateY(10px);
+}
+to{
+opacity:1;
+transform:translateY(0);
+}
+}
+
+/* BUTTONS */
+.btn{
+padding:12px 18px;
+border:none;
+border-radius:12px;
+cursor:pointer;
+font-weight:700;
+background:var(--primary);
+color:white;
+margin-bottom:20px;
+}
+
+.btn:hover{
+opacity:.9;
+}
+
+.btn-sm{
+padding:6px 12px;
+font-size:12px;
+margin:0 3px;
+background:var(--primary);
+color:white;
+border:none;
+border-radius:8px;
+cursor:pointer;
+}
+
+.btn-sm:hover{
+opacity:.8;
+}
+
+.btn-approve{
+background:#10b981;
+}
+
+.btn-reject{
+background:#ef4444;
+}
+
+.btn-block{
+background:#f59e0b;
+color:#111827;
+}
+
+.btn-unblock{
+background:#3b82f6;
+}
+
+.btn-reset{
+background:#8b5cf6;
+}
+
+/* TABLE */
+.table-wrapper{
+background:white;
+border-radius:var(--radius);
+overflow:auto;
+box-shadow:var(--shadow);
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+min-width:800px;
+}
+
+th{
+background:var(--primary);
+color:white;
+padding:16px;
+text-align:left;
+}
+
+td{
+padding:16px;
+border-bottom:1px solid var(--border);
+}
+
+/* BADGES */
+.badge{
+padding:5px 12px;
+border-radius:30px;
+font-size:12px;
+font-weight:700;
+display:inline-block;
+}
+
+.success{
+background:#dcfce7;
+color:#166534;
+}
+
+.warning{
+background:#fef3c7;
+color:#92400e;
+}
+
+.danger{
+background:#fee2e2;
+color:#991b1b;
+}
+
+.info{
+background:#dbeafe;
+color:#1e40af;
+}
+
+/* MODAL */
+.modal{
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.4);
+display:none;
+align-items:center;
+justify-content:center;
+z-index:1000;
+}
+
+.modal.active{
+display:flex;
+}
+
+.modal-content{
+background:white;
+width:450px;
+padding:25px;
+border-radius:20px;
+}
+
+.modal-content h2{
+margin-bottom:20px;
+}
+
+.modal-content input,
+.modal-content select,
+.modal-content textarea{
+width:100%;
+padding:14px;
+margin-bottom:14px;
+border-radius:12px;
+border:1px solid var(--border);
+}
+
+.modal-actions{
+display:flex;
+gap:10px;
+margin-top:15px;
+}
+
+.modal-actions button{
+flex:1;
+}
+
+/* CHART */
+.chart-box{
+background:white;
+padding:25px;
+border-radius:var(--radius);
+box-shadow:var(--shadow);
+}
+
+/* QR */
+#reader{
+width:100%;
+max-width:500px;
+margin:auto;
+border-radius:20px;
+overflow:hidden;
+}
+
+
+#reader video {
+    border-radius: 16px;
+    background: #000;
+}
+
+#scanOverlay {
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { border-color: #10b981; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+    50% { border-color: #f59e0b; box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+    100% { border-color: #10b981; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.zoom-control {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(0,0,0,0.6);
+    padding: 8px;
+    border-radius: 20px;
+    color: white;
+}
+
+/* TOAST */
+.toast{
+position:fixed;
+bottom:20px;
+right:20px;
+background:var(--primary);
+color:white;
+padding:15px 20px;
+border-radius:14px;
+z-index:9999;
+animation:toast 4s forwards;
+}
+
+@keyframes toast{
+0%{
+opacity:0;
+transform:translateY(20px);
+}
+10%{
+opacity:1;
+transform:translateY(0);
+}
+90%{
+opacity:1;
+}
+100%{
+opacity:0;
+}
+}
+
+.loading{
+text-align:center;
+padding:40px;
+color:var(--muted);
+}
+
+.refresh-btn{
+background:var(--primary);
+color:white;
+border:none;
+padding:8px 16px;
+border-radius:8px;
+cursor:pointer;
+margin-left:10px;
+}
+
+.action-buttons{
+display:flex;
+gap:5px;
+flex-wrap:wrap;
+}
+
+/* Analytics Enhancements */
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .cards { grid-template-columns: repeat(2, 1fr); }
+    .grid-2 { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+    .sidebar { width: 0 !important; }
+    .sidebar.active { width: 270px !important; left: 0; }
+    .main { margin-left: 0 !important; }
+    .menu-btn { display: flex !important; }
+    .cards { grid-template-columns: 1fr; }
+    .topbar { padding: 0 15px; }
+    .content { padding: 15px; }
+    .user-box #clock { display: none; }
+    th, td { padding: 10px 8px; font-size: 12px; }
+    .btn { padding: 8px 12px; font-size: 12px; }
+    .modal-content { width: 95%; margin: 10px; padding: 15px; }
+}
+
+@media (max-width: 480px) {
+    .cards { grid-template-columns: 1fr; }
+    .topbar { flex-wrap: wrap; height: auto; padding: 10px; gap: 10px; }
+    .left-top { width: 100%; justify-content: space-between; }
+    .user-box { width: 100%; justify-content: flex-end; }
+    .table-wrapper { font-size: 11px; }
+    th, td { padding: 8px 4px; }
+    .action-buttons { flex-wrap: wrap; }
+    .btn-sm { padding: 4px 6px; font-size: 10px; }
+}
+
+/* Ensure menu items grid is responsive */
+.item-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.item-chip {
+    white-space: normal;
+    word-break: keep-all;
+}
+
+/* Table responsive wrap */
+.table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+</style>
+</head>
+
+<body>
+
+<!-- LOGIN CONTAINER -->
+<div id="loginContainer" class="login-container">
+  <div class="login-box">
+    <h2>🐟 FishFlow Pro</h2>
+    <input type="email" id="loginEmail" placeholder="admin@fishflow.com">
+    <input type="password" id="loginPassword" placeholder="Password">
+    <button onclick="login()">Login to Dashboard</button>
+  </div>
+</div>
+
+<!-- MAIN APP (HIDDEN UNTIL LOGIN) -->
+<div id="app" style="display: none;">
+
+<!-- SIDEBAR -->
+<div class="sidebar" id="sidebar">
+  <div class="logo">🐟 FishFlow</div>
+  <button class="nav-btn active" onclick="switchPanel('dashboard',this)">📊 Dashboard</button>
+  <button class="nav-btn" onclick="switchPanel('sales',this)">💰 Sales</button>
+  <button class="nav-btn" onclick="switchPanel('inventory',this)">📦 Inventory</button>
+  <button class="nav-btn" onclick="switchPanel('menuItems',this)">🍽️ Menu Items</button>
+  <button class="nav-btn" onclick="switchPanel('soda',this)">🥤 Soda</button>
+  <button class="nav-btn" onclick="switchPanel('analytics',this)">📈 Analytics</button>
+  <button class="nav-btn" onclick="switchPanel('scanner',this)">📷 Scanner</button>
+  <button class="nav-btn" onclick="switchPanel('users',this)">👥 Users</button>
+  <button class="nav-btn" onclick="switchPanel('credit',this)">💳 Credit</button>
+  <button class="nav-btn" onclick="switchPanel('expenses',this)">🧾 Expenses</button>
+  <button class="nav-btn" onclick="openUserModal()">➕ Add User</button>
+  <button class="nav-btn" onclick="logout()">🚪 Logout</button>
+</div>
+
+<div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+
+<!-- MAIN -->
+<div class="main">
+
+<div class="topbar">
+  <div class="left-top">
+    <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+    <h2 id="pageTitle">Dashboard</h2>
+  </div>
+<div class="user-box">
+  <div id="clock"></div>
+  <div class="avatar" id="userAvatar" onclick="openProfileModal()" style="cursor: pointer;">A</div>
+  <span id="userName" style="cursor: pointer;" onclick="openProfileModal()"></span>
+</div>
+</div>
+
+<div class="content">
+
+<!-- DASHBOARD -->
+<div class="panel active" id="dashboard">
+  <div class="cards">
+    <div class="card" onclick="switchPanel('sales')">
+      <h3>💰 Total Sales Today</h3>
+      <p id="totalSales">KES 0</p>
+    </div>
+    <div class="card" onclick="switchPanel('expenses')">
+      <h3>🧾 Total Expenses</h3>
+      <p id="totalExpenses">KES 0</p>
+    </div>
+    <div class="card">
+      <h3>💵 Net Profit</h3>
+      <p id="netProfit">KES 0</p>
+    </div>
+    <div class="card">
+      <h3>📊 Transactions</h3>
+      <p id="transactionCount">0</p>
+    </div>
+  </div>
+  <div class="chart-box">
+    <canvas id="salesChart"></canvas>
+  </div>
+</div>
+
+<!-- SALES  -->
+<div class="panel" id="sales">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+    <button class="btn" onclick="refreshSales()">🔄 Refresh Sales</button>
+    <div style="display: flex; gap: 10px;">
+      <label style="display: flex; align-items: center; gap: 5px;">
+        <span>📅 From:</span>
+        <input type="date" id="salesStartDate" class="form-control" style="width: 140px;">
+      </label>
+      <label style="display: flex; align-items: center; gap: 5px;">
+        <span>To:</span>
+        <input type="date" id="salesEndDate" class="form-control" style="width: 140px;">
+      </label>
+      <button class="btn-sm" onclick="filterSalesByDate()" style="background: var(--primary);">Filter</button>
+      <button class="btn-sm" onclick="resetSalesFilter()" style="background: #64748b;">Reset</button>
+    </div>
+  </div>
+  <div class="table-wrapper">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Time</th>
+          <th>Cashier Name</th>
+          <th>Shift</th>
+          <th>Method</th>
+          <th>Items</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody id="salesBody">
+        <tr><td colspan="7" class="loading">Loading sales...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- INVENTORY -->
+<div class="panel" id="inventory">
+  <button class="btn" onclick="openStockModal()">➕ Add Stock</button>
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>Item</th><th>Added</th><th>Remaining</th><th>Purchase</th><th>Selling</th><th>Status</th></tr></thead>
+      <tbody id="inventoryBody"><tr><td colspan="6" class="loading">Loading inventory...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MENU ITEMS MANAGEMENT -->
+<div class="panel" id="menuItems">
+  <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+    <button class="btn" onclick="openAddItemModal()" style="background: #10b981;">➕ Add New Item</button>
+    <select id="categoryFilter" onchange="loadMenuItems()" class="form-control" style="width: auto; padding: 10px 20px;">
+      <option value="all">All Categories</option>
+      <option value="tilapia">🐟 Tilapia</option>
+      <option value="mbuta">🐠 Mbuta</option>
+      <option value="ugali">🍚 Ugali</option>
+      <option value="wetfry">🍳 Wet Fry / Kachumbari</option>
+      <option value="greens">🥬 Greens</option>
+      <option value="chips">🍟 Chips</option>
+      <option value="fuluOmena">🐟 Fulu/Omena</option>
+      <option value="soda">🥤 Soda (Pepsi/Coca Cola)</option>
+      <option value="water">💧 Water</option>
+      <option value="container">📦 Take Away Containers</option>
+      <option value="other">📋 Other Items</option>
+    </select>
+  </div>
+  
+  <div class="table-wrapper">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Item Name</th>
+          <th>Price (KES)</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="menuItemsBody">
+        <tr><td colspan="5" class="loading">Loading menu items......</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+
+<!-- SODA -->
+<div class="panel" id="soda">
+  <button class="btn" onclick="openSodaModal()">➕ Add Soda Stock</button>
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>Brand</th><th>Crates</th><th>Bottles Left</th><th>Sold</th><th>Revenue</th></tr></thead>
+      <tbody id="sodaBody"><tr><td colspan="5" class="loading">Loading soda inventory...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ANALYTICS -->
+<div class="panel" id="analytics">
+  <!-- Date Range Selector -->
+  <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;">
+    <div>
+      <label style="font-size: 12px; color: var(--muted);">Date Range:</label>
+      <select id="analyticsDateRange" onchange="loadAnalytics()" class="form-control" style="width: 150px;">
+        <option value="today">Today</option>
+        <option value="yesterday">Yesterday</option>
+        <option value="week">This Week</option>
+        <option value="month">This Month</option>
+        <option value="custom">Custom Range</option>
+      </select>
+    </div>
+    <div id="customDateRange" style="display: none; display: flex; gap: 10px;">
+      <input type="date" id="startDate" class="form-control" style="width: 140px;">
+      <input type="date" id="endDate" class="form-control" style="width: 140px;">
+      <button class="btn-sm" onclick="loadAnalytics()" style="background: var(--primary);">Apply</button>
+    </div>
+    <button class="btn-sm" onclick="loadAnalytics()" style="background: var(--primary);">🔄 Refresh</button>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(180px,1fr));">
+    <div class="card">
+      <h3>💰 Total Revenue</h3>
+      <p id="analyticsTotalRevenue">KES 0</p>
+    </div>
+    <div class="card">
+      <h3>📊 Total Transactions</h3>
+      <p id="analyticsTotalTransactions">0</p>
+    </div>
+    <div class="card">
+      <h3>☀️ Day Shift Revenue</h3>
+      <p id="analyticsDayRevenue">KES 0</p>
+    </div>
+    <div class="card">
+      <h3>🌙 Night Shift Revenue</h3>
+      <p id="analyticsNightRevenue">KES 0</p>
+    </div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="grid-2" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px;">
+    <div class="chart-box">
+      <h3 style="margin-bottom: 15px;">📈 Revenue by Category</h3>
+      <canvas id="categoryRevenueChart"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3 style="margin-bottom: 15px;">🕐 Shift Comparison</h3>
+      <canvas id="shiftComparisonChart"></canvas>
+    </div>
+  </div>
+
+  <!-- NEW: Soda Brand Breakdown Section -->
+  <div class="chart-box" style="margin-bottom: 20px;">
+    <h3 style="margin-bottom: 15px;">🥤 Soda Brand Revenue Breakdown</h3>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+      <div style="text-align: center;">
+        <div style="background: #1e3a8a; border-radius: 16px; padding: 15px;">
+          <div style="font-size: 48px; margin-bottom: 10px;">🔵</div>
+          <h4 style="color: white;">Pepsi</h4>
+          <p style="font-size: 24px; font-weight: bold; color: #60a5fa;" id="pepsiRevenue">KES 0</p>
+          <p style="color: #93c5fd; font-size: 12px;" id="pepsiQuantity">0 bottles sold</p>
+        </div>
+      </div>
+      <div style="text-align: center;">
+        <div style="background: #991b1b; border-radius: 16px; padding: 15px;">
+          <div style="font-size: 48px; margin-bottom: 10px;">🔴</div>
+          <h4 style="color: white;">Coca Cola</h4>
+          <p style="font-size: 24px; font-weight: bold; color: #f87171;" id="cocacolaRevenue">KES 0</p>
+          <p style="color: #fca5a5; font-size: 12px;" id="cocacolaQuantity">0 bottles sold</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detailed Category Breakdown -->
+  <div class="chart-box" style="margin-bottom: 20px;">
+    <h3 style="margin-bottom: 15px;">📊 Detailed Category Revenue</h3>
+    <div class="table-wrapper">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Items Sold</th>
+            <th>Revenue (KES)</th>
+            <th>% of Total</th>
+            <th>Day Shift</th>
+            <th>Night Shift</th>
+          </tr>
+        </thead>
+        <tbody id="categoryBreakdownBody">
+          <tr><td colspan="6" class="loading">Loading data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Daily Trend Chart -->
+  <div class="chart-box">
+    <h3 style="margin-bottom: 15px;">📅 Daily Sales Trend (Last 7 Days)</h3>
+    <canvas id="dailyTrendChart"></canvas>
+  </div>
+</div>
+
+<!-- USERS - ENHANCED WITH ACTIONS -->
+<div class="panel" id="users">
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Shift</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="usersBody"><tr><td colspan="6" class="loading">Loading users...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- CREDIT -->
+<div class="panel" id="credit">
+  <button class="btn" onclick="openCreditModal()">➕ New Credit Sale</button>
+  <div class="table-wrapper">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>Phone</th>
+          <th>Total</th>
+          <th>Paid</th>
+          <th>Balance</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="creditBody">
+        <tr><td colspan="7" class="loading">Loading credit sales...<\/td><\/tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- EXPENSES -->
+<div class="panel" id="expenses">
+  <button class="btn" onclick="openExpenseModal()">➕ Add Expense</button>
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th></tr></thead>
+      <tbody id="expenseBody"><tr><td colspan="4" class="loading">Loading expenses...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- SCANNER -->
+<div class="panel" id="scanner">
+  <div class="chart-box">
+    <h2 style="margin-bottom:15px;">📷 Smart QR Scanner - Auto Zoom Tracking</h2>
+    <div style="position: relative; width: 100%; max-width: 500px; margin: 0 auto;">
+      <div id="reader" style="width: 100%; border-radius: 16px; overflow: hidden;"></div>
+      <div id="scanOverlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; border: 2px solid #10b981; border-radius: 16px; display: none;"></div>
+    </div>
+    <div id="scanResult" style="margin-top: 15px; text-align: center; font-size: 14px; color: #666;"></div>
+    <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
+      <button class="btn" onclick="startScanner()" style="background: #10b981;">▶ Start Scanner</button>
+      <button class="btn" onclick="stopScanner()" style="background: #ef4444;">⏹ Stop Scanner</button>
+    </div>
+    <div style="margin-top: 15px; padding: 12px; background: #f0fdf4; border-radius: 12px; text-align: center;">
+      <p style="font-size: 12px; color: #166534;">📱 Position QR code in the center of the camera view. Auto-zoom will detect and scan automatically!</p>
+    </div>
+  </div>
+</div>
+
+</div>
+</div>
+</div>
+
+<!-- MODALS -->
+<div class="modal" id="userModal">
+  <div class="modal-content">
+    <h2>➕ Add User</h2>
+    <input type="text" id="userNameInput" placeholder="Full Name">
+    <input type="email" id="userEmailInput" placeholder="Email">
+    <input type="password" id="userPasswordInput" placeholder="Password">
+    <input type="text" id="userPhoneInput" placeholder="Phone">
+    <select id="userRoleInput"><option value="cashier">Cashier</option><option value="manager">Manager</option></select>
+    <select id="userShiftInput"><option value="day">Day Shift</option><option value="night">Night Shift</option></select>
+    <div class="modal-actions">
+      <button class="btn" onclick="createUser()" style="background:#10b981;">Create User</button>
+      <button class="btn" onclick="closeModal('userModal')" style="background:#64748b;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- APPROVE MODAL -->
+<div class="modal" id="approveModal">
+  <div class="modal-content">
+    <h2>✅ Approve User</h2>
+    <p>Are you sure you want to approve this user? They will be able to login immediately.</p>
+    <input type="hidden" id="approveUserId">
+    <div class="modal-actions">
+      <button class="btn" onclick="confirmApprove()" style="background:#10b981;">Yes, Approve</button>
+      <button class="btn" onclick="closeModal('approveModal')" style="background:#64748b;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- REJECT MODAL -->
+<div class="modal" id="rejectModal">
+  <div class="modal-content">
+    <h2>❌ Reject User</h2>
+    <p>⚠️ Warning: This will permanently delete the user account. This action cannot be undone!</p>
+    <input type="hidden" id="rejectUserId">
+    <div class="modal-actions">
+      <button class="btn" onclick="confirmReject()" style="background:#ef4444;">Yes, Reject & Delete</button>
+      <button class="btn" onclick="closeModal('rejectModal')" style="background:#64748b;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- BLOCK MODAL -->
+<div class="modal" id="blockModal">
+  <div class="modal-content">
+    <h2>🚫 Block User</h2>
+    <p>Enter reason for blocking this user:</p>
+    <textarea id="blockReason" rows="3" placeholder="Reason for blocking..."></textarea>
+    <input type="hidden" id="blockUserId">
+    <div class="modal-actions">
+      <button class="btn" onclick="confirmBlock()" style="background:#f59e0b;">Yes, Block User</button>
+      <button class="btn" onclick="closeModal('blockModal')" style="background:#64748b;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESET PASSWORD MODAL -->
+<div class="modal" id="resetPwdModal">
+  <div class="modal-content">
+    <h2>🔑 Reset Password</h2>
+    <input type="password" id="newPassword" placeholder="New Password (min 8 characters)">
+    <input type="password" id="confirmPassword" placeholder="Confirm Password">
+    <input type="hidden" id="resetUserId">
+    <div class="modal-actions">
+      <button class="btn" onclick="confirmResetPassword()" style="background:#8b5cf6;">Reset Password</button>
+      <button class="btn" onclick="closeModal('resetPwdModal')" style="background:#64748b;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="stockModal">
+  <div class="modal-content">
+    <h2>📦 Add Stock</h2>
+    <input type="text" id="stockName" placeholder="Item Name">
+    <input type="number" id="stockQty" placeholder="Quantity Added">
+    <input type="number" id="stockPurchase" placeholder="Purchase Price (KES)">
+    <input type="number" id="stockSelling" placeholder="Selling Price (KES)">
+    <div class="modal-actions">
+      <button class="btn" onclick="addStock()">Add Stock</button>
+      <button class="btn" onclick="closeModal('stockModal')" style="background:#64748b;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="sodaModal">
+  <div class="modal-content">
+    <h2>🥤 Add Soda Stock</h2>
+    <select id="sodaBrand"><option value="pepsi">Pepsi</option><option value="cocacola">Coca Cola</option></select>
+    <input type="number" id="sodaCrates" placeholder="Number of Crates">
+    <input type="number" id="sodaPurchasePrice" placeholder="Purchase Price per Crate (KES)">
+    <input type="number" id="sodaSellingPrice" placeholder="Selling Price per Bottle (KES)">
+    <div class="modal-actions">
+      <button class="btn" onclick="addSodaStock()">Add Soda</button>
+      <button class="btn" onclick="closeModal('sodaModal')" style="background:#64748b;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="creditModal">
+  <div class="modal-content">
+    <h2>💳 New Credit Sale</h2>
+    <input type="text" id="creditCustomer" placeholder="Customer Name">
+    <input type="text" id="creditPhone" placeholder="Phone Number">
+    <input type="number" id="creditTotal" placeholder="Total Amount (KES)">
+    <input type="number" id="creditPaid" placeholder="Amount Paid (KES)">
+    <div class="modal-actions">
+      <button class="btn" onclick="addCreditSale()">Create Credit Sale</button>
+      <button class="btn" onclick="closeModal('creditModal')" style="background:#64748b;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="expenseModal">
+  <div class="modal-content">
+    <h2>🧾 Add Expense</h2>
+    <input type="text" id="expenseDesc" placeholder="Description">
+    <input type="number" id="expenseAmount" placeholder="Amount (KES)">
+    <select id="expenseCategory"><option value="supplies">Supplies</option><option value="salary">Salary</option><option value="maintenance">Maintenance</option><option value="other">Other</option></select>
+    <div class="modal-actions">
+      <button class="btn" onclick="addExpense()">Add Expense</button>
+      <button class="btn" onclick="closeModal('expenseModal')" style="background:#64748b;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROFILE MODAL -->
+<div class="modal" id="profileModal">
+  <div class="modal-content" style="max-width: 500px;">
+    <h2>👤 My Profile</h2>
+    <div style="text-align: center; margin-bottom: 20px;">
+      <div id="profileAvatar" style="width: 100px; height: 100px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 40px; color: white; overflow: hidden;">
+        <img id="avatarPreview" src="" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+        <span id="avatarPlaceholder" style="font-size: 40px;">👤</span>
+      </div>
+      <input type="file" id="avatarUpload" accept="image/jpeg,image/png,image/jpg" style="display: none;">
+      <button class="btn-sm" onclick="document.getElementById('avatarUpload').click()" style="background: var(--primary); color: white; padding: 8px 16px;">📷 Upload Avatar</button>
+      <small style="display: block; margin-top: 8px; color: var(--muted);">Max 2MB, JPG/PNG</small>
+    </div>
+    <div class="form-group">
+      <label>Full Name</label>
+      <input type="text" id="profileFullName" class="form-control">
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="profileEmail" class="form-control" readonly style="background: #f5f5f5;">
+    </div>
+    <div class="form-group">
+      <label>Phone</label>
+      <input type="text" id="profilePhone" class="form-control">
+    </div>
+    <div class="form-group">
+      <label>Role</label>
+      <input type="text" id="profileRole" class="form-control" readonly style="background: #f5f5f5;">
+    </div>
+    <div class="form-group">
+      <label>Shift</label>
+      <select id="profileShift" class="form-control">
+        <option value="day">☀️ Day Shift (09:30-22:00)</option>
+        <option value="night">🌙 Night Shift (22:00-09:30)</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="saveProfile()" style="background: #10b981;">💾 Save Changes</button>
+      <button class="btn" onclick="closeModal('profileModal')" style="background: #64748b;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHANGE PASSWORD MODAL -->
+<div class="modal" id="changePwdModal">
+  <div class="modal-content">
+    <h2>🔐 Change Password</h2>
+    <div class="form-group">
+      <label>Current Password</label>
+      <input type="password" id="currentPassword" class="form-control" placeholder="Enter current password">
+    </div>
+    <div class="form-group">
+      <label>New Password</label>
+      <input type="password" id="newPasswordProfile" class="form-control" placeholder="Min 8 characters">
+    </div>
+    <div class="form-group">
+      <label>Confirm New Password</label>
+      <input type="password" id="confirmNewPassword" class="form-control" placeholder="Re-enter new password">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="changePassword()" style="background: #8b5cf6;">🔑 Update Password</button>
+      <button class="btn" onclick="closeModal('changePwdModal')" style="background: #64748b;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD/EDIT ITEM MODAL -->
+<div class="modal" id="itemModal">
+  <div class="modal-content">
+    <h2 id="itemModalTitle">➕ Add New Menu Item</h2>
+    <input type="hidden" id="editItemId">
+    <div class="form-group">
+      <label>Category *</label>
+      <select id="itemCategory" class="form-control">
+        <option value="tilapia">🐟 Tilapia</option>
+        <option value="mbuta">🐠 Mbuta</option>
+        <option value="ugali">🍚 Ugali</option>
+        <option value="wetfry">🍳 Wet Fry / Kachumbari</option>
+        <option value="greens">🥬 Greens</option>
+        <option value="chips">🍟 Chips</option>
+        <option value="fuluOmena">🐟 Fulu/Omena</option>
+        <option value="soda">🥤 Soda</option>
+        <option value="water">💧 Water</option>
+        <option value="container">📦 Take Away Containers</option>
+        <option value="other">📋 Other Items</option>
+      </select>
+    </div>
+    <div class="form-group" id="sodaBrandGroup" style="display: none;">
+      <label>Soda Brand *</label>
+      <select id="sodaBrand" class="form-control">
+        <option value="pepsi">🔵 Pepsi</option>
+        <option value="cocacola">🔴 Coca Cola</option>
+      </select>
+      <!-- ADD THIS SYNC STATUS INDICATOR -->
+    <span id="menuSyncStatus" style="font-size: 12px; color: #10b981; display: flex; align-items: center; gap: 5px;">
+      <span style="width: 8px; height: 8px; background: #10b981; border-radius: 50%; display: inline-block; animation: pulse 2s infinite;"></span>
+      Menu Sync Active - Cashiers Update Every 5s
+    </span>
+    </div>
+    <div class="form-group">
+      <label>Item Name *</label>
+      <input type="text" id="itemName" class="form-control" placeholder="e.g., Whole Tilapia, Large Chips, etc.">
+    </div>
+    <div class="form-group">
+      <label>Price (KES) *</label>
+      <input type="number" id="itemPrice" class="form-control" placeholder="0">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="saveMenuItem()" style="background: #10b981;">💾 Save Item</button>
+      <button class="btn" onclick="closeModal('itemModal')" style="background: #64748b;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE ITEM CONFIRMATION MODAL -->
+<div class="modal" id="deleteItemModal">
+  <div class="modal-content">
+    <h2>⚠️ Delete Menu Item</h2>
+    <p>Are you sure you want to delete <strong id="deleteItemName"></strong>?</p>
+    <p style="color: var(--danger); font-size: 12px;">This action cannot be undone. Cashiers will no longer see this item.</p>
+    <input type="hidden" id="deleteItemId">
+    <div class="modal-actions">
+      <button class="btn" onclick="confirmDeleteItem()" style="background: #ef4444;">Yes, Delete</button>
+      <button class="btn" onclick="closeModal('deleteItemModal')" style="background: #64748b;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAY CREDIT MODAL -->
+<div class="modal" id="payCreditModal">
+  <div class="modal-content">
+    <h2>💳 Process Credit Payment</h2>
+    <input type="hidden" id="payCreditId">
+    <div class="form-group">
+      <label>Customer</label>
+      <input type="text" id="payCustomerName" class="form-control" readonly>
+    </div>
+    <div class="form-group">
+      <label>Total Balance</label>
+      <input type="text" id="payTotalBalance" class="form-control" readonly>
+    </div>
+    <div class="form-group">
+      <label>Payment Type *</label>
+      <select id="paymentType" class="form-control" onchange="togglePaymentFields()">
+        <option value="full">✅ Pay Full Amount</option>
+        <option value="partial">💸 Pay Partial Amount</option>
+      </select>
+    </div>
+    <div class="form-group" id="partialAmountGroup" style="display: none;">
+      <label>Amount to Pay (KES) *</label>
+      <input type="number" id="partialAmount" class="form-control" placeholder="Enter amount">
+    </div>
+    <div class="form-group">
+      <label>Payment Method *</label>
+      <select id="paymentMethodCredit" class="form-control">
+        <option value="cash">💵 Cash</option>
+        <option value="mpesa">📱 M-Pesa</option>
+        <option value="bank">🏦 Bank Transfer</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="processCreditPayment()" style="background: #10b981;">✅ Process Payment</button>
+      <button class="btn" onclick="closeModal('payCreditModal')" style="background: #64748b;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ CONFIGURATION ============
+const API_URL = 'http://localhost:8000/api';
+let authToken = localStorage.getItem('fishflow_token');
+let currentUser = JSON.parse(localStorage.getItem('fishflow_user') || '{}');
+let salesChart = null;
+let analyticsChart = null;
+let qrScanner = null;
+let scannerRunning = false;
+let lastScannedCode = null;
+let scanTimeout = null;
+let menuItems = [];
+let categoryRevenueChart = null;
+let shiftComparisonChart = null;
+let dailyTrendChart = null;
+
+// ============ AUTH FUNCTIONS ============
+async function login() {
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+
+  if (!email || !password) {
+    toast('Please enter email and password', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/auth/login/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await response.json();
+
+    if (response.ok && data.access_token) {
+      authToken = data.access_token;
+      currentUser = data.user;
+      localStorage.setItem('fishflow_token', authToken);
+      localStorage.setItem('fishflow_user', JSON.stringify(currentUser));
+      
+      document.getElementById('loginContainer').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      document.getElementById('userName').innerText = currentUser.full_name || currentUser.email;
+      
+      updateTopbarAvatar();
+      
+      toast('Welcome back, ' + (currentUser.full_name || currentUser.email) + '!');
+      
+      loadDashboard();
+      loadSales();
+      loadInventory();
+      loadSoda();
+      loadUsers();
+      loadCredit();
+      loadExpenses();
+      loadAnalytics();
+    } else {
+      toast('Login failed: ' + (data.error || 'Invalid credentials'), 'error');
+    }
+  } catch (error) {
+    toast('Cannot connect to server. Make sure backend is running on port 8000', 'error');
+  }
+}
+
+
+// Update topbar avatar display
+function updateTopbarAvatar() {
+  const avatarDiv = document.getElementById('userAvatar');
+  if (!avatarDiv) return;
+  
+  if (currentUser && currentUser.avatar_url && currentUser.avatar_url.length > 100) {
+    // If avatar_url contains base64 image data
+    avatarDiv.innerHTML = `<img src="${currentUser.avatar_url}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+  } else if (currentUser && currentUser.avatar_url) {
+    // If avatar_url is a URL
+    avatarDiv.innerHTML = `<img src="${currentUser.avatar_url}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+  } else if (currentUser && currentUser.full_name) {
+    avatarDiv.innerHTML = currentUser.full_name.charAt(0).toUpperCase();
+  } else if (currentUser && currentUser.email) {
+    avatarDiv.innerHTML = currentUser.email.charAt(0).toUpperCase();
+  } else {
+    avatarDiv.innerHTML = 'A';
+  }
+}
+
+function logout() {
+  localStorage.removeItem('fishflow_token');
+  localStorage.removeItem('fishflow_user');
+  authToken = null;
+  currentUser = {};
+  document.getElementById('loginContainer').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  toast('Logged out successfully');
+}
+
+async function apiRequest(endpoint, method = 'GET', body = null) {
+    // Ensure endpoint doesn't have double slashes
+    let cleanEndpoint = endpoint.replace(/\/+/g, '/').replace(/^\/+/, '');
+    
+    const options = {
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': authToken ? `Bearer ${authToken}` : ''
+        }
+    };
+    if (body && Object.keys(body).length > 0) options.body = JSON.stringify(body);
+    
+    const url = `${API_URL}/${cleanEndpoint}`;
+    console.log('API Request:', method, url, body);
+    
+    try {
+        const response = await fetch(url, options);
+        
+        if (response.status === 401) {
+            logout();
+            throw new Error('Session expired');
+        }
+        
+        // Handle empty responses
+        const text = await response.text();
+        let data = null;
+        if (text && text.length > 0) {
+            try {
+                data = JSON.parse(text);
+            } catch(e) {
+                console.warn('Response not JSON:', text);
+                data = { message: text };
+            }
+        }
+        
+        if (!response.ok) {
+            const errorMsg = data?.error || data?.message || `HTTP ${response.status}`;
+            throw new Error(errorMsg);
+        }
+        
+        return data || { success: true };
+    } catch (error) {
+        console.error('API Error:', error);
+        throw error;
+    }
+}
+
+// Toggle partial amount field
+// ============ CREDIT PAYMENT FIXES ============
+function togglePaymentFields() {
+    const paymentType = document.getElementById('paymentType').value;
+    const partialGroup = document.getElementById('partialAmountGroup');
+    partialGroup.style.display = paymentType === 'partial' ? 'block' : 'none';
+}
+
+function openPayCreditModal(creditId, customerName, balance) {
+    document.getElementById('payCreditId').value = creditId;
+    document.getElementById('payCustomerName').value = customerName;
+    document.getElementById('payTotalBalance').value = 'KES ' + balance.toLocaleString();
+    document.getElementById('paymentType').value = 'full';
+    document.getElementById('partialAmount').value = '';
+    document.getElementById('paymentMethodCredit').value = 'cash';
+    togglePaymentFields();
+    document.getElementById('payCreditModal').classList.add('active');
+}
+
+async function processCreditPayment() {
+    const creditId = document.getElementById('payCreditId').value;
+    const paymentType = document.getElementById('paymentType').value;
+    let amountPaid = 0;
+    
+    const credits = await apiRequest('credit/');
+    const credit = credits.find(c => c.id == creditId);
+    if (!credit) {
+        toast('Credit record not found', 'error');
+        return;
+    }
+    
+    const currentBalance = credit.total - (credit.amount_paid || 0);
+    
+    if (paymentType === 'full') {
+        amountPaid = currentBalance;
+    } else {
+        amountPaid = parseFloat(document.getElementById('partialAmount').value);
+        if (!amountPaid || amountPaid <= 0) {
+            toast('Please enter a valid amount', 'error');
+            return;
+        }
+        if (amountPaid > currentBalance) {
+            toast('Amount cannot exceed remaining balance', 'error');
+            return;
+        }
+    }
+    
+    const newAmountPaid = (credit.amount_paid || 0) + amountPaid;
+    const newStatus = newAmountPaid >= credit.total ? 'paid' : 'partial';
+    
+    try {
+        // ONLY send these two fields - your backend only accepts amount_paid and status
+        const updateData = {
+            amount_paid: newAmountPaid,
+            status: newStatus
+        };
+        
+        console.log('Sending update:', updateData);
+        
+        const result = await apiRequest(`credit/${creditId}/`, 'PATCH', updateData);
+        
+        toast(`✅ Payment of KES ${amountPaid.toLocaleString()} recorded successfully`);
+        closeModal('payCreditModal');
+        loadCredit();
+        loadDashboard();
+    } catch (error) {
+        console.error('Payment error:', error);
+        toast('Failed to process payment: ' + error.message, 'error');
+    }
+}
+
+// ============ UI FUNCTIONS ============
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('active');
+  document.getElementById('overlay').classList.toggle('active');
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('active');
+  document.getElementById('overlay').classList.remove('active');
+}
+
+function updateClock() {
+  document.getElementById('clock').innerHTML = new Date().toLocaleString();
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+function switchPanel(panel, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(panel).classList.add('active');
+  
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  
+  document.getElementById('pageTitle').innerHTML = panel.charAt(0).toUpperCase() + panel.slice(1);
+  closeSidebar();
+  
+  // Load data when switching to specific panels
+  if (panel === 'menuItems') {
+    loadMenuItems();
+  }
+  if (panel === 'dashboard') {
+    loadDashboard();
+  }
+  if (panel === 'sales') {
+    loadSales();
+  }
+  if (panel === 'inventory') {
+    loadInventory();
+  }
+  if (panel === 'soda') {
+    loadSoda();
+  }
+  if (panel === 'users') {
+    loadUsers();
+  }
+  if (panel === 'credit') {
+    loadCredit();
+  }
+  if (panel === 'expenses') {
+    loadExpenses();
+  }
+  if (panel === 'analytics') {
+  initAnalytics();
+}
+  if (panel === 'analytics') {
+    loadAnalytics();
+  }
+}
+
+function toast(message, type = 'success') {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = message;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+function openUserModal() { document.getElementById('userModal').classList.add('active'); }
+function openStockModal() { document.getElementById('stockModal').classList.add('active'); }
+function openSodaModal() { document.getElementById('sodaModal').classList.add('active'); }
+function openCreditModal() { document.getElementById('creditModal').classList.add('active'); }
+function openExpenseModal() { document.getElementById('expenseModal').classList.add('active'); }
+
+function closeModal(id) {
+  const modal = document.getElementById(id);
+  if (modal) modal.classList.remove('active');
+}
+
+// ============ DASHBOARD ============
+async function loadDashboard() {
+  try {
+    const data = await apiRequest('dashboard/admin/');
+    if (data && data.today) {
+      document.getElementById('totalSales').innerHTML = 'KES ' + (data.today.total_sales || 0).toLocaleString();
+      document.getElementById('totalExpenses').innerHTML = 'KES ' + (data.today.total_expenses || 0).toLocaleString();
+      const profit = (data.today.total_sales || 0) - (data.today.total_expenses || 0);
+      document.getElementById('netProfit').innerHTML = 'KES ' + profit.toLocaleString();
+      document.getElementById('transactionCount').innerHTML = data.today.transaction_count || 0;
+    }
+  } catch (error) {
+    console.error('Dashboard error:', error);
+  }
+}
+
+// ============ ENHANCED SALES WITH DATE FILTER ============
+let allSalesData = [];
+let currentSalesFilter = { startDate: null, endDate: null };
+
+// Load sales with date filter
+async function loadSales() {
+  try {
+    // Set default dates (last 7 days)
+    if (!document.getElementById('salesStartDate').value) {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 7);
+      document.getElementById('salesStartDate').value = startDate.toISOString().split('T')[0];
+      document.getElementById('salesEndDate').value = endDate.toISOString().split('T')[0];
+    }
+    
+    // Fetch transactions from API
+    const transactions = await apiRequest('transactions/');
+    allSalesData = transactions || [];
+    
+    // Apply date filter if active
+    let filteredData = allSalesData;
+    if (currentSalesFilter.startDate && currentSalesFilter.endDate) {
+      filteredData = allSalesData.filter(t => {
+        const txDate = new Date(t.time).toISOString().split('T')[0];
+        return txDate >= currentSalesFilter.startDate && txDate <= currentSalesFilter.endDate;
+      });
+    }
+    
+    renderSalesTable(filteredData);
+  } catch (error) {
+    console.error('Sales load error:', error);
+    document.getElementById('salesBody').innerHTML = '<tr><td colspan="7" class="loading">Failed to load sales data</td></tr>';
+  }
+}
+
+// Render sales table
+function renderSalesTable(transactions) {
+  const container = document.getElementById('salesBody');
+  
+  if (!transactions || transactions.length === 0) {
+    container.innerHTML = '<tr><td colspan="7" class="loading">No sales recorded in this period</td></tr>';
+    return;
+  }
+  
+  // Calculate summary
+  let totalSales = 0;
+  let cashTotal = 0;
+  let mpesaTotal = 0;
+  
+  let html = '';
+  transactions.forEach(t => {
+    let items = [];
+    try { 
+      items = typeof t.items === 'string' ? JSON.parse(t.items) : (t.items || []); 
+    } catch(e) { 
+      items = []; 
+    }
+    
+    const dateStr = new Date(t.time).toLocaleDateString('en-KE');
+    const timeStr = new Date(t.time).toLocaleTimeString('en-KE');
+    const shiftClass = t.shift === 'night' ? 'danger' : 'warning';
+    const shiftText = t.shift || 'day';
+    const methodClass = t.method === 'mpesa' ? 'info' : 'success';
+    const txTotal = t.total || 0;
+    
+    totalSales += txTotal;
+    if (t.method === 'cash') cashTotal += txTotal;
+    if (t.method === 'mpesa') mpesaTotal += txTotal;
+    
+    html += `<tr>
+      <td><strong>${dateStr}</strong></td>
+      <td>${timeStr}</td>
+      <td><span class="badge info">${escapeHtml(t.cashier_name || t.cashier || 'Unknown')}</span></td>
+      <td><span class="badge ${shiftClass}">${shiftText === 'day' ? '☀️ Day' : '🌙 Night'}</span></td>
+      <td><span class="badge ${methodClass}">${t.method === 'mpesa' ? '📱 M-Pesa' : '💵 Cash'}</span></td>
+      <td style="font-size: 12px;">${items.map(i => `${escapeHtml(i.name)} ×${i.qty || 1}`).join(', ')}</td>
+      <td><strong>KES ${txTotal.toLocaleString()}</strong></td>
+    </tr>`;
+  });
+  
+  // Add summary row
+  html += `<tr style="background: #f0fdf4; font-weight: bold;">
+    <td colspan="6" style="text-align: right;"><strong>Total Sales:</strong></td>
+    <td><strong>KES ${totalSales.toLocaleString()}</strong></td>
+  </tr>`;
+  html += `<tr style="background: #fef3c7;">
+    <td colspan="6" style="text-align: right;"><strong>💵 Cash Total:</strong></td>
+    <td><strong>KES ${cashTotal.toLocaleString()}</strong></td>
+  </tr>`;
+  html += `<tr style="background: #dbeafe;">
+    <td colspan="6" style="text-align: right;"><strong>📱 M-Pesa Total:</strong></td>
+    <td><strong>KES ${mpesaTotal.toLocaleString()}</strong></td>
+  </tr>`;
+  
+  container.innerHTML = html;
+}
+
+// Filter sales by date range
+function filterSalesByDate() {
+  const startDate = document.getElementById('salesStartDate').value;
+  const endDate = document.getElementById('salesEndDate').value;
+  
+  if (!startDate || !endDate) {
+    toast('Please select both start and end dates', 'error');
+    return;
+  }
+  
+  if (startDate > endDate) {
+    toast('Start date cannot be after end date', 'error');
+    return;
+  }
+  
+  currentSalesFilter.startDate = startDate;
+  currentSalesFilter.endDate = endDate;
+  
+  let filteredData = allSalesData;
+  if (currentSalesFilter.startDate && currentSalesFilter.endDate) {
+    filteredData = allSalesData.filter(t => {
+      const txDate = new Date(t.time).toISOString().split('T')[0];
+      return txDate >= currentSalesFilter.startDate && txDate <= currentSalesFilter.endDate;
+    });
+  }
+  
+  renderSalesTable(filteredData);
+  toast(`Showing sales from ${startDate} to ${endDate}`, 'info');
+}
+
+// Reset sales filter
+function resetSalesFilter() {
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - 7);
+  
+  document.getElementById('salesStartDate').value = startDate.toISOString().split('T')[0];
+  document.getElementById('salesEndDate').value = endDate.toISOString().split('T')[0];
+  
+  currentSalesFilter.startDate = null;
+  currentSalesFilter.endDate = null;
+  
+  renderSalesTable(allSalesData);
+  toast('Filter reset - showing all sales', 'info');
+}
+
+// Refresh sales (reload from server)
+function refreshSales() {
+  loadSales();
+  toast('Sales data refreshed', 'success');
+}
+
+// ============ INVENTORY ============
+async function loadInventory() {
+  try {
+    const stock = await apiRequest('stock/');
+    const container = document.getElementById('inventoryBody');
+    
+    if (!stock || stock.length === 0) {
+      container.innerHTML = '<tr><td colspan="6" class="loading">No inventory items</td></tr>';
+      return;
+    }
+    
+    let html = '';
+    stock.forEach(s => {
+      const status = (s.remaining_quantity || 0) < 10 ? 'Low Stock' : 'Available';
+      const statusClass = (s.remaining_quantity || 0) < 10 ? 'warning' : 'success';
+      html += `<tr>
+        <td>${s.item_name}</td>
+        <td>${s.quantity_added || 0}</td>
+        <td><strong>${s.remaining_quantity || 0}</strong></td>
+        <td>KES ${(s.purchase_price_per_unit || 0).toLocaleString()}</td>
+        <td>KES ${(s.selling_price_per_unit || 0).toLocaleString()}</td>
+        <td><span class="badge ${statusClass}">${status}</span></td>
+      </tr>`;
+    });
+    container.innerHTML = html;
+  } catch (error) {
+    document.getElementById('inventoryBody').innerHTML = '<tr><td colspan="6" class="loading">Failed to load inventory</td></tr>';
+  }
+}
+
+async function addStock() {
+  const stockData = {
+    item_name: document.getElementById('stockName').value,
+    quantity_added: parseInt(document.getElementById('stockQty').value) || 0,
+    purchase_price_per_unit: parseFloat(document.getElementById('stockPurchase').value) || 0,
+    selling_price_per_unit: parseFloat(document.getElementById('stockSelling').value) || 0
+  };
+  
+  if (!stockData.item_name || !stockData.quantity_added) {
+    toast('Please fill all fields', 'error');
+    return;
+  }
+  
+  try {
+    await apiRequest('stock/', 'POST', stockData);
+    toast('Stock added successfully');
+    closeModal('stockModal');
+    loadInventory();
+    document.getElementById('stockName').value = '';
+    document.getElementById('stockQty').value = '';
+    document.getElementById('stockPurchase').value = '';
+    document.getElementById('stockSelling').value = '';
+  } catch (error) {
+    toast('Failed to add stock: ' + error.message, 'error');
+  }
+}
+
+// ============ SODA ============
+async function loadSoda() {
+  try {
+    const soda = await apiRequest('soda/');
+    const container = document.getElementById('sodaBody');
+    
+    if (!soda || soda.length === 0) {
+      container.innerHTML = '<tr><td colspan="5" class="loading">No soda inventory</td></tr>';
+      return;
+    }
+    
+    let html = '';
+    soda.forEach(s => {
+      const revenue = (s.bottles_sold || 0) * (s.selling_price_per_bottle || 0);
+      html += `<tr>
+        <td>${s.brand === 'pepsi' ? '🔵 Pepsi' : '🔴 Coca Cola'}</td>
+        <td>${s.crates_added || 0}</td>
+        <td><strong>${s.bottles_remaining || 0}</strong></td>
+        <td>${s.bottles_sold || 0}</td>
+        <td>KES ${revenue.toLocaleString()}</td>
+      </tr>`;
+    });
+    container.innerHTML = html;
+  } catch (error) {
+    document.getElementById('sodaBody').innerHTML = '<tr><td colspan="5" class="loading">Failed to load soda</td></tr>';
+  }
+}
+
+async function addSodaStock() {
+  const sodaData = {
+    brand: document.getElementById('sodaBrand').value,
+    crates_added: parseInt(document.getElementById('sodaCrates').value) || 0,
+    purchase_price_per_crate: parseFloat(document.getElementById('sodaPurchasePrice').value) || 0,
+    selling_price_per_bottle: parseFloat(document.getElementById('sodaSellingPrice').value) || 0
+  };
+  
+  if (!sodaData.crates_added) {
+    toast('Please enter number of crates', 'error');
+    return;
+  }
+  
+  try {
+    await apiRequest('soda/', 'POST', sodaData);
+    toast('Soda stock added successfully');
+    closeModal('sodaModal');
+    loadSoda();
+    document.getElementById('sodaCrates').value = '';
+    document.getElementById('sodaPurchasePrice').value = '';
+    document.getElementById('sodaSellingPrice').value = '';
+  } catch (error) {
+    toast('Failed to add soda: ' + error.message, 'error');
+  }
+}
+
+// ============ USERS WITH FULL ACTIONS ============
+async function loadUsers() {
+    try {
+        const users = await apiRequest('auth/cashiers/');
+        const container = document.getElementById('usersBody');
+        
+        if (!users || users.length === 0) {
+            container.innerHTML = '<tr><td colspan="6" class="loading">No users found</td></tr>';
+            return;
+        }
+        
+        let html = '';
+        for (const u of users) {
+            const isCurrentUser = currentUser && currentUser.id === u.id;
+            const statusBadge = u.is_blocked ? 'danger' : (u.is_approved ? 'success' : 'warning');
+            const statusText = u.is_blocked ? 'Blocked' : (u.is_approved ? 'Active' : 'Pending');
+            
+            html += `<tr>
+                <td>${escapeHtml(u.full_name || u.email)}${isCurrentUser ? ' <span class="badge info">You</span>' : ''}</td>
+                <td>${escapeHtml(u.email)}</td>
+                <td><span class="badge ${u.role === 'admin' ? 'danger' : 'info'}">${u.role || 'cashier'}</span></td>
+                <td><span class="badge ${u.shift === 'night' ? 'danger' : 'warning'}">${u.shift || 'day'}</span></td>
+                <td><span class="badge ${statusBadge}">${statusText}</span></td>
+                <td class="action-buttons">`;
+            
+            // Approve button (only for pending users)
+            if (!u.is_approved && !u.is_blocked && u.role !== 'admin') {
+                html += `<button class="btn-sm btn-approve" onclick="showApproveModal('${u.id}')" title="Approve User">✅ Approve</button>`;
+            }
+            
+            // Reject button (only for pending users)
+            if (!u.is_approved && !u.is_blocked && u.role !== 'admin') {
+                html += `<button class="btn-sm btn-reject" onclick="showRejectModal('${u.id}')" title="Reject & Delete User">❌ Reject</button>`;
+            }
+            
+            // Block button (only for active approved users, not admin and not current user)
+            if (u.is_approved && !u.is_blocked && u.role !== 'admin' && !isCurrentUser) {
+                html += `<button class="btn-sm btn-block" onclick="showBlockModal('${u.id}')" title="Block User">🚫 Block</button>`;
+            }
+            
+            // Unblock button (only for blocked users)
+            if (u.is_blocked && u.role !== 'admin') {
+                html += `<button class="btn-sm btn-unblock" onclick="unblockUser('${u.id}')" title="Unblock User">🔓 Unblock</button>`;
+            }
+            
+            // Reset password button
+            if (!isCurrentUser) {
+                html += `<button class="btn-sm btn-reset" onclick="showResetPwdModal('${u.id}')" title="Reset Password">🔑 Reset</button>`;
+            }
+            
+            html += `</td></tr>`;
+        }
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Users load error:', error);
+        document.getElementById('usersBody').innerHTML = '<tr><td colspan="6" class="loading">Failed to load users: ' + escapeHtml(error.message) + '</td></tr>';
+    }
+}
+
+// Helper function to escape HTML
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+    });
+}
+
+async function createUser() {
+  const userData = {
+    full_name: document.getElementById('userNameInput').value,
+    email: document.getElementById('userEmailInput').value,
+    password: document.getElementById('userPasswordInput').value,
+    phone: document.getElementById('userPhoneInput').value,
+    role: document.getElementById('userRoleInput').value,
+    shift: document.getElementById('userShiftInput').value
+  };
+  
+  if (!userData.full_name || !userData.email || !userData.password) {
+    toast('Please fill all required fields', 'error');
+    return;
+  }
+  
+  if (userData.password.length < 8) {
+    toast('Password must be at least 8 characters', 'error');
+    return;
+  }
+  
+  try {
+    await apiRequest('auth/signup/', 'POST', userData);
+    toast('User created successfully');
+    closeModal('userModal');
+    loadUsers();
+    document.getElementById('userNameInput').value = '';
+    document.getElementById('userEmailInput').value = '';
+    document.getElementById('userPasswordInput').value = '';
+    document.getElementById('userPhoneInput').value = '';
+  } catch (error) {
+    toast('Failed to create user: ' + error.message, 'error');
+  }
+}
+
+// ============ USERS WITH FULL ACTIONS============
+
+// Approve User 
+function showApproveModal(userId) {
+    document.getElementById('approveUserId').value = userId;
+    document.getElementById('approveModal').classList.add('active');
+}
+
+async function confirmApprove() {
+    const userId = document.getElementById('approveUserId').value;
+    try {
+        // Try different endpoint formats
+        let response;
+        try {
+            response = await apiRequest(`auth/approve/${userId}/`, 'POST', {});
+        } catch(e) {
+            // Try without trailing slash
+            response = await apiRequest(`auth/approve/${userId}/`, 'POST', {});
+        }
+        toast('✅ User approved successfully');
+        closeModal('approveModal');
+        loadUsers(); // Refresh user list
+    } catch (error) {
+        console.error('Approve error:', error);
+        toast('Failed to approve user: ' + error.message, 'error');
+    }
+}
+
+// Reject User - Fixed
+function showRejectModal(userId) {
+    document.getElementById('rejectUserId').value = userId;
+    document.getElementById('rejectModal').classList.add('active');
+}
+
+async function confirmReject() {
+    const userId = document.getElementById('rejectUserId').value;
+    try {
+        await apiRequest(`auth/reject/${userId}/`, 'POST', {});
+        toast('❌ User rejected and permanently deleted');
+        closeModal('rejectModal');
+        loadUsers();
+    } catch (error) {
+        console.error('Reject error:', error);
+        toast('Failed to reject user: ' + error.message, 'error');
+    }
+}
+
+// Block User - Fixed
+function showBlockModal(userId) {
+    document.getElementById('blockUserId').value = userId;
+    document.getElementById('blockReason').value = '';
+    document.getElementById('blockModal').classList.add('active');
+}
+
+async function confirmBlock() {
+    const userId = document.getElementById('blockUserId').value;
+    const reason = document.getElementById('blockReason').value || 'No reason provided';
+    try {
+        await apiRequest(`auth/block/${userId}/`, 'POST', { reason: reason });
+        toast('🚫 User blocked successfully');
+        closeModal('blockModal');
+        loadUsers();
+    } catch (error) {
+        console.error('Block error:', error);
+        toast('Failed to block user: ' + error.message, 'error');
+    }
+}
+
+// Unblock User - Fixed
+async function unblockUser(userId) {
+    if (confirm('Are you sure you want to unblock this user?')) {
+        try {
+            await apiRequest(`auth/unblock/${userId}/`, 'POST', {});
+            toast('🔓 User unblocked successfully');
+            loadUsers();
+        } catch (error) {
+            console.error('Unblock error:', error);
+            toast('Failed to unblock user: ' + error.message, 'error');
+        }
+    }
+}
+
+// Reset Password - Fixed
+function showResetPwdModal(userId) {
+    document.getElementById('resetUserId').value = userId;
+    document.getElementById('newPassword').value = '';
+    document.getElementById('confirmPassword').value = '';
+    document.getElementById('resetPwdModal').classList.add('active');
+}
+
+async function confirmResetPassword() {
+    const userId = document.getElementById('resetUserId').value;
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    
+    if (!newPassword || newPassword.length < 8) {
+        toast('Password must be at least 8 characters', 'error');
+        return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+        toast('Passwords do not match', 'error');
+        return;
+    }
+    
+    try {
+        await apiRequest(`auth/reset-password/${userId}/`, 'POST', { password: newPassword });
+        toast('🔑 Password reset successfully');
+        closeModal('resetPwdModal');
+    } catch (error) {
+        console.error('Reset password error:', error);
+        toast('Failed to reset password: ' + error.message, 'error');
+    }
+}
+
+// ============ CREDIT ============
+
+async function loadCredit() {
+    try {
+        const credits = await apiRequest('credit/');
+        const container = document.getElementById('creditBody');
+        
+        if (!credits || credits.length === 0) {
+            container.innerHTML = '<table><td colspan="7" class="loading">No credit sales</td></tr>';
+            return;
+        }
+        
+        let html = '';
+        credits.forEach(c => {
+            const balance = (c.total || 0) - (c.amount_paid || 0);
+            const statusClass = c.status === 'paid' ? 'success' : (c.status === 'partial' ? 'warning' : 'danger');
+            const statusText = c.status === 'paid' ? 'Paid' : (c.status === 'partial' ? 'Partial' : 'Pending');
+            
+            html += `<tr>
+                <td>${escapeHtml(c.customer_name)}</td>
+                <td>${c.customer_phone || '-'}</td>
+                <td>KES ${(c.total || 0).toLocaleString()}</td>
+                <td>KES ${(c.amount_paid || 0).toLocaleString()}</td>
+                <td class="${balance > 0 ? 'danger' : 'success'}"><strong>KES ${balance.toLocaleString()}</strong></td>
+                <td><span class="badge ${statusClass}">${statusText}</span></td>
+                <td class="action-buttons">
+                    ${balance > 0 ? `<button class="btn-sm" onclick="openPayCreditModal('${c.id}', '${escapeHtml(c.customer_name)}', ${balance})" style="background: #10b981;">💳 Pay</button>` : ''}
+                </td>
+            </tr>`;
+        });
+        container.innerHTML = html;
+    } catch (error) {
+        document.getElementById('creditBody').innerHTML = '<tr><td colspan="7" class="loading">Failed to load credit</td></tr>';
+    }
+}
+
+async function addCreditSale() {
+  const creditData = {
+    customer_name: document.getElementById('creditCustomer').value,
+    customer_phone: document.getElementById('creditPhone').value,
+    total: parseFloat(document.getElementById('creditTotal').value) || 0,
+    amount_paid: parseFloat(document.getElementById('creditPaid').value) || 0
+  };
+  
+  if (!creditData.customer_name || !creditData.total) {
+    toast('Please fill required fields', 'error');
+    return;
+  }
+  
+  try {
+    await apiRequest('credit/', 'POST', creditData);
+    toast('Credit sale created successfully');
+    closeModal('creditModal');
+    loadCredit();
+    document.getElementById('creditCustomer').value = '';
+    document.getElementById('creditPhone').value = '';
+    document.getElementById('creditTotal').value = '';
+    document.getElementById('creditPaid').value = '';
+  } catch (error) {
+    toast('Failed to create credit sale: ' + error.message, 'error');
+  }
+}
+
+// ============ EXPENSES ============
+async function loadExpenses() {
+  try {
+    const expenses = await apiRequest('expenses/');
+    const container = document.getElementById('expenseBody');
+    
+    if (!expenses || expenses.length === 0) {
+      container.innerHTML = '<tr><td colspan="4" class="loading">No expenses recorded</td></tr>';
+      return;
+    }
+    
+    let html = '';
+    let total = 0;
+    expenses.forEach(e => {
+      total += e.amount || 0;
+      html += `<tr>
+        <td>${new Date(e.created_at).toLocaleDateString()}</td>
+        <td>${e.name || e.description}</td>
+        <td><span class="badge info">${e.category || 'other'}</span></td>
+        <td><strong>KES ${(e.amount || 0).toLocaleString()}</strong></td>
+      </tr>`;
+    });
+    html += `<tr style="background:#f0f0f0;"><td colspan="3"><strong>Total Expenses</strong></td><td><strong>KES ${total.toLocaleString()}</strong></td></tr>`;
+    container.innerHTML = html;
+  } catch (error) {
+    document.getElementById('expenseBody').innerHTML = '<tr><td colspan="4" class="loading">Failed to load expenses</td></tr>';
+  }
+}
+
+async function addExpense() {
+  const expenseData = {
+    name: document.getElementById('expenseDesc').value,
+    amount: parseFloat(document.getElementById('expenseAmount').value) || 0,
+    category: document.getElementById('expenseCategory').value
+  };
+  
+  if (!expenseData.name || !expenseData.amount) {
+    toast('Please fill all fields', 'error');
+    return;
+  }
+  
+  try {
+    await apiRequest('expenses/', 'POST', expenseData);
+    toast('Expense added successfully');
+    closeModal('expenseModal');
+    loadExpenses();
+    loadDashboard();
+    document.getElementById('expenseDesc').value = '';
+    document.getElementById('expenseAmount').value = '';
+  } catch (error) {
+    toast('Failed to add expense: ' + error.message, 'error');
+  }
+}
+
+// ============ ENHANCED ANALYTICS WITH SHIFT BREAKDOWN ============
+
+
+// Toggle custom date range visibility
+document.getElementById('analyticsDateRange')?.addEventListener('change', function() {
+  const customRange = document.getElementById('customDateRange');
+  if (this.value === 'custom') {
+    customRange.style.display = 'flex';
+  } else {
+    customRange.style.display = 'none';
+  }
+});
+
+// Load enhanced analytics
+async function loadAnalytics() {
+  try {
+    const dateRange = document.getElementById('analyticsDateRange').value;
+    let startDate, endDate;
+    const today = new Date();
+    
+    // Calculate date range
+    if (dateRange === 'today') {
+      startDate = today.toISOString().split('T')[0];
+      endDate = startDate;
+    } else if (dateRange === 'yesterday') {
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      startDate = yesterday.toISOString().split('T')[0];
+      endDate = startDate;
+    } else if (dateRange === 'week') {
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      startDate = weekAgo.toISOString().split('T')[0];
+      endDate = today.toISOString().split('T')[0];
+    } else if (dateRange === 'month') {
+      const monthAgo = new Date(today);
+      monthAgo.setDate(monthAgo.getDate() - 30);
+      startDate = monthAgo.toISOString().split('T')[0];
+      endDate = today.toISOString().split('T')[0];
+    } else if (dateRange === 'custom') {
+      startDate = document.getElementById('startDate').value;
+      endDate = document.getElementById('endDate').value;
+      if (!startDate || !endDate) {
+        toast('Please select both start and end dates', 'error');
+        return;
+      }
+    }
+    
+    // Fetch analytics data from backend
+    const analyticsData = await apiRequest(`dashboard/analytics/?start_date=${startDate}&end_date=${endDate}`);
+    
+    if (analyticsData) {
+      updateAnalyticsUI(analyticsData);
+      updateAnalyticsCharts(analyticsData);
+      updateCategoryBreakdown(analyticsData.category_breakdown || []);
+    }
+  } catch (error) {
+    console.error('Analytics error:', error);
+    toast('Failed to load analytics data', 'error');
+  }
+}
+
+// Update analytics UI
+// Update analytics UI with soda breakdown
+function updateAnalyticsUI(data) {
+  document.getElementById('analyticsTotalRevenue').innerHTML = 'KES ' + (data.total_revenue || 0).toLocaleString();
+  document.getElementById('analyticsTotalTransactions').innerHTML = (data.total_transactions || 0).toLocaleString();
+  document.getElementById('analyticsDayRevenue').innerHTML = 'KES ' + (data.day_shift_revenue || 0).toLocaleString();
+  document.getElementById('analyticsNightRevenue').innerHTML = 'KES ' + (data.night_shift_revenue || 0).toLocaleString();
+  
+  // Update soda breakdown
+  if (data.soda_breakdown) {
+    document.getElementById('pepsiRevenue').innerHTML = 'KES ' + (data.soda_breakdown.pepsi?.revenue || 0).toLocaleString();
+    document.getElementById('pepsiQuantity').innerHTML = (data.soda_breakdown.pepsi?.quantity || 0) + ' bottles sold';
+    document.getElementById('cocacolaRevenue').innerHTML = 'KES ' + (data.soda_breakdown.cocacola?.revenue || 0).toLocaleString();
+    document.getElementById('cocacolaQuantity').innerHTML = (data.soda_breakdown.cocacola?.quantity || 0) + ' bottles sold';
+  }
+}
+
+// Update analytics charts
+function updateAnalyticsCharts(data) {
+  // Category Revenue Chart (Pie/Donut)
+// Category Revenue Chart with better colors
+if (categoryRevenueChart) categoryRevenueChart.destroy();
+
+const categoryCtx = document.getElementById('categoryRevenueChart').getContext('2d');
+const categories = data.category_revenue || {};
+const categoryLabels = Object.keys(categories);
+const categoryValues = Object.values(categories);
+
+// Special color for soda category
+const backgroundColor = categoryLabels.map(label => {
+  if (label === 'soda') return '#3b82f6';
+  if (label === 'tilapia') return '#0f172a';
+  if (label === 'mbuta') return '#1e293b';
+  if (label === 'ugali') return '#f59e0b';
+  if (label === 'greens') return '#10b981';
+  return '#64748b';
+});
+
+categoryRevenueChart = new Chart(categoryCtx, {
+  type: 'doughnut',
+  data: {
+    labels: categoryLabels.map(l => getCategoryDisplayName(l)),
+    datasets: [{
+      data: categoryValues,
+      backgroundColor: backgroundColor,
+      borderWidth: 0,
+      borderRadius: 8
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { position: 'right' },
+      tooltip: { 
+        callbacks: { 
+          label: (ctx) => `${ctx.label}: KES ${ctx.raw.toLocaleString()}` 
+        } 
+      }
+    }
+  }
+});
+  
+  // Shift Comparison Chart (Bar)
+  if (shiftComparisonChart) shiftComparisonChart.destroy();
+  
+  const shiftCtx = document.getElementById('shiftComparisonChart').getContext('2d');
+  shiftComparisonChart = new Chart(shiftCtx, {
+    type: 'bar',
+    data: {
+      labels: ['Day Shift', 'Night Shift'],
+      datasets: [{
+        label: 'Revenue (KES)',
+        data: [data.day_shift_revenue || 0, data.night_shift_revenue || 0],
+        backgroundColor: ['#f59e0b', '#0f172a'],
+        borderRadius: 8,
+        barPercentage: 0.6
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'top' } }
+    }
+  });
+  
+  // Daily Trend Chart (Line)
+  if (dailyTrendChart) dailyTrendChart.destroy();
+  
+  const dailyTrendCtx = document.getElementById('dailyTrendChart').getContext('2d');
+  const dailyData = data.daily_trend || [];
+  
+  dailyTrendChart = new Chart(dailyTrendCtx, {
+    type: 'line',
+    data: {
+      labels: dailyData.map(d => d.date),
+      datasets: [
+        {
+          label: 'Day Shift Sales',
+          data: dailyData.map(d => d.day_sales || 0),
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245, 158, 11, 0.1)',
+          tension: 0.4,
+          fill: true
+        },
+        {
+          label: 'Night Shift Sales',
+          data: dailyData.map(d => d.night_sales || 0),
+          borderColor: '#0f172a',
+          backgroundColor: 'rgba(15, 23, 42, 0.1)',
+          tension: 0.4,
+          fill: true
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'top' } },
+      scales: { y: { beginAtZero: true, title: { display: true, text: 'Sales (KES)' } } }
+    }
+  });
+}
+
+// Update category breakdown table
+function updateCategoryBreakdown(breakdown) {
+  const container = document.getElementById('categoryBreakdownBody');
+  
+  if (!breakdown || breakdown.length === 0) {
+    container.innerHTML = '<tr><td colspan="6" class="loading">No data available</td></tr>';
+    return;
+  }
+  
+  const total = breakdown.reduce((sum, cat) => sum + cat.revenue, 0);
+  let html = '';
+  
+  breakdown.forEach(cat => {
+    const percentage = total > 0 ? ((cat.revenue / total) * 100).toFixed(1) : 0;
+    html += `<tr>
+      <td><strong>${getCategoryDisplayName(cat.category)}</strong></td>
+      <td>${cat.quantity || 0} items</td>
+      <td>KES ${(cat.revenue || 0).toLocaleString()}</td>
+      <td><span class="badge ${percentage > 20 ? 'success' : 'info'}">${percentage}%</span></td>
+      <td>KES ${(cat.day_revenue || 0).toLocaleString()}</td>
+      <td>KES ${(cat.night_revenue || 0).toLocaleString()}</td>
+    </tr>`;
+  });
+  
+  container.innerHTML = html;
+}
+
+// Get display name for categories
+function getCategoryDisplayName(category) {
+  const names = {
+    'tilapia': '🐟 Tilapia', 'mbuta': '🐠 Mbuta', 'ugali': '🍚 Ugali',
+    'wetfry': '🍳 Wet Fry', 'greens': '🥬 Greens', 'chips': '🍟 Chips',
+    'fuluOmena': '🐟 Fulu/Omena', 'soda': '🥤 Soda', 'water': '💧 Water',
+    'container': '📦 Containers', 'other': '📋 Other'
+  };
+  return names[category] || category;
+}
+
+// Load initial analytics when panel is opened
+function initAnalytics() {
+  // Set default dates for custom range
+  const today = new Date();
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  document.getElementById('startDate').value = weekAgo.toISOString().split('T')[0];
+  document.getElementById('endDate').value = today.toISOString().split('T')[0];
+  
+  loadAnalytics();
+}
+
+
+// ============ QR SCANNER WITH AUTO-ZOOM TRACKING ============
+
+async function startScanner() {
+    if (scannerRunning) {
+        toast('Scanner is already running', 'info');
+        return;
+    }
+    
+    const readerElement = document.getElementById('reader');
+    if (!readerElement) return;
+    
+    // Clear previous scanner
+    readerElement.innerHTML = '';
+    document.getElementById('scanResult').innerHTML = '📷 Initializing camera...';
+    document.getElementById('scanOverlay').style.display = 'block';
+    
+    // Advanced QR Scanner configuration with auto-zoom
+    const config = {
+        fps: 30,
+        qrbox: { width: 280, height: 280 },
+        aspectRatio: 1.0,
+        showTorchButton: true,
+        showZoomSlider: true,
+        defaultZoomValue: 2,
+        experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+        },
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        videoConstraints: {
+            facingMode: "environment",
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+        }
+    };
+    
+    try {
+        qrScanner = new Html5Qrcode("reader");
+        
+        await qrScanner.start(
+            { facingMode: "environment" },
+            config,
+            async (decodedText, decodedResult) => {
+                // Prevent duplicate scans within 3 seconds
+                if (lastScannedCode === decodedText && scanTimeout) {
+                    return;
+                }
+                
+                lastScannedCode = decodedText;
+                document.getElementById('scanResult').innerHTML = `
+                    <div style="background: #dcfce7; padding: 12px; border-radius: 10px;">
+                        <strong>✅ QR Code Detected!</strong><br>
+                        <span style="font-size: 12px;">${decodedText}</span>
+                    </div>
+                `;
+                
+                // Play beep sound (optional - creates a beep on scan)
+                try {
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    oscillator.frequency.value = 880;
+                    gainNode.gain.value = 0.1;
+                    oscillator.start();
+                    gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.5);
+                    oscillator.stop(audioContext.currentTime + 0.5);
+                } catch(e) { console.log('Beep not supported'); }
+                
+                toast('✅ QR Code Scanned: ' + decodedText.substring(0, 50));
+                
+                // Send to backend for processing
+                try {
+                    const response = await fetch(`${API_URL}/trash/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${authToken}`
+                        },
+                        body: JSON.stringify({
+                            item_type: 'qr_scan',
+                            description: decodedText,
+                            data: { 
+                                scanned_at: new Date().toISOString(),
+                                scanned_by: currentUser?.id || 'unknown'
+                            }
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        console.log('QR code logged to backend');
+                    }
+                } catch (err) {
+                    console.log('Backend log failed:', err);
+                }
+                
+                // Set timeout to prevent duplicate scans
+                scanTimeout = setTimeout(() => {
+                    lastScannedCode = null;
+                    scanTimeout = null;
+                }, 3000);
+                
+                // Auto-restart scanner after a short pause
+                setTimeout(() => {
+                    if (scannerRunning && qrScanner) {
+                        document.getElementById('scanResult').innerHTML = '📷 Waiting for next QR code...';
+                    }
+                }, 1500);
+            },
+            (errorMessage) => {
+                // Silent error handling - only log on major errors
+                if (errorMessage && errorMessage.includes('No MultiFormat Readers')) {
+                    console.log('Scanning...');
+                }
+            }
+        ).then(() => {
+            scannerRunning = true;
+            document.getElementById('scanResult').innerHTML = '📷 Scanner ready - Auto-zoom enabled. Point camera at QR code.';
+            toast('📷 Scanner started with auto-zoom tracking');
+            
+            // Try to set zoom to optimal level after camera starts
+            setTimeout(() => {
+                if (qrScanner && qrScanner.getVideoElement) {
+                    const video = qrScanner.getVideoElement();
+                    if (video && video.srcObject) {
+                        const track = video.srcObject.getVideoTracks()[0];
+                        if (track && track.getCapabilities().zoom) {
+                            const capabilities = track.getCapabilities();
+                            const maxZoom = capabilities.zoom.max;
+                            const targetZoom = Math.min(maxZoom, 2.5);
+                            track.applyConstraints({ advanced: [{ zoom: targetZoom }] });
+                            console.log('Zoom set to:', targetZoom);
+                        }
+                    }
+                }
+            }, 1000);
+        });
+        
+    } catch (err) {
+        console.error('Scanner error:', err);
+        document.getElementById('scanResult').innerHTML = `<div style="color: red;">❌ Camera error: ${err.message}</div>`;
+        toast('Camera error: ' + err.message, 'error');
+        scannerRunning = false;
+        document.getElementById('scanOverlay').style.display = 'none';
+    }
+}
+
+function stopScanner() {
+    if (qrScanner && scannerRunning) {
+        qrScanner.stop().then(() => {
+            scannerRunning = false;
+            qrScanner = null;
+            document.getElementById('scanResult').innerHTML = '⏹ Scanner stopped';
+            document.getElementById('scanOverlay').style.display = 'none';
+            toast('Scanner stopped');
+        }).catch((err) => {
+            console.error('Stop error:', err);
+            scannerRunning = false;
+        });
+    } else {
+        toast('Scanner is not running', 'info');
+    }
+}
+
+// Clean up scanner on page unload
+window.addEventListener('beforeunload', () => {
+    if (qrScanner && scannerRunning) {
+        qrScanner.stop().catch(console.error);
+    }
+});
+
+// ============ INIT ============
+if (authToken && currentUser && currentUser.email) {
+  document.getElementById('loginContainer').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('userName').innerText = currentUser.full_name || currentUser.email;
+  updateTopbarAvatar();
+  loadDashboard();
+  loadSales();
+  loadInventory();
+  loadSoda();
+  loadUsers();
+  loadCredit();
+  loadExpenses();
+  loadAnalytics();
+}
+
+// Close modals when clicking outside
+document.querySelectorAll('.modal').forEach(modal => {
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.classList.remove('active');
+  });
+});
+
+// Auto-refresh dashboard every 30 seconds
+setInterval(() => {
+  if (authToken && document.getElementById('dashboard').classList.contains('active')) {
+    loadDashboard();
+  }
+}, 30000);
+
+// ============ PROFILE WITH AVATAR UPLOAD ============
+
+// Open profile modal
+// Open profile modal - FETCH FROM DATABASE
+async function openProfileModal() {
+    if (!currentUser) return;
+    
+    try {
+        // Fetch the latest user data from database
+        const userProfile = await apiRequest('auth/profile/');
+        
+        // Update currentUser with fresh data
+        if (userProfile) {
+            currentUser = { ...currentUser, ...userProfile };
+            localStorage.setItem('fishflow_user', JSON.stringify(currentUser));
+        }
+        
+        // Load current user data into modal
+        document.getElementById('profileFullName').value = currentUser.full_name || '';
+        document.getElementById('profileEmail').value = currentUser.email || '';
+        document.getElementById('profilePhone').value = currentUser.phone || '';
+        document.getElementById('profileRole').value = currentUser.role || 'cashier';
+        document.getElementById('profileShift').value = currentUser.shift || 'day';
+        
+        // Load avatar if exists
+        if (currentUser.avatar_url) {
+            document.getElementById('avatarPreview').src = currentUser.avatar_url;
+            document.getElementById('avatarPreview').style.display = 'block';
+            document.getElementById('avatarPlaceholder').style.display = 'none';
+        } else {
+            document.getElementById('avatarPreview').style.display = 'none';
+            document.getElementById('avatarPlaceholder').style.display = 'flex';
+            document.getElementById('avatarPlaceholder').innerHTML = getAvatarInitial(currentUser.full_name);
+        }
+        
+        document.getElementById('profileModal').classList.add('active');
+    } catch (error) {
+        console.error('Error loading profile:', error);
+        toast('Failed to load profile data', 'error');
+    }
+}
+
+// Get avatar initial
+function getAvatarInitial(name) {
+    if (!name) return '👤';
+    return name.charAt(0).toUpperCase();
+}
+
+// Handle avatar upload
+document.getElementById('avatarUpload')?.addEventListener('change', async function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.match('image/jpeg') && !file.type.match('image/png') && !file.type.match('image/jpg')) {
+        toast('Please upload JPG or PNG image', 'error');
+        return;
+    }
+    
+    // Validate size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+        toast('Image must be less than 2MB', 'error');
+        return;
+    }
+    
+    toast('Uploading avatar...', 'info');
+    
+    try {
+        // Convert to base64
+        const reader = new FileReader();
+        reader.onloadend = async function() {
+            const base64String = reader.result;
+            
+            // Save to backend
+            const result = await apiRequest('auth/update-avatar/', 'POST', {
+                avatar: base64String
+            });
+            
+            if (result.success) {
+                currentUser.avatar_url = result.avatar_url;
+                localStorage.setItem('fishflow_user', JSON.stringify(currentUser));
+                
+                // Update UI
+                document.getElementById('avatarPreview').src = result.avatar_url;
+                document.getElementById('avatarPreview').style.display = 'block';
+                document.getElementById('avatarPlaceholder').style.display = 'none';
+                
+                // Update topbar avatar
+                const topbarAvatar = document.getElementById('userAvatar');
+                topbarAvatar.innerHTML = `<img src="${result.avatar_url}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+                
+                toast('Avatar updated successfully!');
+            }
+        };
+        reader.readAsDataURL(file);
+    } catch (error) {
+        toast('Failed to upload avatar: ' + error.message, 'error');
+    }
+});
+
+// Save profile changes
+async function saveProfile() {
+    const profileData = {
+        full_name: document.getElementById('profileFullName').value,
+        phone: document.getElementById('profilePhone').value,
+        shift: document.getElementById('profileShift').value
+    };
+    
+    if (!profileData.full_name) {
+        toast('Full name is required', 'error');
+        return;
+    }
+    
+    try {
+        const result = await apiRequest('auth/update-profile/', 'POST', profileData);
+        
+        if (result.success) {
+            // Update current user
+            currentUser.full_name = profileData.full_name;
+            currentUser.phone = profileData.phone;
+            currentUser.shift = profileData.shift;
+            localStorage.setItem('fishflow_user', JSON.stringify(currentUser));
+            
+            // Update UI
+            document.getElementById('userName').innerText = currentUser.full_name;
+            
+            toast('Profile updated successfully!');
+            closeModal('profileModal');
+            
+            // Reload user list if in users panel
+            if (document.getElementById('users').classList.contains('active')) {
+                loadUsers();
+            }
+        }
+    } catch (error) {
+        toast('Failed to update profile: ' + error.message, 'error');
+    }
+}
+
+// Change password
+async function changePassword() {
+    const currentPassword = document.getElementById('currentPassword').value;
+    const newPassword = document.getElementById('newPasswordProfile').value;
+    const confirmPassword = document.getElementById('confirmNewPassword').value;
+    
+    if (!currentPassword) {
+        toast('Please enter current password', 'error');
+        return;
+    }
+    
+    if (!newPassword || newPassword.length < 8) {
+        toast('New password must be at least 8 characters', 'error');
+        return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+        toast('New passwords do not match', 'error');
+        return;
+    }
+    
+    try {
+        const result = await apiRequest('auth/change-password/', 'POST', {
+            current_password: currentPassword,
+            new_password: newPassword
+        });
+        
+        if (result.success) {
+            toast('Password changed successfully!');
+            closeModal('changePwdModal');
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPasswordProfile').value = '';
+            document.getElementById('confirmNewPassword').value = '';
+        }
+    } catch (error) {
+        toast('Failed to change password: ' + error.message, 'error');
+    }
+}
+
+// Open change password modal
+function openChangePasswordModal() {
+    closeModal('profileModal');
+    document.getElementById('changePwdModal').classList.add('active');
+}
+
+// Update topbar avatar display
+function updateTopbarAvatar() {
+    const avatarDiv = document.getElementById('userAvatar');
+    if (currentUser.avatar_url) {
+        avatarDiv.innerHTML = `<img src="${currentUser.avatar_url}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+    } else {
+        avatarDiv.innerHTML = (currentUser.full_name || 'A').charAt(0).toUpperCase();
+    }
+}
+
+// ============ MENU ITEMS MANAGEMENT ============
+
+// Load menu items from backend
+async function loadMenuItems() {
+    try {
+        const category = document.getElementById('categoryFilter').value;
+        let items = await apiRequest('items/');
+        
+        // Filter by category if not 'all'
+        if (category !== 'all') {
+            items = items.filter(item => item.category === category);
+        }
+        
+        menuItems = items;
+        renderMenuItems(items);
+    } catch (error) {
+        console.error('Load menu items error:', error);
+        document.getElementById('menuItemsBody').innerHTML = '<tr><td colspan="5" class="loading">Failed to load menu items</td></tr>';
+    }
+}
+
+// Render menu items table
+function renderMenuItems(items) {
+    const container = document.getElementById('menuItemsBody');
+    
+    if (!items || items.length === 0) {
+        container.innerHTML = '<tr><td colspan="5" class="loading">No menu items found. Click "Add New Item" to create one.</td></tr>';
+        return;
+    }
+    
+    let html = '';
+    items.forEach(item => {
+        const categoryIcon = getCategoryIcon(item.category);
+        const statusBadge = item.is_active ? 'success' : 'danger';
+        const statusText = item.is_active ? 'Active' : 'Inactive';
+        
+        html += `<tr>
+            <td>${categoryIcon} ${item.category}</td>
+            <td><strong>${escapeHtml(item.name)}</strong></td>
+            <td>KES ${(item.price || 0).toLocaleString()}</td>
+            <td><span class="badge ${statusBadge}">${statusText}</span></td>
+            <td class="action-buttons">
+                <button class="btn-sm" onclick="editMenuItem('${item.id}')" style="background: #3b82f6;">✏️ Edit</button>
+                <button class="btn-sm" onclick="toggleItemStatus('${item.id}', ${!item.is_active})" style="background: ${item.is_active ? '#f59e0b' : '#10b981'}">
+                    ${item.is_active ? '🔒 Disable' : '✅ Enable'}
+                </button>
+                <button class="btn-sm" onclick="showDeleteItemModal('${item.id}', '${escapeHtml(item.name)}')" style="background: #ef4444;">🗑️ Delete</button>
+            </td>
+        </tr>`;
+    });
+    container.innerHTML = html;
+}
+
+// Get category icon
+function getCategoryIcon(category) {
+    const icons = {
+        'tilapia': '🐟', 'mbuta': '🐠', 'ugali': '🍚', 'wetfry': '🍳',
+        'greens': '🥬', 'chips': '🍟', 'fuluOmena': '🐟', 'soda': '🥤',
+        'water': '💧', 'container': '📦', 'other': '📋'
+    };
+    return icons[category] || '📋';
+}
+
+// Open add item modal
+function openAddItemModal() {
+    document.getElementById('itemModalTitle').innerHTML = '➕ Add New Menu Item';
+    document.getElementById('editItemId').value = '';
+    document.getElementById('itemCategory').value = 'tilapia';
+    document.getElementById('itemName').value = '';
+    document.getElementById('itemPrice').value = '';
+    toggleSodaBrandField();
+    document.getElementById('itemModal').classList.add('active');
+}
+
+// Edit menu item
+function editMenuItem(itemId) {
+    const item = menuItems.find(i => i.id == itemId);
+    if (!item) return;
+    
+    document.getElementById('itemModalTitle').innerHTML = '✏️ Edit Menu Item';
+    document.getElementById('editItemId').value = item.id;
+    document.getElementById('itemCategory').value = item.category;
+    document.getElementById('itemName').value = item.name;
+    document.getElementById('itemPrice').value = item.price;
+    
+    if (item.category === 'soda' && item.soda_brand) {
+        document.getElementById('sodaBrand').value = item.soda_brand;
+    }
+    
+    toggleSodaBrandField();
+    document.getElementById('itemModal').classList.add('active');
+}
+
+// Toggle soda brand field visibility
+function toggleSodaBrandField() {
+    const category = document.getElementById('itemCategory').value;
+    const sodaBrandGroup = document.getElementById('sodaBrandGroup');
+    if (category === 'soda') {
+        sodaBrandGroup.style.display = 'block';
+    } else {
+        sodaBrandGroup.style.display = 'none';
+    }
+}
+
+// Save menu item - FIXED
+async function saveMenuItem() {
+    const itemId = document.getElementById('editItemId').value;
+    const category = document.getElementById('itemCategory').value;
+    const name = document.getElementById('itemName').value.trim();
+    const price = parseFloat(document.getElementById('itemPrice').value);
+    
+    if (!name || !price || price <= 0) {
+        toast('Please enter valid item name and price', 'error');
+        return;
+    }
+    
+    const itemData = {
+        category: category,
+        name: name,
+        price: price,
+        is_active: true
+    };
+    
+    try {
+        if (itemId) {
+            // Update existing item - use PUT to items/<id>/
+            await apiRequest(`items/${itemId}/`, 'PUT', itemData);
+            toast('✅ Item updated! Cashiers will see changes.');
+        } else {
+            // Create new item - use POST to items/
+            await apiRequest('items/', 'POST', itemData);
+            toast('✅ Item added! Available to cashiers.');
+        }
+        
+        closeModal('itemModal');
+        loadMenuItems();
+        document.getElementById('itemName').value = '';
+        document.getElementById('itemPrice').value = '';
+        document.getElementById('editItemId').value = '';
+    } catch (error) {
+        toast('Failed to save item: ' + error.message, 'error');
+    }
+}
+
+// Toggle item active status - ENHANCED WITH CASHIER SYNC
+async function toggleItemStatus(itemId, newStatus) {
+    try {
+        await apiRequest(`items/${itemId}/toggle/`, 'POST', { is_active: newStatus });
+        toast(newStatus ? '✅ Item enabled' : '🔒 Item disabled');
+        loadMenuItems();
+    } catch (error) {
+        toast('Failed to update status: ' + error.message, 'error');
+    }
+}
+
+
+// Force menu version update so cashiers detect changes
+async function forceMenuRefresh() {
+    try {
+        // Call the menu refresh endpoint to update the version hash
+        await apiRequest('menu/refresh/', 'POST', {
+            timestamp: new Date().toISOString(),
+            updated_by: currentUser?.full_name || 'Admin'
+        });
+        console.log('🔄 Menu version updated - cashiers will refresh');
+    } catch (error) {
+        // If menu/refresh endpoint doesn't exist, it's okay
+        // The cashier will still detect changes on next poll
+        console.log('Menu refresh signal sent (endpoint may not exist yet)');
+    }
+}
+
+// Show delete confirmation modal
+function showDeleteItemModal(itemId, itemName) {
+    document.getElementById('deleteItemId').value = itemId;
+    document.getElementById('deleteItemName').innerHTML = itemName;
+    document.getElementById('deleteItemModal').classList.add('active');
+}
+
+// Confirm delete item - ENHANCED WITH CASHIER SYNC
+async function confirmDeleteItem() {
+    const itemId = document.getElementById('deleteItemId').value;
+    try {
+        await apiRequest(`items/${itemId}/`, 'DELETE');
+        toast('🗑️ Item deleted');
+        closeModal('deleteItemModal');
+        loadMenuItems();
+    } catch (error) {
+        toast('Failed to delete item: ' + error.message, 'error');
+    }
+}
+
+// Add event listener for category change
+document.getElementById('itemCategory')?.addEventListener('change', toggleSodaBrandField);
+
+</script>
+
+</body>
+</html>

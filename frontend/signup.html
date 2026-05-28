@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FishFlow Pro - Sign Up</title>
+    <style>
+        :root {
+            --primary: #0b3954;
+            --primary-dark: #092d42;
+            --gold: #f59e0b;
+            --danger: #dc3545;
+            --success: #10b981;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body {
+            background: linear-gradient(135deg, #0a1628 0%, #0b3954 50%, #092d42 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .signup-card {
+            background: rgba(255, 255, 255, 0.97);
+            border-radius: 24px;
+            padding: 35px 30px;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4);
+            width: 100%;
+            max-width: 480px;
+        }
+        h1 {
+            text-align: center;
+            color: var(--primary);
+            font-size: 1.6rem;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 0.85rem;
+            margin-bottom: 25px;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .form-group {
+            margin-bottom: 14px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #e0e5ec;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+            background: #f8fafd;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(11, 57, 84, 0.1);
+            background: white;
+        }
+        .btn-signup {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.05rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+        .btn-signup:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(11, 57, 84, 0.3);
+        }
+        .btn-signup:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .error-msg, .success-msg {
+            text-align: center;
+            padding: 12px;
+            border-radius: 10px;
+            margin-top: 12px;
+            font-size: 0.85rem;
+            display: none;
+        }
+        .error-msg { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+        .success-msg { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+        .login-link {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.85rem;
+            color: #666;
+        }
+        .login-link a { color: var(--primary); text-decoration: none; font-weight: 600; }
+        .role-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            background: #f1f5f9;
+            border-radius: 12px;
+            padding: 4px;
+        }
+        .role-option {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border: none;
+            background: transparent;
+            color: #666;
+            transition: all 0.3s;
+        }
+        .role-option.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="signup-card">
+        <h1>🐟 Create Account</h1>
+        <p class="subtitle">Join FishFlow Pro Management System</p>
+        
+        <div class="role-selector" id="roleSelector">
+            <button class="role-option active" data-role="cashier" onclick="selectRole('cashier', this)">💰 Cashier</button>
+            <button class="role-option" data-role="manager" onclick="selectRole('manager', this)">🔑 Manager</button>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>👤 Full Name</label>
+                <input type="text" id="fullName" placeholder="John Doe" required>
+            </div>
+            <div class="form-group">
+                <label>📱 Phone Number</label>
+                <input type="tel" id="phone" placeholder="+254 700 000000">
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label>📧 Email Address</label>
+            <input type="email" id="email" placeholder="your@email.com" required>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>🔒 Password</label>
+                <input type="password" id="password" placeholder="Min 8 characters" minlength="8" required>
+            </div>
+            <div class="form-group">
+                <label>🔒 Confirm Password</label>
+                <input type="password" id="confirmPassword" placeholder="Repeat password" required>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label>🕐 Shift Preference</label>
+            <select id="shift">
+                <option value="day">☀️ Day Shift (6AM - 6PM)</option>
+                <option value="night">🌙 Night Shift (6PM - 6AM)</option>
+            </select>
+        </div>
+        
+        <button class="btn-signup" id="signupBtn" onclick="handleSignup()">
+            📝 Create Account
+        </button>
+        
+        <div class="error-msg" id="errorMsg"></div>
+        <div class="success-msg" id="successMsg"></div>
+        
+        <div class="login-link">
+            Already have an account? <a href="login.html">Sign In</a>
+        </div>
+    </div>
+
+    <script>
+        const API = 'http://127.0.0.1:8000/api';
+        let selectedRole = 'cashier';
+        
+        function selectRole(role, element) {
+            selectedRole = role;
+            document.querySelectorAll('.role-option').forEach(btn => btn.classList.remove('active'));
+            element.classList.add('active');
+        }
+        
+        async function handleSignup() {
+            const fullName = document.getElementById('fullName').value.trim();
+            const phone = document.getElementById('phone').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const shift = document.getElementById('shift').value;
+            const errorDiv = document.getElementById('errorMsg');
+            const successDiv = document.getElementById('successMsg');
+            const btn = document.getElementById('signupBtn');
+            
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+            
+            if (!fullName || !email || !password) {
+                showError('Please fill all required fields');
+                return;
+            }
+            
+            if (password.length < 8) {
+                showError('Password must be at least 8 characters');
+                return;
+            }
+            
+            if (password !== confirmPassword) {
+                showError('Passwords do not match');
+                return;
+            }
+            
+            btn.textContent = '⏳ Creating Account...';
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch(`${API}/auth/signup/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        full_name: fullName,
+                        phone: phone,
+                        email: email,
+                        password: password,
+                        role: selectedRole,
+                        shift: shift
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showSuccess('Account created! Waiting for admin approval.');
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 2000);
+                } else {
+                    showError(data.error || 'Registration failed');
+                }
+            } catch (error) {
+                showError('Connection failed. Please try again.');
+            } finally {
+                btn.textContent = '📝 Create Account';
+                btn.disabled = false;
+            }
+        }
+        
+        function showError(msg) {
+            const div = document.getElementById('errorMsg');
+            div.textContent = '❌ ' + msg;
+            div.style.display = 'block';
+        }
+        
+        function showSuccess(msg) {
+            const div = document.getElementById('successMsg');
+            div.textContent = '✅ ' + msg;
+            div.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

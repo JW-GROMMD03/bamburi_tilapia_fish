@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="description" content="FishFlow Pro - Enterprise Manager Dashboard">
+    <meta name="robots" content="noindex, nofollow">
+    <title>FishFlow Pro • Manager Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        :root {
+            --primary: #0b3954;
+            --primary-light: #1a5f7a;
+            --primary-dark: #092d42;
+            --gold: #f59e0b;
+            --gold-light: #fbbf24;
+            --danger: #ef4444;
+            --danger-light: #fca5a5;
+            --success: #10b981;
+            --success-light: #6ee7b7;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+            --bg: #f1f5f9;
+            --bg-dark: #0f172a;
+            --card: #ffffff;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --text-muted: #94a3b8;
+            --border: #e2e8f0;
+            --sidebar-width: 260px;
+            --header-height: 60px;
+            --radius: 14px;
+            --radius-sm: 10px;
+            --shadow: 0 1px 3px rgba(0,0,0,0.04);
+            --shadow-lg: 0 10px 40px rgba(0,0,0,0.1);
+            --transition: all 0.2s ease;
+            --font: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            min-height: 100vh;
+            font-family: var(--font);
+            line-height: 1.5;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        @media print { body { display: none !important; } }
+        
+        .sidebar {
+            width: var(--sidebar-width);
+            background: linear-gradient(180deg, #0a1628 0%, #0b3954 40%, #092d42 100%);
+            color: #ffffff;
+            position: fixed;
+            top: 0; left: 0; bottom: 0;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 4px 0 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .sidebar::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(circle at 50% 0%, rgba(16,185,129,0.08) 0%, transparent 60%);
+            pointer-events: none;
+        }
+        .sidebar-brand { padding: 22px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); text-align: center; position: relative; z-index: 1; }
+        .sidebar-brand .icon { font-size: 2rem; display: block; margin-bottom: 5px; animation: float 3s ease-in-out infinite; }
+        @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+        .sidebar-brand h2 { font-size: 1.15rem; font-weight: 700; color: #fff; }
+        .sidebar-brand .role { display: inline-block; background: var(--success); color: #fff; padding: 4px 14px; border-radius: 14px; font-size: 0.68rem; font-weight: 700; margin-top: 8px; letter-spacing: 0.5px; text-transform: uppercase; }
+        .sidebar-nav { flex: 1; overflow-y: auto; padding: 12px 0; position: relative; z-index: 1; }
+        .sidebar-nav::-webkit-scrollbar { width: 4px; }
+        .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+        .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+        .nav-section { padding: 10px 20px 4px; font-size: 0.6rem; text-transform: uppercase; color: rgba(255,255,255,0.3); letter-spacing: 2px; font-weight: 700; }
+        .nav-item { display: flex; align-items: center; gap: 10px; padding: 12px 20px; color: rgba(255,255,255,0.65); cursor: pointer; transition: var(--transition); border-left: 3px solid transparent; font-size: 0.84rem; font-weight: 500; position: relative; }
+        .nav-item:hover { background: rgba(255,255,255,0.04); color: #fff; }
+        .nav-item.active { background: rgba(255,255,255,0.08); color: #fff; border-left-color: var(--success); font-weight: 600; }
+        .nav-item .badge { margin-left: auto; background: var(--danger); color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 0.62rem; font-weight: 700; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+        .sidebar-footer { padding: 14px 20px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.8rem; color: rgba(255,255,255,0.6); transition: var(--transition); position: relative; z-index: 1; }
+        .sidebar-footer:hover { background: rgba(220,53,69,0.2); color: var(--danger-light); }
+        
+        .main-content { margin-left: var(--sidebar-width); flex: 1; min-height: 100vh; display: flex; flex-direction: column; }
+        .topbar { background: #fff; padding: 0 24px; height: var(--header-height); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
+        .topbar h3 { font-size: 1rem; font-weight: 700; color: var(--primary); }
+        .topbar-right { display: flex; align-items: center; gap: 14px; font-size: 0.8rem; }
+        .live-dot { display: inline-block; width: 8px; height: 8px; background: var(--success); border-radius: 50%; animation: pulse 1.5s infinite; margin-right: 4px; }
+        .realtime-ticker { background: var(--primary); color: #fff; padding: 6px 14px; border-radius: 20px; font-size: 0.7rem; display: inline-flex; align-items: center; gap: 8px; }
+        .ticker-item { background: rgba(255,255,255,0.12); padding: 3px 8px; border-radius: 10px; font-weight: 600; }
+        .user-info { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.82rem; }
+        .avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--success), var(--primary)); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.8rem; }
+        
+        .page-content { padding: 20px 24px; flex: 1; }
+        .page { display: none; }
+        .page.active { display: block; animation: fadeSlide 0.3s ease; }
+        @keyframes fadeSlide { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+        
+        .shift-banner { background: linear-gradient(135deg,#fef3c7,#fde68a); padding: 10px 16px; border-radius: var(--radius-sm); font-size: 0.78rem; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #fcd34d; }
+        .shift-banner.night { background: linear-gradient(135deg,#dbeafe,#bfdbfe); border-color: #93c5fd; }
+        .countdown { font-weight: 700; color: var(--danger); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+        .shift-warning { background: #fee2e2; color: var(--danger); padding: 4px 10px; border-radius: 6px; font-size: 0.68rem; font-weight: 600; animation: pulse 1s infinite; }
+        
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
+        .stat-card { background: #fff; border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); border: 1px solid var(--border); transition: var(--transition); position: relative; overflow: hidden; }
+        .stat-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+        .stat-card.revenue { border-left: 4px solid var(--success); }
+        .stat-card.expense { border-left: 4px solid var(--danger); }
+        .stat-card.profit { border-left: 4px solid var(--gold); }
+        .stat-card.pending { border-left: 4px solid var(--warning); }
+        .stat-card .stat-value { font-size: 1.5rem; font-weight: 800; margin: 4px 0; color: var(--primary); }
+        .stat-card .stat-label { font-size: 0.7rem; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.3px; }
+        .stat-card .stat-sub { font-size: 0.65rem; color: var(--text-muted); margin-top: 2px; }
+        
+        .card { background: #fff; border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); border: 1px solid var(--border); margin-bottom: 16px; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .card-header h4 { font-size: 0.95rem; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px; }
+        
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+        
+        .table-wrapper { overflow-x: auto; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        th { background: #f8fafc; padding: 12px 14px; text-align: left; font-weight: 600; color: var(--text-light); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.3px; border-bottom: 2px solid var(--border); white-space: nowrap; }
+        td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+        tbody tr:hover td { background: #fafbfc; }
+        
+        .btn { padding: 9px 18px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; font-size: 0.8rem; transition: var(--transition); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+        .btn:active { transform: scale(0.97); }
+        .btn-sm { padding: 5px 12px; font-size: 0.7rem; border-radius: 6px; }
+        .btn-xs { padding: 4px 10px; font-size: 0.65rem; border-radius: 5px; }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover { background: var(--primary-light); box-shadow: 0 4px 12px rgba(11,57,84,0.3); }
+        .btn-success { background: var(--success); color: #fff; }
+        .btn-success:hover { box-shadow: 0 4px 12px rgba(16,185,129,0.3); }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-danger:hover { box-shadow: 0 4px 12px rgba(239,68,68,0.3); }
+        .btn-warning { background: var(--warning); color: #000; }
+        .btn-outline { background: #fff; border: 1.5px solid var(--border); color: var(--text); }
+        .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+        
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 0.65rem; font-weight: 700; white-space: nowrap; }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-info { background: #dbeafe; color: #1e40af; }
+        .badge-purple { background: #ede9fe; color: #5b21b6; }
+        
+        .cat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+        .cat-item { background: #f8fafc; padding: 12px 10px; border-radius: 8px; text-align: center; border: 1px solid #e8ecf0; transition: var(--transition); }
+        .cat-item:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.06); border-color: var(--success); }
+        .cat-item .cat-name { font-weight: 600; font-size: 0.73rem; color: var(--primary); margin-bottom: 3px; }
+        .cat-item .cat-count { font-size: 1.1rem; font-weight: 700; color: var(--primary-dark); }
+        .cat-item .cat-amount { font-size: 0.65rem; color: var(--text-light); margin-top: 2px; }
+        
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 4px; color: var(--text); }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 0.85rem; transition: var(--transition); background: #f8fafc; color: var(--text); }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(11,57,84,0.06); background: #fff; }
+        
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.55); z-index: 200; justify-content: center; align-items: center; backdrop-filter: blur(2px); animation: fadeIn 0.2s; }
+        .modal-overlay.active { display: flex; }
+        @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+        .modal { background: #fff; border-radius: 16px; padding: 24px 28px; width: 90%; max-width: 520px; max-height: 85vh; overflow-y: auto; box-shadow: 0 25px 70px rgba(0,0,0,0.25); animation: modalSlide 0.3s; }
+        @keyframes modalSlide { from{opacity:0;transform:translateY(20px)scale(.95)} to{opacity:1;transform:translateY(0)scale(1)} }
+        .modal h3 { margin-bottom: 18px; font-size: 1.1rem; font-weight: 700; color: var(--primary); }
+        .modal-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+        
+        #qrScannerContainer { width: 100%; max-width: 380px; margin: 0 auto; border-radius: 10px; overflow: hidden; border: 2px solid var(--border); }
+        #qrResult { text-align: center; padding: 10px; font-weight: 600; font-size: 0.9rem; margin-top: 8px; border-radius: 8px; }
+        
+        .toast-container { position: fixed; top: 16px; right: 16px; z-index: 999; display: flex; flex-direction: column; gap: 6px; }
+        .toast { background: #fff; padding: 12px 18px; border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); font-size: 0.8rem; font-weight: 600; animation: slideIn .3s; display: flex; align-items: center; gap: 8px; }
+        @keyframes slideIn { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
+        .toast.sale { border-left: 4px solid var(--success); }
+        .toast.expense { border-left: 4px solid var(--danger); }
+        .toast.info { border-left: 4px solid var(--info); }
+        .toast.warning { border-left: 4px solid var(--warning); }
+        
+        .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-30deg); font-size: 5rem; color: rgba(0,0,0,0.012); pointer-events: none; z-index: 0; white-space: nowrap; font-weight: 900; }
+        
+        @media (max-width: 768px) {
+            .sidebar { width: 0; overflow: hidden; }
+            .main-content { margin-left: 0; }
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+            .stats-row { grid-template-columns: 1fr 1fr; }
+            .topbar { padding: 0 12px; }
+            .page-content { padding: 14px; }
+            .realtime-ticker { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="watermark">FISHFLOW PRO</div>
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- ============ MODALS ============ -->
+    <!-- Block Cashier Modal -->
+    <div class="modal-overlay" id="blockModal">
+        <div class="modal">
+            <h3>🚫 Block Cashier</h3>
+            <input type="hidden" id="blockCashierId">
+            <div class="form-group">
+                <label>Reason for Blocking</label>
+                <textarea id="blockReason" rows="3" placeholder="e.g., End of shift, off-duty, security concern..."></textarea>
+            </div>
+            <div style="margin-top:8px;font-size:0.75rem;color:var(--text-light);">
+                ⚠️ The cashier will not be able to log in until unblocked.
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="closeModal('blockModal')">Cancel</button>
+                <button class="btn btn-danger" onclick="confirmBlock()">🚫 Block Cashier</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Password Modal -->
+    <div class="modal-overlay" id="resetPwdModal">
+        <div class="modal">
+            <h3>🔑 Reset Cashier Password</h3>
+            <input type="hidden" id="resetUserId">
+            <div class="form-group">
+                <label>New Password</label>
+                <input type="password" id="newPassword" placeholder="Minimum 8 characters">
+            </div>
+            <div class="form-group">
+                <label>Confirm Password</label>
+                <input type="password" id="confirmPassword" placeholder="Re-enter password">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="closeModal('resetPwdModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmResetPwd()">🔑 Reset Password</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Cashier Details Modal -->
+    <div class="modal-overlay" id="viewCashierModal">
+        <div class="modal">
+            <h3>👤 Cashier Details</h3>
+            <div id="cashierDetailsContent"></div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="closeModal('viewCashierModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ SIDEBAR ============ -->
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <span class="icon">🐟</span>
+            <h2>FishFlow Pro</h2>
+            <span class="role">🔑 Manager</span>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-section">Main</div>
+            <div class="nav-item active" data-page="dashboard">
+                <span>📊</span> Dashboard Overview
+                <span class="badge">LIVE</span>
+            </div>
+            <div class="nav-item" data-page="sales">
+                <span>💰</span> Sales Monitor
+            </div>
+            
+            <div class="nav-section">Management</div>
+            <div class="nav-item" data-page="cashiers">
+                <span>👥</span> My Cashiers
+            </div>
+            <div class="nav-item" data-page="approvals">
+                <span>✅</span> Pending Approvals
+                <span class="badge" id="approvalBadge">0</span>
+            </div>
+            <div class="nav-item" data-page="blocked">
+                <span>🚫</span> Blocked Cashiers
+            </div>
+            
+            <div class="nav-section">Security Tools</div>
+            <div class="nav-item" data-page="scanner">
+                <span>📷</span> QR Delete Scanner
+            </div>
+            <div class="nav-item" data-page="trash">
+                <span>🗑️</span> Trash Bin
+            </div>
+            
+            <div class="nav-section">Reports</div>
+            <div class="nav-item" data-page="analytics">
+                <span>📈</span> Sales Analytics
+            </div>
+            <div class="nav-item" data-page="reports">
+                <span>📋</span> Shift Reports
+            </div>
+        </nav>
+        <div class="sidebar-footer" onclick="logout()">
+            <span>🚪</span> Sign Out
+        </div>
+    </aside>
+
+    <!-- ============ MAIN CONTENT ============ -->
+    <main class="main-content">
+        <header class="topbar">
+            <h3 id="pageTitle">📊 Dashboard Overview</h3>
+            <div class="topbar-right">
+                <div class="realtime-ticker">
+                    <span class="live-dot"></span> LIVE
+                    <span class="ticker-item" id="tickerSales">0/=</span>
+                    <span class="ticker-item" id="tickerTxns">0 txns</span>
+                </div>
+                <span id="currentDateTime" style="color:var(--text-light);"></span>
+                <div class="user-info">
+                    <div class="avatar" id="userInitial">M</div>
+                    <span id="mgrName">Manager</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="page-content">
+            <!-- ============ DASHBOARD PAGE ============ -->
+            <div class="page active" id="page-dashboard">
+                <div class="shift-banner" id="shiftBanner">
+                    <span>🕐 <strong id="shiftLabel">Day Shift</strong> (09:30 - 22:00)</span>
+                    <span>Shift ends in: <span class="countdown" id="shiftCountdown">--:--:--</span></span>
+                    <span class="shift-warning" id="shiftWarning" style="display:none;">⚠️ Ending soon!</span>
+                </div>
+                <div class="stats-row" id="dashStats"></div>
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-header"><h4><span class="live-dot"></span> Category Sales Today</h4></div>
+                        <div class="cat-grid" id="catBreakdown"></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h4>🐟 Fish Sales Distribution</h4></div>
+                        <canvas id="fishPieChart" height="200"></canvas>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><h4>👥 Cashier Performance Today</h4></div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr><th>Cashier</th><th>Shift</th><th>Sales</th><th>Transactions</th><th>Avg Sale</th><th>Status</th></tr></thead>
+                            <tbody id="cashierPerfBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><h4>📋 Recent Transactions</h4></div>
+                    <div id="recentTxns"></div>
+                </div>
+            </div>
+
+            <!-- ============ SALES PAGE ============ -->
+            <div class="page" id="page-sales">
+                <div class="card">
+                    <div class="card-header">
+                        <h4><span class="live-dot"></span> All Sales Today</h4>
+                        <span id="salesUpdateTime" style="font-size:0.75rem;color:var(--text-light);"></span>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr><th>Time</th><th>Cashier</th><th>Method</th><th>Items</th><th>Total</th></tr></thead>
+                            <tbody id="allSalesTbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ CASHIERS PAGE ============ -->
+            <div class="page" id="page-cashiers">
+                <div class="card">
+                    <div class="card-header">
+                        <h4>👥 Active Cashiers</h4>
+                        <button class="btn btn-primary btn-sm" onclick="refreshCashiers()">🔄 Refresh</button>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Shift</th><th>Status</th><th>Last Login</th><th>Actions</th></tr></thead>
+                            <tbody id="cashiersTbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ APPROVALS PAGE ============ -->
+            <div class="page" id="page-approvals">
+                <div class="card">
+                    <div class="card-header"><h4>✅ Pending Cashier Approvals</h4></div>
+                    <div style="background:#fffbeb;padding:12px 16px;border-radius:8px;margin-bottom:14px;font-size:0.8rem;color:#92400e;border:1px solid #fde68a;">
+                        ⚠️ New cashiers need your approval before they can start selling.
+                    </div>
+                    <div id="approvalsList"></div>
+                </div>
+            </div>
+
+            <!-- ============ BLOCKED PAGE ============ -->
+            <div class="page" id="page-blocked">
+                <div class="card">
+                    <div class="card-header"><h4>🚫 Blocked Cashiers</h4></div>
+                    <div id="blockedList"></div>
+                </div>
+            </div>
+
+            <!-- ============ QR SCANNER PAGE ============ -->
+            <div class="page" id="page-scanner">
+                <div class="card">
+                    <div class="card-header"><h4>📷 QR Scanner - Authorize Item Deletion</h4></div>
+                    <p style="font-size:0.8rem;color:var(--text-light);margin-bottom:12px;">
+                        🔒 Scan the QR code from the cashier's screen to authorize deletion of a transaction.
+                    </p>
+                    <div id="qrScannerContainer"></div>
+                    <div id="qrResult"></div>
+                    <div style="display:flex;gap:10px;margin-top:12px;">
+                        <button class="btn btn-primary" style="flex:1;" onclick="startQR()">🔍 Start Scanner</button>
+                        <button class="btn btn-outline" style="flex:1;" onclick="stopQR()">⏹️ Stop Scanner</button>
+                    </div>
+                    <div style="margin-top:12px;font-size:0.75rem;color:var(--text-muted);">
+                        <strong>Last scanned:</strong> <span id="lastScanned">None</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ TRASH PAGE ============ -->
+            <div class="page" id="page-trash">
+                <div class="card">
+                    <div class="card-header">
+                        <h4>🗑️ Deleted Items (Trash Bin)</h4>
+                        <span style="font-size:0.75rem;color:var(--text-light);">Items deleted by cashiers appear here</span>
+                    </div>
+                    <div id="mgrTrashList"></div>
+                </div>
+            </div>
+
+            <!-- ============ ANALYTICS PAGE ============ -->
+            <div class="page" id="page-analytics">
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-header"><h4>📈 7-Day Sales Trend</h4></div>
+                        <canvas id="mgrTrendChart" height="200"></canvas>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h4>🐟 Tilapia vs Mbuta</h4></div>
+                        <canvas id="mgrFishChart" height="200"></canvas>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><h4>💰 Revenue by Payment Method</h4></div>
+                    <canvas id="paymentChart" height="120"></canvas>
+                </div>
+            </div>
+
+            <!-- ============ REPORTS PAGE ============ -->
+            <div class="page" id="page-reports">
+                <div class="card">
+                    <div class="card-header"><h4>📋 Shift Reports from Cashiers</h4></div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr><th>Date</th><th>Cashier</th><th>Shift</th><th>Total Sales</th><th>Transactions</th><th>Report</th></tr></thead>
+                            <tbody id="reportsTbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+    // ============================================
+    // FISHFLOW PRO - MANAGER DASHBOARD ENGINE
+    // Version: 2.0 Production
+    // ============================================
+    
+    const CONFIG = {
+        API_BASE: 'http://127.0.0.1:8000/api',
+        REFRESH_INTERVAL: 15000,
+        SHIFT_DAY_START: { h: 9, m: 30 },
+        SHIFT_DAY_END: { h: 22, m: 0 },
+        APP_NAME: 'FishFlow Pro',
+        VERSION: '2.0.0'
+    };
+    
+    const TOKEN = localStorage.getItem('fishflow_token');
+    const USER = JSON.parse(localStorage.getItem('fishflow_user') || '{}');
+    
+    if (!TOKEN || USER.role !== 'manager') {
+        window.location.href = 'login.html';
+    }
+    
+    document.getElementById('userInitial').textContent = (USER.full_name || 'M')[0].toUpperCase();
+    document.getElementById('mgrName').textContent = USER.full_name || 'Manager';
+    
+    let refreshInterval;
+    let scanInstance = null;
+    let previousSales = 0;
+    
+    // Anti-screenshot
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'PrintScreen' || (e.ctrlKey && (e.key === 'p' || e.key === 's'))) {
+            e.preventDefault();
+            showToast('🚫 Screenshots disabled for security', 'warning');
+            return false;
+        }
+    });
+    document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
+    
+    // Navigation
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            this.classList.add('active');
+            const page = this.dataset.page;
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            const target = document.getElementById('page-' + page);
+            if (target) {
+                target.classList.add('active');
+                document.getElementById('pageTitle').textContent = this.textContent.trim().replace(/\d+/, '').trim();
+                clearInterval(refreshInterval);
+                loadPage(page);
+            }
+        });
+    });
+    
+    function loadPage(page) {
+        const loaders = {
+            dashboard: () => { loadDashboard(); refreshInterval = setInterval(loadDashboard, CONFIG.REFRESH_INTERVAL); },
+            sales: () => { loadSales(); refreshInterval = setInterval(loadSales, CONFIG.REFRESH_INTERVAL); },
+            cashiers: loadCashiers,
+            approvals: loadApprovals,
+            blocked: loadBlocked,
+            trash: loadTrash,
+            analytics: loadAnalytics,
+            reports: loadReports
+        };
+        if (loaders[page]) loaders[page]();
+    }
+    
+    // API Helper
+    async function api(endpoint, method = 'GET', body = null) {
+        try {
+            const options = {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + TOKEN
+                }
+            };
+            if (body) options.body = JSON.stringify(body);
+            const response = await fetch(CONFIG.API_BASE + '/' + endpoint, options);
+            if (response.status === 401 || response.status === 403) { logout(); return null; }
+            return await response.json();
+        } catch (error) {
+            console.error('API Error:', error);
+            return null;
+        }
+    }
+    
+    // Toast Notifications
+    function showToast(message, type = 'info') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = 'toast ' + type;
+        toast.textContent = message;
+        container.appendChild(toast);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+    
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+    
+    // Shift Management
+    function updateShift() {
+        const now = new Date();
+        const h = now.getHours();
+        const m = now.getMinutes();
+        let label, cd;
+        const dayStart = CONFIG.SHIFT_DAY_START;
+        const dayEnd = CONFIG.SHIFT_DAY_END;
+        
+        if (h >= dayStart.h && h < dayEnd.h || (h === dayStart.h && m >= dayStart.m)) {
+            label = '☀️ Day Shift (09:30 - 22:00)';
+            const end = new Date(now);
+            end.setHours(dayEnd.h, dayEnd.m, 0, 0);
+            const diff = end - now;
+            const hrs = Math.floor(diff / 3600000);
+            const mins = Math.floor((diff % 3600000) / 60000);
+            const secs = Math.floor((diff % 60000) / 1000);
+            cd = `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+            document.getElementById('shiftBanner').className = 'shift-banner';
+        } else {
+            label = '🌙 Night Shift (22:00 - 09:30)';
+            const end = new Date(now);
+            end.setDate(end.getDate() + 1);
+            end.setHours(9, 30, 0, 0);
+            const diff = end - now;
+            const hrs = Math.floor(diff / 3600000);
+            const mins = Math.floor((diff % 3600000) / 60000);
+            const secs = Math.floor((diff % 60000) / 1000);
+            cd = `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+            document.getElementById('shiftBanner').className = 'shift-banner night';
+        }
+        
+        document.getElementById('shiftLabel').textContent = label;
+        document.getElementById('shiftCountdown').textContent = cd;
+        
+        // Show warning when less than 30 minutes
+        const totalMin = Math.floor((new Date() - now) / 60000) + (parseInt(cd.split(':')[0]) * 60) + parseInt(cd.split(':')[1]);
+        if (totalMin <= 30 && totalMin > 0) {
+            document.getElementById('shiftWarning').style.display = 'inline-block';
+        } else {
+            document.getElementById('shiftWarning').style.display = 'none';
+        }
+    }
+    setInterval(updateShift, 1000);
+    updateShift();
+    
+    // Dashboard
+    async function loadDashboard() {
+        const data = await api('dashboard/manager/');
+        if (!data || !data.today) return;
+        
+        const s = data.today;
+        const cat = s.category_stats || {};
+        const sales = s.total_sales || 0;
+        const exp = s.total_expenses || 0;
+        const profit = sales - exp;
+        
+        document.getElementById('dashStats').innerHTML = `
+            <div class="stat-card revenue">
+                <div class="stat-label">💰 Total Sales Today</div>
+                <div class="stat-value">${sales.toLocaleString()}/=</div>
+                <div class="stat-sub">${sales > previousSales ? '↑' : '↓'} ${Math.abs(sales - previousSales).toLocaleString()}/= change</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">📊 Transactions</div>
+                <div class="stat-value">${s.transaction_count || 0}</div>
+                <div class="stat-sub">Today's count</div>
+            </div>
+            <div class="stat-card profit">
+                <div class="stat-label">💵 Net Revenue</div>
+                <div class="stat-value">${profit.toLocaleString()}/=</div>
+                <div class="stat-sub">After expenses</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">👥 Day / Night</div>
+                <div class="stat-value">${data.cashiers?.day_shift || 0} / ${data.cashiers?.night_shift || 0}</div>
+                <div class="stat-sub">Active cashiers</div>
+            </div>
+            <div class="stat-card pending">
+                <div class="stat-label">⏳ Pending Approvals</div>
+                <div class="stat-value">${data.pending_approvals?.length || 0}</div>
+                <div class="stat-sub">Need attention</div>
+            </div>
+        `;
+        
+        document.getElementById('tickerSales').textContent = sales.toLocaleString() + '/=';
+        document.getElementById('tickerTxns').textContent = (s.transaction_count || 0) + ' txns';
+        
+        let catHTML = '';
+        for (const [key, stats] of Object.entries(cat)) {
+            if (stats.pieces > 0) {
+                const names = { tilapia: '🐟 Tilapia', mbuta: '🐠 Mbuta', ugali: '🍚 Ugali', wetfry: '🍳 Wet Fry', soda: '🥤 Soda', greens: '🥬 Greens', chips: '🍟 Chips', bag: '🛍️ Bags', fuluOmena: '🐟 Fulu/Omena', water: '💧 Water', container: '📦 Containers', other: '📋 Other' };
+                catHTML += `<div class="cat-item"><div class="cat-name">${names[key] || key}</div><div class="cat-count">${stats.pieces}</div><div class="cat-amount">${(stats.amount||0).toLocaleString()}/=</div></div>`;
+            }
+        }
+        document.getElementById('catBreakdown').innerHTML = catHTML || '<p style="text-align:center;padding:20px;color:var(--text-light);">No sales recorded today</p>';
+        
+        // Fish pie chart
+        const ctx = document.getElementById('fishPieChart').getContext('2d');
+        if (window.fishPie) window.fishPie.destroy();
+        window.fishPie = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Tilapia', 'Mbuta'],
+                datasets: [{ data: [cat.tilapia?.pieces || 0, cat.mbuta?.pieces || 0], backgroundColor: ['#e67e22', '#0b3954'], borderWidth: 3, borderColor: '#fff' }]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+        });
+        
+        // Cashier performance
+        const perf = data.cashiers?.performance || [];
+        document.getElementById('cashierPerfBody').innerHTML = perf.length === 0 ? '<tr><td colspan="6" style="text-align:center;padding:20px;">No cashier data</td></tr>' :
+            perf.map(c => {
+                const avg = c.transaction_count > 0 ? Math.round(c.total_sales / c.transaction_count) : 0;
+                return `<tr><td><strong>${c.name}</strong></td><td>N/A</td><td>${(c.total_sales||0).toLocaleString()}/=</td><td>${c.transaction_count}</td><td>${avg.toLocaleString()}/=</td><td><span class="badge badge-success">Active</span></td></tr>`;
+            }).join('');
+        
+        // Recent transactions
+        const txns = await api('transactions/') || [];
+        document.getElementById('recentTxns').innerHTML = txns.length === 0 ? '<p style="text-align:center;padding:20px;">No transactions</p>' :
+            txns.slice(0, 10).map(t => {
+                const items = typeof t.items === 'string' ? JSON.parse(t.items) : (t.items || []);
+                return `<div style="padding:8px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;"><div><strong>${t.time}</strong> | ${t.cashier_name||'N/A'}<br><small>${items.map(i=>i.name+' ×'+(i.qty||1)).join(', ')}</small></div><strong>${t.total}/=</strong></div>`;
+            }).join('');
+        
+        if (sales > previousSales && previousSales > 0) {
+            showToast('💰 New sale! +' + (sales - previousSales).toLocaleString() + '/=', 'sale');
+        }
+        previousSales = sales;
+    }
+    
+    // Sales
+    async function loadSales() {
+        const txns = await api('transactions/') || [];
+        document.getElementById('salesUpdateTime').textContent = 'Updated: ' + new Date().toLocaleTimeString('en-KE');
+        document.getElementById('allSalesTbody').innerHTML = txns.length === 0 ? '<tr><td colspan="5" style="text-align:center;padding:20px;">No sales</td></tr>' :
+            txns.map(t => {
+                const items = typeof t.items === 'string' ? JSON.parse(t.items) : (t.items || []);
+                return `<tr><td>${t.time}</td><td>${t.cashier_name||'N/A'}</td><td><span class="badge ${t.method==='mpesa'?'badge-info':'badge-success'}">${t.method}</span></td><td style="font-size:0.75rem;">${items.map(i=>i.name+'×'+(i.qty||1)).join(', ')}</td><td><strong>${t.total}/=</strong></td></tr>`;
+            }).join('');
+    }
+    
+    // Cashiers
+    async function loadCashiers() {
+        const cashiers = await api('auth/cashiers/') || [];
+        document.getElementById('cashiersTbody').innerHTML = cashiers.length === 0 ? '<tr><td colspan="7" style="text-align:center;padding:20px;">No cashiers</td></tr>' :
+            cashiers.map(c => `
+                <tr>
+                    <td><strong>${c.full_name}</strong></td>
+                    <td>${c.email}</td>
+                    <td>${c.phone || 'N/A'}</td>
+                    <td>${c.shift === 'night' ? '🌙 Night' : '☀️ Day'}</td>
+                    <td>${c.is_blocked ? '<span class="badge badge-danger">🚫 Blocked</span>' : c.is_approved ? '<span class="badge badge-success">✅ Active</span>' : '<span class="badge badge-warning">⏳ Pending</span>'}</td>
+                    <td style="font-size:0.7rem;">${c.last_login ? new Date(c.last_login).toLocaleDateString('en-KE') : 'Never'}</td>
+                    <td>
+                        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                            <button class="btn btn-outline btn-xs" onclick="viewCashier('${c.id}')" title="View">👁️</button>
+                            ${c.is_blocked ? `<button class="btn btn-warning btn-xs" onclick="unblockCashier('${c.id}')">🔓</button>` : `<button class="btn btn-danger btn-xs" onclick="showBlockModal('${c.id}')">🚫</button>`}
+                            <button class="btn btn-outline btn-xs" onclick="showResetPwdModal('${c.id}')">🔑</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+    }
+    
+    async function refreshCashiers() { await loadCashiers(); showToast('🔄 Refreshed', 'info'); }
+    
+    async function viewCashier(id) {
+        const cashiers = await api('auth/cashiers/') || [];
+        const c = cashiers.find(x => x.id === id);
+        if (c) {
+            document.getElementById('cashierDetailsContent').innerHTML = `
+                <p><strong>Name:</strong> ${c.full_name}</p>
+                <p><strong>Email:</strong> ${c.email}</p>
+                <p><strong>Phone:</strong> ${c.phone || 'N/A'}</p>
+                <p><strong>Shift:</strong> ${c.shift}</p>
+                <p><strong>Status:</strong> ${c.is_blocked ? 'Blocked' : c.is_approved ? 'Active' : 'Pending'}</p>
+                <p><strong>Last Login:</strong> ${c.last_login || 'Never'}</p>
+            `;
+            document.getElementById('viewCashierModal').classList.add('active');
+        }
+    }
+    
+    function showBlockModal(id) { document.getElementById('blockCashierId').value = id; document.getElementById('blockModal').classList.add('active'); }
+    
+    async function confirmBlock() {
+        const id = document.getElementById('blockCashierId').value;
+        const reason = document.getElementById('blockReason').value || 'Blocked by manager';
+        await api('auth/block/' + id + '/', 'POST', { reason: reason });
+        closeModal('blockModal');
+        showToast('🚫 Cashier blocked', 'expense');
+        loadCashiers();
+    }
+    
+    async function unblockCashier(id) {
+        if (confirm('Unblock this cashier?')) {
+            await api('auth/unblock/' + id + '/', 'POST');
+            showToast('🔓 Cashier unblocked', 'sale');
+            loadCashiers();
+        }
+    }
+    
+    function showResetPwdModal(id) { document.getElementById('resetUserId').value = id; document.getElementById('resetPwdModal').classList.add('active'); }
+    
+    async function confirmResetPwd() {
+        const id = document.getElementById('resetUserId').value;
+        const pwd = document.getElementById('newPassword').value;
+        const confirmPwd = document.getElementById('confirmPassword').value;
+        if (!pwd || pwd.length < 8) { alert('Password must be at least 8 characters'); return; }
+        if (pwd !== confirmPwd) { alert('Passwords do not match'); return; }
+        await api('auth/reset-password/' + id + '/', 'POST', { password: pwd });
+        closeModal('resetPwdModal');
+        showToast('🔑 Password reset successfully', 'info');
+    }
+    
+    // Approvals
+    async function loadApprovals() {
+        const cashiers = await api('auth/cashiers/') || [];
+        const pending = cashiers.filter(c => !c.is_approved);
+        document.getElementById('approvalBadge').textContent = pending.length;
+        document.getElementById('approvalsList').innerHTML = pending.length === 0 ? '<p style="text-align:center;padding:30px;">✅ No pending approvals</p>' :
+            pending.map(c => `
+                <div class="card" style="margin-bottom:8px;padding:14px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <strong>${c.full_name}</strong> (${c.email})
+                            <br><small>Shift: ${c.shift === 'night' ? '🌙 Night' : '☀️ Day'} | Phone: ${c.phone || 'N/A'}</small>
+                            <br><small>Registered: ${new Date(c.created_at).toLocaleDateString('en-KE')}</small>
+                        </div>
+                        <button class="btn btn-success btn-sm" onclick="approveCashier('${c.id}')">✅ Approve</button>
+                    </div>
+                </div>
+            `).join('');
+    }
+    
+    async function approveCashier(id) {
+        await api('auth/approve/' + id + '/', 'POST');
+        showToast('✅ Cashier approved', 'sale');
+        loadApprovals();
+        loadCashiers();
+    }
+    
+    // Blocked
+    async function loadBlocked() {
+        const cashiers = await api('auth/cashiers/') || [];
+        const blocked = cashiers.filter(c => c.is_blocked);
+        document.getElementById('blockedList').innerHTML = blocked.length === 0 ? '<p style="text-align:center;padding:30px;">No blocked cashiers</p>' :
+            blocked.map(c => `
+                <div class="card" style="margin-bottom:8px;padding:14px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <strong>${c.full_name}</strong> (${c.email})
+                            <br><small>Reason: ${c.blocked_reason || 'N/A'}</small>
+                        </div>
+                        <button class="btn btn-warning btn-sm" onclick="unblockCashier('${c.id}')">🔓 Unblock</button>
+                    </div>
+                </div>
+            `).join('');
+    }
+    
+    // QR Scanner
+    function startQR() {
+        document.getElementById('qrScannerContainer').innerHTML = '';
+        scanInstance = new Html5Qrcode('qrScannerContainer');
+        scanInstance.start(
+            { facingMode: 'environment' },
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            async (decodedText) => {
+                document.getElementById('qrResult').innerHTML = '✅ Scanned: <strong>' + decodedText + '</strong>';
+                document.getElementById('qrResult').style.background = '#d1fae5';
+                document.getElementById('lastScanned').textContent = decodedText;
+                
+                const parts = decodedText.split(':');
+                if (parts.length === 2 && parts[0] && parts[1]) {
+                    await api('transactions/' + parts[0] + '/', 'DELETE');
+                    showToast('🗑️ Transaction deleted via QR authorization', 'expense');
+                    loadSales();
+                }
+                scanInstance.stop();
+                scanInstance = null;
+            },
+            (error) => {}
+        ).catch(err => {
+            showToast('❌ Camera access denied', 'expense');
+        });
+    }
+    
+    function stopQR() {
+        if (scanInstance) {
+            scanInstance.stop();
+            scanInstance = null;
+            document.getElementById('qrResult').innerHTML = '';
+            document.getElementById('qrResult').style.background = 'transparent';
+        }
+    }
+    
+    // Trash
+    async function loadTrash() {
+        const trash = await api('trash/') || [];
+        document.getElementById('mgrTrashList').innerHTML = trash.length === 0 ? '<p style="text-align:center;padding:30px;">Trash is empty</p>' :
+            trash.map(t => `
+                <div class="card" style="margin-bottom:6px;padding:12px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <span class="badge ${t.item_type==='sale'?'badge-info':'badge-warning'}">${t.item_type}</span>
+                            <strong>${t.description}</strong>
+                            <br><small>Deleted: ${new Date(t.trashed_at).toLocaleString('en-KE')}</small>
+                        </div>
+                        <div style="display:flex;gap:4px;">
+                            <button class="btn btn-success btn-xs" onclick="restoreTrash('${t.id}')">↩️ Restore</button>
+                            <button class="btn btn-danger btn-xs" onclick="permDelete('${t.id}')">❌</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+    }
+    
+    async function restoreTrash(id) {
+        await api('trash/restore/' + id + '/', 'POST');
+        showToast('↩️ Item restored', 'sale');
+        loadTrash();
+    }
+    
+    async function permDelete(id) {
+        if (confirm('Permanently delete?')) {
+            await api('trash/' + id + '/', 'DELETE');
+            showToast('🗑️ Deleted permanently', 'expense');
+            loadTrash();
+        }
+    }
+    
+    // Analytics
+    async function loadAnalytics() {
+        const data = await api('dashboard/monthly/') || [];
+        const recent = data.slice(0, 7).reverse();
+        
+        const ctx1 = document.getElementById('mgrTrendChart').getContext('2d');
+        if (window.mgrTrend) window.mgrTrend.destroy();
+        window.mgrTrend = new Chart(ctx1, {
+            type: 'line',
+            data: {
+                labels: recent.map(d => d.date),
+                datasets: [{
+                    label: 'Daily Sales (Ksh)',
+                    data: recent.map(d => d.total_sales),
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16,185,129,0.08)',
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { display: false } } }
+        });
+        
+        const ctx2 = document.getElementById('mgrFishChart').getContext('2d');
+        if (window.mgrFish) window.mgrFish.destroy();
+        window.mgrFish = new Chart(ctx2, {
+            type: 'bar',
+            data: {
+                labels: recent.map(d => d.date),
+                datasets: [
+                    { label: 'Tilapia', data: recent.map(d => d.tilapia_sales || 0), backgroundColor: '#e67e22aa', borderRadius: 6 },
+                    { label: 'Mbuta', data: recent.map(d => d.mbuta_sales || 0), backgroundColor: '#0b3954aa', borderRadius: 6 }
+                ]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+    
+    // Reports
+    async function loadReports() {
+        const reports = await api('shift-reports/') || [];
+        document.getElementById('reportsTbody').innerHTML = reports.length === 0 ? '<tr><td colspan="6" style="text-align:center;padding:20px;">No reports submitted</td></tr>' :
+            reports.map(r => `<tr><td>${r.date}</td><td>${r.cashier_name}</td><td>${r.shift}</td><td>${(r.total_sales||0).toLocaleString()}/=</td><td>${r.transaction_count}</td><td><a href="https://wa.me/254792988239?text=${encodeURIComponent(r.report_text||'')}" target="_blank" class="btn btn-success btn-xs">📱 View</a></td></tr>`).join('');
+    }
+    
+    function logout() {
+        if (confirm('Sign out?')) {
+            localStorage.clear();
+            window.location.href = 'login.html';
+        }
+    }
+    
+    setInterval(() => {
+        document.getElementById('currentDateTime').textContent = new Date().toLocaleString('en-KE', {
+            weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+    }, 1000);
+    
+    // Initialize
+    function init() {
+        loadDashboard();
+        refreshInterval = setInterval(loadDashboard, CONFIG.REFRESH_INTERVAL);
+        console.log(`%c${CONFIG.APP_NAME} v${CONFIG.VERSION} %c| Manager Dashboard`,
+            'color:#10b981;font-weight:bold;', 'color:#10b981;');
+    }
+    
+    init();
+    </script>
+</body>
+</html>
