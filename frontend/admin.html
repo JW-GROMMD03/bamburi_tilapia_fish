@@ -2409,7 +2409,7 @@ function initAnalytics() {
 }
 
 
-// ============ QR SCANNER WITH AUTO-ZOOM TRACKING ============
+// ============ QR SCANNER - UPDATED FOR DELETION PROCESSING ============
 
 async function startScanner() {
     if (scannerRunning) {
@@ -2420,12 +2420,10 @@ async function startScanner() {
     const readerElement = document.getElementById('reader');
     if (!readerElement) return;
     
-    // Clear previous scanner
     readerElement.innerHTML = '';
     document.getElementById('scanResult').innerHTML = '📷 Initializing camera...';
     document.getElementById('scanOverlay').style.display = 'block';
     
-    // Advanced QR Scanner configuration with auto-zoom
     const config = {
         fps: 30,
         qrbox: { width: 280, height: 280 },
@@ -2451,85 +2449,120 @@ async function startScanner() {
             { facingMode: "environment" },
             config,
             async (decodedText, decodedResult) => {
-                // Prevent duplicate scans within 3 seconds
-                if (lastScannedCode === decodedText && scanTimeout) {
-                    return;
-                }
+                if (lastScannedCode === decodedText && scanTimeout) return;
                 
                 lastScannedCode = decodedText;
-                document.getElementById('scanResult').innerHTML = `
-                    <div style="background: #dcfce7; padding: 12px; border-radius: 10px;">
-                        <strong>✅ QR Code Detected!</strong><br>
-                        <span style="font-size: 12px;">${decodedText}</span>
-                    </div>
-                `;
                 
-                // Play beep sound (optional - creates a beep on scan)
-                try {
-                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    const oscillator = audioContext.createOscillator();
-                    const gainNode = audioContext.createGain();
-                    oscillator.connect(gainNode);
-                    gainNode.connect(audioContext.destination);
-                    oscillator.frequency.value = 880;
-                    gainNode.gain.value = 0.1;
-                    oscillator.start();
-                    gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.5);
-                    oscillator.stop(audioContext.currentTime + 0.5);
-                } catch(e) { console.log('Beep not supported'); }
-                
-                toast('✅ QR Code Scanned: ' + decodedText.substring(0, 50));
-                
-                // Send to backend for processing
-                try {
-                    const response = await fetch(`${API_URL}/trash/`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${authToken}`
-                        },
-                        body: JSON.stringify({
-                            item_type: 'qr_scan',
-                            description: decodedText,
-                            data: { 
-                                scanned_at: new Date().toISOString(),
-                                scanned_by: currentUser?.id || 'unknown'
-                            }
-                        })
-                    });
+                // ============ CHECK IF THIS IS A DELETION QR CODE ============
+                if (decodedText.startsWith('CLEAR-') || 
+                    decodedText.startsWith('ITEMS-') ||
+                    decodedText.startsWith('REMOVE-ITEM-') ||
+                    decodedText.startsWith('RECEIPT-') ||
+                    decodedText.startsWith('HOLD-')) {
                     
-                    if (response.ok) {
-                        console.log('QR code logged to backend');
+                    // This is a deletion request from cashier
+                    document.getElementById('scanResult').innerHTML = `
+                        <div style="background: #fef3c7; padding: 12px; border-radius: 10px;">
+                            <strong>🗑️ Deletion Request Detected!</strong><br>
+                            <span style="font-size: 12px;">Processing: ${decodedText.substring(0, 40)}...</span>
+                        </div>
+                    `;
+                    
+                    // Process the deletion
+                    try {
+                        const response = await fetch(`${API_URL}/trash/`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${authToken}`
+                            },
+                            body: JSON.stringify({
+                                item_type: 'qr_delete_approved',
+                                description: `Admin approved deletion: ${decodedText}`,
+                                data: { 
+                                    qr_code: decodedText,
+                                    scanned_at: new Date().toISOString(),
+                                    scanned_by: currentUser?.id || 'admin',
+                                    approved: true
+                                }
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            document.getElementById('scanResult').innerHTML = `
+                                <div style="background: #dcfce7; padding: 12px; border-radius: 10px;">
+                                    <strong>✅ Deletion Approved!</strong><br>
+                                    <span style="font-size: 12px;">Cashier items will be removed</span>
+                                </div>
+                            `;
+                            toast('✅ Deletion approved! Cashier items cleared.');
+                        } else {
+                            document.getElementById('scanResult').innerHTML = `
+                                <div style="background: #fee2e2; padding: 12px; border-radius: 10px;">
+                                    <strong>❌ Deletion Failed</strong><br>
+                                    <span style="font-size: 12px;">Could not process deletion</span>
+                                </div>
+                            `;
+                        }
+                    } catch (err) {
+                        console.log('Delete processing error:', err);
                     }
-                } catch (err) {
-                    console.log('Backend log failed:', err);
+                    
+                } else {
+                    // Regular QR code - just log it
+                    document.getElementById('scanResult').innerHTML = `
+                        <div style="background: #dbeafe; padding: 12px; border-radius: 10px;">
+                            <strong>📷 QR Code Scanned</strong><br>
+                            <span style="font-size: 12px;">${decodedText.substring(0, 50)}</span>
+                        </div>
+                    `;
+                    toast('📷 QR Code scanned');
+                    
+                    // Save to trash for audit
+                    try {
+                        await fetch(`${API_URL}/trash/`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${authToken}`
+                            },
+                            body: JSON.stringify({
+                                item_type: 'qr_scan',
+                                description: decodedText,
+                                data: { 
+                                    scanned_at: new Date().toISOString(),
+                                    scanned_by: currentUser?.id || 'unknown'
+                                }
+                            })
+                        });
+                    } catch (err) {
+                        console.log('Backend log failed:', err);
+                    }
                 }
                 
-                // Set timeout to prevent duplicate scans
+                // Reset after 3 seconds
                 scanTimeout = setTimeout(() => {
                     lastScannedCode = null;
                     scanTimeout = null;
                 }, 3000);
                 
-                // Auto-restart scanner after a short pause
+                // Auto-restart scanner
                 setTimeout(() => {
                     if (scannerRunning && qrScanner) {
                         document.getElementById('scanResult').innerHTML = '📷 Waiting for next QR code...';
                     }
-                }, 1500);
+                }, 2000);
             },
             (errorMessage) => {
-                // Silent error handling - only log on major errors
                 if (errorMessage && errorMessage.includes('No MultiFormat Readers')) {
                     console.log('Scanning...');
                 }
             }
         ).then(() => {
             scannerRunning = true;
-            document.getElementById('scanResult').innerHTML = '📷 Scanner ready - Auto-zoom enabled. Point camera at QR code.';
-            toast('📷 Scanner started with auto-zoom tracking');
+            document.getElementById('scanResult').innerHTML = '📷 Scanner ready - Point at cashier QR code to approve deletion.';
+            toast('📷 Scanner started');
             
-            // Try to set zoom to optimal level after camera starts
             setTimeout(() => {
                 if (qrScanner && qrScanner.getVideoElement) {
                     const video = qrScanner.getVideoElement();
@@ -2540,7 +2573,6 @@ async function startScanner() {
                             const maxZoom = capabilities.zoom.max;
                             const targetZoom = Math.min(maxZoom, 2.5);
                             track.applyConstraints({ advanced: [{ zoom: targetZoom }] });
-                            console.log('Zoom set to:', targetZoom);
                         }
                     }
                 }
