@@ -1271,7 +1271,7 @@ flex-wrap:wrap;
 
 <script>
 // ============ CONFIGURATION ============
-const API_URL = 'https://bamburi-tilapia-fish.onrender.com';
+const API_URL = 'https://bamburi-tilapia-fish.onrender.com/api'; 
 let authToken = localStorage.getItem('fishflow_token');
 let currentUser = JSON.parse(localStorage.getItem('fishflow_user') || '{}');
 let salesChart = null;
@@ -1366,7 +1366,6 @@ function logout() {
 }
 
 async function apiRequest(endpoint, method = 'GET', body = null) {
-    // Ensure endpoint doesn't have double slashes
     let cleanEndpoint = endpoint.replace(/\/+/g, '/').replace(/^\/+/, '');
     
     const options = {
