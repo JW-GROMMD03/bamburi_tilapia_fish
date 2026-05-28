@@ -196,7 +196,9 @@
     </div>
 
     <script>
-        const API = 'http://127.0.0.1:8000/api';
+        const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://127.0.0.1:8000/api'
+    : 'https://bamburi-tilapia-backend.onrender.com/api';
         let selectedRole = 'cashier';
         
         function selectRole(role, element) {

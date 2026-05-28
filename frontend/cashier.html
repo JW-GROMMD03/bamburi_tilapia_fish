@@ -225,7 +225,8 @@
 
 <script>
 // ============ CONFIGURATION ============
-const API_URL = 'https://bamburi-tilapia-backend.onrender.com/api';
+const API_BASE = 'https://bamburi-tilapia-backend.onrender.com/api';
+const API_URL = API_BASE;
 const token = localStorage.getItem('fishflow_token');
 const user = JSON.parse(localStorage.getItem('fishflow_user') || '{}');
 
