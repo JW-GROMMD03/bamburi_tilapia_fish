@@ -2410,151 +2410,114 @@ function initAnalytics() {
 }
 
 
-// ============ QR SCANNER - COMPLETE FIXED FUNCTION ============
-
-// Add this at the top with other global variables:
-var scannedQRCodes = [];  // Track scanned QR codes
-
-// Inside startScanner, replace the scan handler:
-async (decodedText, decodedResult) => {
-    if (lastScannedCode === decodedText && scanTimeout) return;
-    
-    lastScannedCode = decodedText;
-    
-    // ============ VALIDATE QR FORMAT ============
-    var validPrefixes = ['CLEAR-', 'ITEMS-', 'REMOVE-ITEM-', 'RECEIPT-', 'HOLD-'];
-    var isValidDeleteQR = validPrefixes.some(function(prefix) {
-        return decodedText.startsWith(prefix);
-    });
-    
-    if (isValidDeleteQR) {
-        // ============ CHECK FOR DUPLICATE ============
-        if (scannedQRCodes.indexOf(decodedText) !== -1) {
-            document.getElementById('scanResult').innerHTML = `
-                <div style="background: #fef3c7; padding: 12px; border-radius: 10px;">
-                    <strong>⚠️ Already Authorized!</strong><br>
-                    <span style="font-size: 12px;">This QR code has already been approved for deletion.</span>
-                </div>
-            `;
-            toast('⚠️ QR already authorized');
-            setTimeout(() => {
-                if (scannerRunning && qrScanner) {
-                    document.getElementById('scanResult').innerHTML = '📷 Scanner ready';
-                }
-            }, 2000);
-            return;
-        }
-        
-        // ============ PROCESS DELETION ============
-        document.getElementById('scanResult').innerHTML = `
-            <div style="background: #fef3c7; padding: 12px; border-radius: 10px;">
-                <strong>🗑️ Deletion Request Detected!</strong><br>
-                <span style="font-size: 12px;">Processing: ${decodedText.substring(0, 40)}...</span>
-            </div>
-        `;
-        
-        try {
-            var response = await fetch(`${API_URL}/trash/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                },
-                body: JSON.stringify({
-                    item_type: 'qr_delete_approved',
-                    description: `Admin approved deletion: ${decodedText}`,
-                    data: {
-                        qr_code: decodedText,
-                        scanned_at: new Date().toISOString(),
-                        scanned_by: currentUser?.id || 'admin',
-                        approved: true
-                    }
-                })
-            });
-            
-            if (response.ok) {
-                // Add to scanned list to prevent duplicates
-                scannedQRCodes.push(decodedText);
-                
-                document.getElementById('scanResult').innerHTML = `
-                    <div style="background: #dcfce7; padding: 12px; border-radius: 10px;">
-                        <strong>✅ Deletion Approved!</strong><br>
-                        <span style="font-size: 12px;">Cashier items will be cleared</span>
-                    </div>
-                `;
-                toast('✅ Deletion approved!');
-            } else {
-                document.getElementById('scanResult').innerHTML = `
-                    <div style="background: #fee2e2; padding: 12px; border-radius: 10px;">
-                        <strong>❌ Failed to Process</strong><br>
-                        <span style="font-size: 12px;">Please try scanning again</span>
-                    </div>
-                `;
-            }
-        } catch (err) {
-            document.getElementById('scanResult').innerHTML = `
-                <div style="background: #fee2e2; padding: 12px; border-radius: 10px;">
-                    <strong>❌ Connection Error</strong>
-                </div>
-            `;
-        }
-        
-    } else {
-        // ============ UNKNOWN QR CODE ============
-        document.getElementById('scanResult').innerHTML = `
-            <div style="background: #fee2e2; padding: 12px; border-radius: 10px;">
-                <strong>❌ Unrecognized QR Code</strong><br>
-                <span style="font-size: 12px;">This QR code is not a valid deletion request.</span>
-            </div>
-        `;
-        toast('❌ Cannot recognize this QR code');
+async function startScanner() {
+    if (scannerRunning) {
+        toast('Scanner is already running', 'info');
+        return;
     }
     
-    // Reset after 3 seconds
-    scanTimeout = setTimeout(() => {
-        lastScannedCode = null;
-        scanTimeout = null;
-    }, 3000);
+    const readerElement = document.getElementById('reader');
+    if (!readerElement) return;
     
-    // Auto-restart scanner
-    setTimeout(() => {
-        if (scannerRunning && qrScanner) {
-            document.getElementById('scanResult').innerHTML = '📷 Scanner ready - Point at cashier QR code.';
+    readerElement.innerHTML = '';
+    document.getElementById('scanResult').innerHTML = '📷 Initializing camera...';
+    document.getElementById('scanOverlay').style.display = 'block';
+    
+    const config = {
+        fps: 30,
+        qrbox: { width: 280, height: 280 },
+        aspectRatio: 1.0,
+        showTorchButton: true,
+        showZoomSlider: true,
+        defaultZoomValue: 2,
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        videoConstraints: {
+            facingMode: "environment",
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
         }
-    }, 2000);
-},
-            (errorMessage) => {
-                if (errorMessage && errorMessage.includes('No MultiFormat Readers')) {
-                    console.log('Scanning...');
+    };
+    
+    try {
+        qrScanner = new Html5Qrcode("reader");
+        
+        await qrScanner.start(
+            { facingMode: "environment" },
+            config,
+            async (decodedText, decodedResult) => {
+                if (lastScannedCode === decodedText && scanTimeout) return;
+                lastScannedCode = decodedText;
+                
+                var validPrefixes = ['CLEAR-', 'ITEMS-', 'REMOVE-ITEM-', 'RECEIPT-', 'HOLD-'];
+                var isValidDeleteQR = validPrefixes.some(function(prefix) {
+                    return decodedText.startsWith(prefix);
+                });
+                
+                if (isValidDeleteQR) {
+                    if (scannedQRCodes.indexOf(decodedText) !== -1) {
+                        document.getElementById('scanResult').innerHTML = `
+                            <div style="background: #fef3c7; padding: 12px; border-radius: 10px;">
+                                <strong>⚠️ Already Authorized!</strong><br>
+                                <span style="font-size: 12px;">This QR code has already been approved.</span>
+                            </div>`;
+                        toast('⚠️ QR already authorized');
+                        setTimeout(() => { if (scannerRunning && qrScanner) document.getElementById('scanResult').innerHTML = '📷 Scanner ready'; }, 2000);
+                        return;
+                    }
+                    
+                    document.getElementById('scanResult').innerHTML = `
+                        <div style="background: #fef3c7; padding: 12px; border-radius: 10px;">
+                            <strong>🗑️ Deletion Request Detected!</strong><br>
+                            <span style="font-size: 12px;">Processing: ${decodedText.substring(0, 40)}...</span>
+                        </div>`;
+                    
+                    try {
+                        var response = await fetch(`${API_URL}/trash/`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                            body: JSON.stringify({
+                                item_type: 'qr_delete_approved',
+                                description: `Admin approved deletion: ${decodedText}`,
+                                data: { qr_code: decodedText, scanned_at: new Date().toISOString(), scanned_by: currentUser?.id || 'admin', approved: true }
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            scannedQRCodes.push(decodedText);
+                            document.getElementById('scanResult').innerHTML = `<div style="background: #dcfce7; padding: 12px; border-radius: 10px;"><strong>✅ Deletion Approved!</strong><br><span style="font-size: 12px;">Cashier items will be cleared</span></div>`;
+                            toast('✅ Deletion approved!');
+                        } else {
+                            document.getElementById('scanResult').innerHTML = `<div style="background: #fee2e2; padding: 12px; border-radius: 10px;"><strong>❌ Failed to Process</strong></div>`;
+                        }
+                    } catch (err) {
+                        document.getElementById('scanResult').innerHTML = `<div style="background: #fee2e2; padding: 12px; border-radius: 10px;"><strong>❌ Connection Error</strong></div>`;
+                    }
+                } else {
+                    document.getElementById('scanResult').innerHTML = `
+                        <div style="background: #fee2e2; padding: 12px; border-radius: 10px;">
+                            <strong>❌ Unrecognized QR Code</strong><br>
+                            <span style="font-size: 12px;">Not a valid deletion request.</span>
+                        </div>`;
+                    toast('❌ Cannot recognize this QR code');
                 }
+                
+                scanTimeout = setTimeout(() => { lastScannedCode = null; scanTimeout = null; }, 3000);
+                setTimeout(() => { if (scannerRunning && qrScanner) document.getElementById('scanResult').innerHTML = '📷 Scanner ready'; }, 2000);
+            },
+            (errorMessage) => {
+                if (errorMessage && errorMessage.includes('No MultiFormat Readers')) console.log('Scanning...');
             }
         ).then(() => {
             scannerRunning = true;
-            document.getElementById('scanResult').innerHTML = '📷 Scanner ready - Point at cashier QR code to approve deletion.';
-            toast('📷 Scanner started successfully');
-            
-            setTimeout(() => {
-                if (qrScanner && qrScanner.getVideoElement) {
-                    const video = qrScanner.getVideoElement();
-                    if (video && video.srcObject) {
-                        const track = video.srcObject.getVideoTracks()[0];
-                        if (track && track.getCapabilities().zoom) {
-                            const capabilities = track.getCapabilities();
-                            const maxZoom = capabilities.zoom.max;
-                            const targetZoom = Math.min(maxZoom, 2.5);
-                            track.applyConstraints({ advanced: [{ zoom: targetZoom }] });
-                        }
-                    }
-                }
-            }, 1000);
+            document.getElementById('scanResult').innerHTML = '📷 Scanner ready';
+            toast('📷 Scanner started');
         });
         
     } catch (err) {
         console.error('Scanner error:', err);
         document.getElementById('scanResult').innerHTML = `<div style="color: red;">❌ Camera error: ${err.message}</div>`;
-        toast('Camera error: ' + err.message, 'error');
         scannerRunning = false;
-        document.getElementById('scanOverlay').style.display = 'none';
     }
 }
 
