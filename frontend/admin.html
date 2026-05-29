@@ -2409,7 +2409,7 @@ function initAnalytics() {
 }
 
 
-// ============ QR SCANNER - COMPLETE UPDATED FUNCTION ============
+// ============ QR SCANNER - COMPLETE FIXED FUNCTION ============
 
 async function startScanner() {
     if (scannerRunning) {
@@ -2453,7 +2453,7 @@ async function startScanner() {
                 
                 lastScannedCode = decodedText;
                 
-                // Check if this is a deletion QR code from cashier
+                // ============ CHECK IF DELETION QR CODE ============
                 if (decodedText.startsWith('CLEAR-') || 
                     decodedText.startsWith('ITEMS-') ||
                     decodedText.startsWith('REMOVE-ITEM-') ||
@@ -2468,7 +2468,7 @@ async function startScanner() {
                         </div>
                     `;
                     
-                    // Save as approved deletion to trash
+                    // Save as approved deletion - FIXED: data is plain object, NOT JSON.stringify
                     try {
                         const response = await fetch(`${API_URL}/trash/`, {
                             method: 'POST',
@@ -2479,12 +2479,12 @@ async function startScanner() {
                             body: JSON.stringify({
                                 item_type: 'qr_delete_approved',
                                 description: `Admin approved deletion: ${decodedText}`,
-                                data: JSON.stringify({
+                                data: {
                                     qr_code: decodedText,
                                     scanned_at: new Date().toISOString(),
                                     scanned_by: currentUser?.id || 'admin',
                                     approved: true
-                                })
+                                }
                             })
                         });
                         
@@ -2516,7 +2516,7 @@ async function startScanner() {
                     }
                     
                 } else {
-                    // Regular QR code - just log it
+                    // ============ REGULAR QR CODE ============
                     document.getElementById('scanResult').innerHTML = `
                         <div style="background: #dbeafe; padding: 12px; border-radius: 10px;">
                             <strong>📷 QR Code Scanned</strong><br>
@@ -2525,7 +2525,7 @@ async function startScanner() {
                     `;
                     toast('📷 QR Code scanned');
                     
-                    // Save regular scan to trash for audit
+                    // Save regular scan to trash - FIXED: data is plain object
                     try {
                         await fetch(`${API_URL}/trash/`, {
                             method: 'POST',
@@ -2536,10 +2536,10 @@ async function startScanner() {
                             body: JSON.stringify({
                                 item_type: 'qr_scan',
                                 description: decodedText,
-                                data: JSON.stringify({ 
+                                data: { 
                                     scanned_at: new Date().toISOString(),
                                     scanned_by: currentUser?.id || 'unknown'
-                                })
+                                }
                             })
                         });
                     } catch (err) {
@@ -2547,13 +2547,13 @@ async function startScanner() {
                     }
                 }
                 
-                // Reset after 3 seconds for next scan
+                // Reset after 3 seconds
                 scanTimeout = setTimeout(() => {
                     lastScannedCode = null;
                     scanTimeout = null;
                 }, 3000);
                 
-                // Auto-restart scanner display
+                // Auto-restart scanner
                 setTimeout(() => {
                     if (scannerRunning && qrScanner) {
                         document.getElementById('scanResult').innerHTML = '📷 Scanner ready - Point at cashier QR code to approve deletion.';
@@ -2570,7 +2570,6 @@ async function startScanner() {
             document.getElementById('scanResult').innerHTML = '📷 Scanner ready - Point at cashier QR code to approve deletion.';
             toast('📷 Scanner started successfully');
             
-            // Auto-zoom after camera starts
             setTimeout(() => {
                 if (qrScanner && qrScanner.getVideoElement) {
                     const video = qrScanner.getVideoElement();
