@@ -233,7 +233,7 @@ const user = JSON.parse(localStorage.getItem('fishflow_user') || '{}');
 // ============ AUTH CHECK ============
 if (!token || !user.id || user.role !== 'cashier') {
   localStorage.clear();
-  location.href = 'login.html';
+  location.href = 'index.html';
 }
 
 if (user.is_blocked) {
@@ -254,7 +254,7 @@ if (user.shift === 'night') {
 
 function logout() {
   localStorage.clear();
-  location.href = 'login.html';
+  location.href = 'index.html';
 }
 
 // ============ GLOBAL VARIABLES ============
