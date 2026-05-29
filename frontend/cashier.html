@@ -874,35 +874,43 @@ if (r) {
   }
 }
 
-// Add this function near the other check functions
 async function checkForAdminApproval() {
   if (!pendingDeleteRequest) return;
   
   try {
-    // Check trash for our deletion request approved by admin
-    var response = await fetch(API_BASE + '/trash/', {
+    var response = await fetch(API_BASE + '/qr/check/?qr_id=' + pendingDeleteRequest.id, {
       headers: { 'Authorization': 'Bearer ' + token }
     });
     
     if (!response.ok) return;
     
-    var trashItems = await response.json();
+    var data = await response.json();
     
-    // Look for our QR code approved by admin
-    for (var i = 0; i < trashItems.length; i++) {
-      var item = trashItems[i];
-      if (item.item_type === 'qr_delete_approved' && 
-          item.description && 
-          item.description.includes(pendingDeleteRequest.id)) {
-        
-        // Admin approved! Execute the deletion
-        console.log('✅ Admin approved deletion!');
-        executePendingDelete();
-        return;
-      }
+    if (data.approved) {
+      console.log('✅ Admin approved deletion!');
+      executePendingDelete();
     }
   } catch (e) {
-    // Silent fail
+    // Also check trash as fallback
+    try {
+      var trashResponse = await fetch(API_BASE + '/trash/', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (!trashResponse.ok) return;
+      
+      var trashItems = await trashResponse.json();
+      
+      for (var i = 0; i < trashItems.length; i++) {
+        var item = trashItems[i];
+        if (item.item_type === 'qr_delete_approved' && 
+            item.description && 
+            item.description.includes(pendingDeleteRequest.id)) {
+          console.log('✅ Admin approved deletion (trash check)!');
+          executePendingDelete();
+          return;
+        }
+      }
+    } catch (e2) { /* silent */ }
   }
 }
 
