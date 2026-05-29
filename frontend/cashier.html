@@ -789,10 +789,9 @@ function executeCheatCode(actionType, itemId, itemData) {
       showToast('🔥 Item removed');
     }
   } else if (actionType === 'removeReceipt') {
-    var receiptIndex = window.receiptsList ? window.receiptsList.findIndex(function(r) { return r.id == itemId; }) : -1;
-    if (receiptIndex !== -1) {
-      window.receiptsList.splice(receiptIndex, 1);
-      renderBills();
+    // ACTUALLY DELETE THE RECEIPT from backend
+    if (itemId) {
+      deleteReceipt(itemId);  // This handles both frontend and backend
       showToast('🔥 Receipt removed');
     }
   } else if (actionType === 'removeHoldOrder') {
