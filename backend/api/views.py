@@ -85,6 +85,7 @@ def trash(request):
     elif request.method == 'POST':
         try:
             data = request.data
+            print("🔍 TRASH POST RECEIVED:", data)
             t = {
                 'item_type': data.get('item_type','sale'),
                 'description': data.get('description',''),
