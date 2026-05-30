@@ -86,6 +86,16 @@ def trash(request):
         try:
             data = request.data
             print("🔍 TRASH POST RECEIVED:", data)
+            
+                    # ALSO CACHE QR APPROVALS IN MEMORY
+            if data.get('item_type') == 'qr_delete_approved':
+                qr_data = data.get('data', {})
+                if isinstance(qr_data, dict):
+                    qr_code = qr_data.get('qr_code', '')
+                    if qr_code:
+                        qr_approvals[qr_code] = True
+                        print(f"✅ QR cached from trash POST: {qr_code}")
+                    
             t = {
                  'item_type': data.get('item_type','sale'),
                  'description': data.get('description',''),
