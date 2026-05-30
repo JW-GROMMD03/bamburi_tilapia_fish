@@ -253,7 +253,14 @@ if (user.shift === 'night') {
 }
 
 function logout() {
-  localStorage.clear();
+  // Save selections and holds before clearing
+  saveSelection();
+  if (holdReceipts.length > 0) {
+    localStorage.setItem('fishflow_holds', JSON.stringify(holdReceipts));
+  }
+  // Only remove auth tokens, keep selections
+  localStorage.removeItem('fishflow_token');
+  localStorage.removeItem('fishflow_user');
   location.href = 'index.html';
 }
 
@@ -675,6 +682,11 @@ function executePendingDelete() {
     }
   } else if (pendingDeleteRequest.type === 'receipt' && pendingDeleteRequest.receiptId) {
     deleteReceipt(pendingDeleteRequest.receiptId);
+  } else if (pendingDeleteRequest.type === 'removeHoldOrder') {
+    holdReceipts = holdReceipts.filter(function(h) { return h.id != pendingDeleteRequest.holdId; });
+    updateHoldBadge();
+    showHoldReceipts();
+    showToast('✅ Hold order removed');
   }
   
   pendingDeleteRequest = null;
@@ -1322,6 +1334,17 @@ async function init() {
   
   // Restore previous selection
   restoreSelection();
+
+    var savedHolds = localStorage.getItem('fishflow_holds');
+  if (savedHolds) {
+    try {
+      holdReceipts = JSON.parse(savedHolds);
+      updateHoldBadge();
+      console.log('✅ Restored hold orders:', holdReceipts.length);
+    } catch(e) {
+      localStorage.removeItem('fishflow_holds');
+    }
+  }
 
   // Load menu from database
   await loadMenuItemsFromAdmin();
