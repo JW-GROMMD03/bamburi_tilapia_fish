@@ -102,7 +102,7 @@ def trash(request):
                  'data': data.get('data', {}),
                  'deleted_by': data.get('data', {}).get('scanned_by', '00000000-0000-0000-0000-000000000000'),
                  'trashed_at': datetime.now().isoformat()
-        }
+            }
             r = SupabaseDB.save_trash(t)
             if r: return Response(r, status=status.HTTP_201_CREATED)
             print("⚠️ Supabase save failed, returning success")
