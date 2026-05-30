@@ -582,8 +582,13 @@ function holdCurrentOrder() {
   selItems = [];
   updateSel();
   updateHoldBadge();
+  
+  // SAVE HOLDS TO LOCAL STORAGE
+  localStorage.setItem('fishflow_holds', JSON.stringify(holdReceipts));
+  
   showToast('Order placed on hold - ' + holdReceipts.length + '/5');
 }
+
 
 function updateHoldBadge() {
   document.getElementById('holdCount').textContent = holdReceipts.length;
@@ -623,6 +628,7 @@ function requestRemoveHoldOrder(holdId) {
 
 function closeHoldModal() { document.getElementById('holdModal').style.display = 'none'; }
 
+
 function restoreHoldOrder(orderId) {
   var order = holdReceipts.find(function(h) { return h.id === orderId; });
   if (order) {
@@ -630,6 +636,10 @@ function restoreHoldOrder(orderId) {
     updateSel();
     holdReceipts = holdReceipts.filter(function(h) { return h.id !== orderId; });
     updateHoldBadge();
+    
+    // SAVE UPDATED HOLDS
+    localStorage.setItem('fishflow_holds', JSON.stringify(holdReceipts));
+    
     closeHoldModal();
     showToast('Order restored');
   }
@@ -685,6 +695,7 @@ function executePendingDelete() {
   } else if (pendingDeleteRequest.type === 'removeHoldOrder') {
     holdReceipts = holdReceipts.filter(function(h) { return h.id != pendingDeleteRequest.holdId; });
     updateHoldBadge();
+    localStorage.setItem('fishflow_holds', JSON.stringify(holdReceipts));
     showHoldReceipts();
     showToast('✅ Hold order removed');
   }
@@ -1376,15 +1387,16 @@ async function init() {
   }, 30000);
   
   // Reset at midnight
-  setInterval(function() {
+setInterval(function() {
     var now = new Date();
     if (now.getHours() === 0 && now.getMinutes() === 0) {
       selItems = [];
       updateSel();
       holdReceipts = [];
       updateHoldBadge();
+      localStorage.removeItem('fishflow_holds'); // Clear saved holds at midnight
     }
-  }, 60000);
+}, 60000);
   
   // Check for QR scan results AND admin approvals (single interval)
   setInterval(function() {
