@@ -9,55 +9,69 @@ def admin_dashboard(request):
     """Admin dashboard - complete overview"""
     today = str(date.today())
     
-    # Get today's data
     transactions = SupabaseDB.get_tx(today)
     expenses = SupabaseDB.get_exp(today)
     cashiers = SupabaseDB.get_all_cashiers()
     
-    # Calculate category stats
     category_stats = calculate_category_stats(transactions)
-    
-    # Get all cashiers' performance
     cashier_performance = get_cashier_performance(transactions)
     
-    # Today's summary
     total_sales = sum(t.get('total', 0) for t in transactions)
     total_expenses = sum(e.get('amount', 0) for e in expenses)
     
-    # Shift comparison
-    day_shift_sales = sum(t.get('total', 0) for t in transactions if t.get('shift') == 'day')
-    night_shift_sales = sum(t.get('total', 0) for t in transactions if t.get('shift') == 'night')
+    # Cash vs M-Pesa breakdown
+    cash_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'cash')
+    mpesa_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'mpesa')
     
-    # Pending approvals
-    pending_approvals = [c for c in cashiers if not c.get('is_approved')]
+    # Cash at Hand = Cash Sales - Expenses
+    cash_at_hand = cash_sales - total_expenses
     
-    # Blocked users
-    blocked_users = [c for c in cashiers if c.get('is_blocked')]
+    # Fish/Mbuta cash vs M-Pesa
+    fish_cash, fish_mpesa = 0, 0
+    mbuta_cash, mbuta_mpesa = 0, 0
+    
+    for t in transactions:
+        items = t.get('items', [])
+        if isinstance(items, str):
+            items = json.loads(items)
+        method = t.get('method', 'cash')
+        for item in items:
+            name = item.get('name', '').lower()
+            amt = item.get('price', 0) * item.get('qty', 1)
+            if 'tilapia' in name:
+                if method == 'cash': fish_cash += amt
+                else: fish_mpesa += amt
+            elif 'mbuta' in name:
+                if method == 'cash': mbuta_cash += amt
+                else: mbuta_mpesa += amt
     
     return Response({
         'today': {
             'date': today,
             'total_sales': total_sales,
+            'cash_sales': cash_sales,
+            'mpesa_sales': mpesa_sales,
             'total_expenses': total_expenses,
+            'cash_at_hand': cash_at_hand,
             'net_revenue': total_sales - total_expenses,
             'transaction_count': len(transactions),
             'category_stats': category_stats,
         },
+        'fish_breakdown': {
+            'tilapia': {'cash': fish_cash, 'mpesa': fish_mpesa, 'total': fish_cash + fish_mpesa},
+            'mbuta': {'cash': mbuta_cash, 'mpesa': mbuta_mpesa, 'total': mbuta_cash + mbuta_mpesa},
+        },
         'shifts': {
-            'day_shift_sales': day_shift_sales,
-            'night_shift_sales': night_shift_sales,
-            'day_shift_count': len([t for t in transactions if t.get('shift') == 'day']),
-            'night_shift_count': len([t for t in transactions if t.get('shift') == 'night']),
+            'day_shift_sales': sum(t.get('total', 0) for t in transactions if t.get('shift') == 'day'),
+            'night_shift_sales': sum(t.get('total', 0) for t in transactions if t.get('shift') == 'night'),
         },
         'cashiers': {
             'total': len(cashiers),
             'active': len([c for c in cashiers if c.get('is_approved') and not c.get('is_blocked')]),
-            'pending': len(pending_approvals),
-            'blocked': len(blocked_users),
+            'pending': len([c for c in cashiers if not c.get('is_approved')]),
+            'blocked': len([c for c in cashiers if c.get('is_blocked')]),
             'performance': cashier_performance,
         },
-        'pending_approvals': pending_approvals,
-        'blocked_users': blocked_users,
     })
 
 @api_view(['GET'])
@@ -235,3 +249,29 @@ def get_cashier_performance(transactions):
         cashier_stats[cashier_id]['transaction_count'] += 1
     
     return list(cashier_stats.values())
+
+
+
+@api_view(['GET', 'POST'])
+def glovo_orders(request):
+    """Glovo orders - affect stock but NOT cash/MPesa sales"""
+    if request.method == 'GET':
+        glovo = SupabaseDB.get_glovo_orders() if hasattr(SupabaseDB, 'get_glovo_orders') else []
+        return Response(glovo if glovo else [])
+    try:
+        data = request.data
+        glovo_data = {
+            'date': str(date.today()),
+            'time': datetime.now().strftime('%H:%M'),
+            'customer_name': data.get('customer_name', 'Glovo Customer'),
+            'items': json.dumps(data.get('items', [])),
+            'total': data.get('total', 0),
+            'status': 'pending',
+            'created_at': datetime.now().isoformat()
+        }
+        result = SupabaseDB.save_glovo(glovo_data) if hasattr(SupabaseDB, 'save_glovo') else glovo_data
+        if result:
+            return Response(result, status=201)
+        return Response({'message': 'Saved locally', 'data': glovo_data}, status=201)
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)

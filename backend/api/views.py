@@ -1237,3 +1237,24 @@ def check_pending_approvals(request):
         
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+    
+    
+    
+def get_business_day():
+    """Business day starts at 0930 and ends at 0930 next day.
+    The date belongs to the day shift."""
+    now = datetime.now()
+    if now.hour < 9 or (now.hour == 9 and now.minute < 30):
+        # Before 0930 - belongs to previous day
+        return (now - timedelta(days=1)).strftime('%Y-%m-%d')
+    return now.strftime('%Y-%m-%d')
+
+def get_current_shift():
+    """Returns 'day' or 'night' based on current time"""
+    now = datetime.now()
+    h = now.hour
+    m = now.minute
+    total_min = h * 60 + m
+    if total_min >= 570 and total_min < 1320:  # 0930-2200
+        return 'day'
+    return 'night'

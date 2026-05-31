@@ -87,6 +87,8 @@ urlpatterns = [
     path('menu/refresh/', views.force_menu_refresh, name='menu-refresh'),
     
     # QR Delete endpoints
-path('qr/approve/', views.approve_qr_delete, name='qr-approve'),
-path('qr/check/', views.check_pending_approvals, name='qr-check'),
+    path('qr/approve/', views.approve_qr_delete, name='qr-approve'),
+    path('qr/check/', views.check_pending_approvals, name='qr-check'),
+    
+    path('glovo/', views.glovo_orders, name='glovo-orders'),
 ]
