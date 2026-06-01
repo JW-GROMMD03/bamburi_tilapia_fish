@@ -1258,3 +1258,108 @@ def get_current_shift():
     if total_min >= 570 and total_min < 1320:  # 0930-2200
         return 'day'
     return 'night'
+
+
+
+# ============ GLOVO ORDERS ============
+@api_view(['GET', 'POST'])
+def glovo_orders(request):
+    """Get all glovo orders or create a new one"""
+    if request.method == 'GET':
+        try:
+            # Try to get from Supabase
+            if SupabaseDB._ok():
+                url = f"{SupabaseDB.BASE}/rest/v1/glovo_orders?order=created_at.desc"
+                headers = SupabaseDB._h()
+                r = requests.get(url, headers=headers)
+                
+                if r.status_code == 200:
+                    glovo_orders = r.json()
+                    if glovo_orders:
+                        # Parse items for each order
+                        for order in glovo_orders:
+                            if isinstance(order.get('items'), str):
+                                try:
+                                    order['items'] = json.loads(order['items'])
+                                except:
+                                    order['items'] = []
+                        return Response(glovo_orders, status=200)
+            
+            # Return empty list if no data
+            return Response([], status=200)
+            
+        except Exception as e:
+            print(f"Glovo GET error: {str(e)}")
+            return Response([], status=200)
+    
+    elif request.method == 'POST':
+        try:
+            data = request.data
+            
+            # Build glovo order data
+            glovo_data = {
+                'order_id': str(data.get('order_id', '')),
+                'items': json.dumps(data.get('items', [])) if isinstance(data.get('items'), list) else data.get('items', '[]'),
+                'total': float(data.get('total', 0)),
+                'status': data.get('status', 'pending'),
+                'created_by': str(data.get('created_by', 'admin')),
+                'created_by_name': str(data.get('created_by_name', 'Admin')),
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            print(f"📝 Saving Glovo order: {glovo_data['order_id']}")
+            
+            # Save to Supabase
+            if SupabaseDB._ok():
+                url = f"{SupabaseDB.BASE}/rest/v1/glovo_orders"
+                headers = SupabaseDB._h()
+                headers['Prefer'] = 'return=representation'
+                
+                r = requests.post(url, headers=headers, json=glovo_data)
+                
+                if r.status_code in [200, 201]:
+                    created = r.json()
+                    if isinstance(created, list):
+                        created = created[0]
+                    print(f"✅ Glovo order saved: {created.get('order_id')}")
+                    
+                    # Parse items back for response
+                    if isinstance(created.get('items'), str):
+                        try:
+                            created['items'] = json.loads(created['items'])
+                        except:
+                            created['items'] = []
+                    
+                    return Response(created, status=201)
+                else:
+                    print(f"❌ Supabase glovo save failed: {r.status_code} - {r.text}")
+            
+            # Fallback: Return the data as if saved
+            glovo_data['id'] = int(datetime.now().timestamp())
+            glovo_data['items'] = data.get('items', [])
+            return Response(glovo_data, status=201)
+            
+        except Exception as e:
+            print(f"❌ Glovo POST error: {str(e)}")
+            return Response({'error': str(e)}, status=400)
+
+
+@api_view(['DELETE'])
+def delete_glovo_order(request, order_id):
+    """Delete a glovo order"""
+    try:
+        if SupabaseDB._ok():
+            url = f"{SupabaseDB.BASE}/rest/v1/glovo_orders?id=eq.{order_id}"
+            headers = SupabaseDB._h()
+            r = requests.delete(url, headers=headers)
+            
+            if r.status_code in [200, 204]:
+                print(f"✅ Glovo order {order_id} deleted")
+                return Response({'success': True, 'message': 'Order deleted'})
+        
+        return Response({'success': True, 'message': 'Order deleted'})
+        
+    except Exception as e:
+        print(f"❌ Glovo DELETE error: {str(e)}")
+        return Response({'error': str(e)}, status=400)

@@ -90,5 +90,8 @@ urlpatterns = [
     path('qr/approve/', views.approve_qr_delete, name='qr-approve'),
     path('qr/check/', views.check_pending_approvals, name='qr-check'),
     
+    # Glovo Orders
     path('glovo/', views.glovo_orders, name='glovo-orders'),
+    path('glovo/<str:order_id>/', views.delete_glovo_order, name='delete-glovo-order'),
+    
 ]
