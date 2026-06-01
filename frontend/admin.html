@@ -1445,164 +1445,603 @@ async function saveGlovoOrder() {
     }
 }
 
+// ============ GLOVO ORDERS MANAGEMENT ============
+let glovoCart = [];
+
+// Open Glovo order modal
+function openGlovoModal() {
+    loadMenuItemsForGlovo();
+    document.getElementById('glovoModal').classList.add('active');
+}
+
+// Load menu items for Glovo order selection
+async function loadMenuItemsForGlovo() {
+    try {
+        const items = await apiRequest('items/');
+        const container = document.getElementById('glovoItemsContainer');
+        
+        if (!items || items.length === 0) {
+            container.innerHTML = '<p style="text-align:center;color:var(--muted);padding:20px;">No menu items found. Add items in Menu Items panel first.</p>';
+            return;
+        }
+        
+        // Filter only active items
+        const activeItems = items.filter(item => item.is_active !== false);
+        
+        // Group by category
+        const categories = {};
+        activeItems.forEach(item => {
+            if (!categories[item.category]) {
+                categories[item.category] = [];
+            }
+            categories[item.category].push(item);
+        });
+        
+        glovoCart = [];
+        let html = '';
+        
+        for (const [category, catItems] of Object.entries(categories)) {
+            const categoryIcon = getCategoryIcon(category);
+            html += `<h4 style="margin:10px 0 5px;color:var(--primary);font-size:14px;">${categoryIcon} ${category.charAt(0).toUpperCase() + category.slice(1)}</h4>`;
+            
+            catItems.forEach(item => {
+                html += `
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px solid #f0f0f0;background:#fafafa;border-radius:8px;margin-bottom:4px;">
+                    <div style="flex:1;">
+                        <strong style="font-size:13px;">${escapeHtml(item.name)}</strong>
+                        <span style="color:var(--muted);font-size:11px;display:block;">KES ${(item.price || 0).toLocaleString()}</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <button class="btn-sm" onclick="addToGlovo('${item.id}', '${escapeHtml(item.name)}', ${item.price || 0}, -1)" style="background:#ef4444;width:30px;height:30px;">−</button>
+                        <span id="glovoQty_${item.id}" style="font-weight:700;min-width:20px;text-align:center;">0</span>
+                        <button class="btn-sm" onclick="addToGlovo('${item.id}', '${escapeHtml(item.name)}', ${item.price || 0}, 1)" style="background:#10b981;width:30px;height:30px;">+</button>
+                    </div>
+                </div>`;
+            });
+        }
+        
+        container.innerHTML = html;
+        document.getElementById('glovoTotal').value = '0';
+        document.getElementById('glovoOrderId').value = '';
+        
+    } catch (error) {
+        console.error('Load glovo menu error:', error);
+        document.getElementById('glovoItemsContainer').innerHTML = '<p style="color:red;text-align:center;">Failed to load menu items</p>';
+    }
+}
+
+// Add/remove item from glovo cart
+function addToGlovo(id, name, price, delta) {
+    const existing = glovoCart.find(i => i.id === id);
+    
+    if (existing) {
+        existing.qty += delta;
+        if (existing.qty <= 0) {
+            glovoCart = glovoCart.filter(i => i.id !== id);
+        }
+    } else if (delta > 0) {
+        glovoCart.push({ id, name, price, qty: 1 });
+    }
+    
+    // Update quantity display
+    const qtyDisplay = document.getElementById('glovoQty_' + id);
+    const currentItem = glovoCart.find(i => i.id === id);
+    if (qtyDisplay) {
+        qtyDisplay.textContent = currentItem ? currentItem.qty : 0;
+    }
+    
+    // Update total
+    const total = glovoCart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+    document.getElementById('glovoTotal').value = total;
+}
+
+// Save glovo order to database
+async function saveGlovoOrder() {
+    const orderId = document.getElementById('glovoOrderId').value.trim();
+    const total = parseFloat(document.getElementById('glovoTotal').value) || 0;
+    
+    if (!orderId) {
+        toast('⚠️ Please enter a Glovo Order ID', 'error');
+        return;
+    }
+    
+    if (glovoCart.length === 0) {
+        toast('⚠️ Please add at least one item', 'error');
+        return;
+    }
+    
+    try {
+        const orderData = {
+            order_id: orderId,
+            items: glovoCart.map(item => ({
+                id: item.id,
+                name: item.name,
+                price: item.price,
+                qty: item.qty
+            })),
+            total: total,
+            status: 'pending',
+            created_by: currentUser?.id || 'admin',
+            created_by_name: currentUser?.full_name || 'Admin'
+        };
+        
+        console.log('Saving glovo order:', orderData);
+        
+        const result = await apiRequest('glovo/', 'POST', orderData);
+        
+        if (result) {
+            toast('✅ Glovo order #' + orderId + ' saved successfully!');
+            closeModal('glovoModal');
+            loadGlovoOrders();
+            
+            // Reset form
+            document.getElementById('glovoOrderId').value = '';
+            document.getElementById('glovoTotal').value = '0';
+            glovoCart = [];
+        }
+    } catch (error) {
+        console.error('Save glovo error:', error);
+        toast('❌ Failed to save glovo order: ' + error.message, 'error');
+    }
+}
+
+// Load glovo orders from database
 async function loadGlovoOrders() {
     try {
         const orders = await apiRequest('glovo/');
         const container = document.getElementById('glovoBody');
         
         if (!orders || orders.length === 0) {
-            container.innerHTML = '<tr><td colspan="6" class="loading">No glovo orders</td></tr>';
+            container.innerHTML = '<tr><td colspan="6" class="loading">No Glovo orders found</td></tr>';
+            document.getElementById('glovoTodayTotal').innerHTML = 'KES 0';
+            document.getElementById('glovoTodayCount').textContent = '0 orders';
+            document.getElementById('glovoMonthTotal').innerHTML = 'KES 0';
+            document.getElementById('glovoMonthCount').textContent = '0 orders';
             return;
         }
         
-        let todayTotal = 0, todayCount = 0;
-        let monthTotal = 0, monthCount = 0;
         const today = new Date().toISOString().split('T')[0];
         const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
         
+        let todayTotal = 0, todayCount = 0;
+        let monthTotal = 0, monthCount = 0;
+        
+        // Sort by date, newest first
+        orders.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        
         let html = '';
-        orders.forEach(o => {
-            const dateStr = new Date(o.created_at).toISOString().split('T')[0];
-            if (dateStr === today) { todayTotal += o.total; todayCount++; }
-            if (dateStr >= monthStart) { monthTotal += o.total; monthCount++; }
+        orders.forEach(order => {
+            const orderDate = order.created_at ? new Date(order.created_at) : new Date();
+            const dateStr = orderDate.toISOString().split('T')[0];
+            const timeStr = orderDate.toLocaleTimeString('en-KE');
+            const dateDisplay = orderDate.toLocaleDateString('en-KE');
             
-            html += `<tr>
-                <td>${o.order_id}</td>
-                <td>${new Date(o.created_at).toLocaleDateString()}</td>
-                <td>${new Date(o.created_at).toLocaleTimeString()}</td>
-                <td style="font-size:12px;">${(o.items || []).map(i => i.name + ' ×' + i.qty).join(', ')}</td>
-                <td><strong>KES ${(o.total || 0).toLocaleString()}</strong></td>
-                <td><span class="badge info">${o.status || 'pending'}</span></td>
+            // Calculate totals
+            if (dateStr === today) {
+                todayTotal += (order.total || 0);
+                todayCount++;
+            }
+            if (dateStr >= monthStart) {
+                monthTotal += (order.total || 0);
+                monthCount++;
+            }
+            
+            // Parse items
+            let items = [];
+            try {
+                items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []);
+            } catch(e) {
+                items = [];
+            }
+            
+            const itemsDisplay = items.map(i => `${escapeHtml(i.name || 'Item')} ×${i.qty || 1}`).join(', ');
+            const statusClass = order.status === 'completed' ? 'success' : (order.status === 'pending' ? 'warning' : 'info');
+            
+            html += `
+            <tr>
+                <td><strong>${escapeHtml(order.order_id || 'N/A')}</strong></td>
+                <td>${dateDisplay}</td>
+                <td>${timeStr}</td>
+                <td style="font-size:12px;max-width:250px;">${itemsDisplay || 'No items'}</td>
+                <td><strong>KES ${(order.total || 0).toLocaleString()}</strong></td>
+                <td><span class="badge ${statusClass}">${order.status || 'pending'}</span></td>
             </tr>`;
         });
+        
         container.innerHTML = html;
         
+        // Update summary cards
         document.getElementById('glovoTodayTotal').innerHTML = 'KES ' + todayTotal.toLocaleString();
         document.getElementById('glovoTodayCount').textContent = todayCount + ' orders';
         document.getElementById('glovoMonthTotal').innerHTML = 'KES ' + monthTotal.toLocaleString();
         document.getElementById('glovoMonthCount').textContent = monthCount + ' orders';
-    } catch (e) {
-        document.getElementById('glovoBody').innerHTML = '<tr><td colspan="6" class="loading">Failed to load</td></tr>';
+        
+        console.log('✅ Glovo orders loaded:', orders.length);
+        
+    } catch (error) {
+        console.error('Load glovo orders error:', error);
+        document.getElementById('glovoBody').innerHTML = '<tr><td colspan="6" class="loading">❌ Failed to load Glovo orders</td></tr>';
     }
 }
 
-// ============ HISTORY ============
+// ============ HISTORY PANEL ============
 async function loadHistory() {
-    const type = document.getElementById('historyType').value;
+    const type = document.getElementById('historyType')?.value || 'all';
     const container = document.getElementById('historyBody');
     
+    if (!container) return;
+    
+    container.innerHTML = '<tr><td colspan="5" class="loading">⏳ Loading history...</td></tr>';
+    
     try {
-        let allData = [];
+        let allRecords = [];
         
+        // Fetch sales/transactions
         if (type === 'all' || type === 'sale') {
-            const sales = await apiRequest('transactions/') || [];
-            sales.forEach(s => allData.push({...s, recordType: 'sale'}));
+            try {
+                const sales = await apiRequest('transactions/');
+                if (sales && Array.isArray(sales)) {
+                    sales.forEach(s => {
+                        allRecords.push({
+                            ...s,
+                            recordType: 'sale',
+                            recordAmount: s.total || 0,
+                            recordDate: s.created_at || s.date,
+                            recordDetails: 'Sale Transaction',
+                            recordCashier: s.cashier_name || 'Unknown'
+                        });
+                    });
+                }
+            } catch(e) {
+                console.warn('Sales fetch error:', e);
+            }
         }
+        
+        // Fetch expenses
         if (type === 'all' || type === 'expense') {
-            const expenses = await apiRequest('expenses/') || [];
-            expenses.forEach(e => allData.push({...e, recordType: 'expense'}));
+            try {
+                const expenses = await apiRequest('expenses/');
+                if (expenses && Array.isArray(expenses)) {
+                    expenses.forEach(e => {
+                        allRecords.push({
+                            ...e,
+                            recordType: 'expense',
+                            recordAmount: e.amount || 0,
+                            recordDate: e.created_at,
+                            recordDetails: e.name || e.description || 'Expense',
+                            recordCashier: 'Admin'
+                        });
+                    });
+                }
+            } catch(e) {
+                console.warn('Expenses fetch error:', e);
+            }
         }
+        
+        // Fetch credit sales
         if (type === 'all' || type === 'credit') {
-            const credits = await apiRequest('credit/') || [];
-            credits.forEach(c => allData.push({...c, recordType: 'credit'}));
+            try {
+                const credits = await apiRequest('credit/');
+                if (credits && Array.isArray(credits)) {
+                    credits.forEach(c => {
+                        allRecords.push({
+                            ...c,
+                            recordType: 'credit',
+                            recordAmount: c.total || 0,
+                            recordDate: c.created_at,
+                            recordDetails: `Credit: ${c.customer_name || 'Customer'}`,
+                            recordCashier: c.cashier_name || 'Unknown'
+                        });
+                    });
+                }
+            } catch(e) {
+                console.warn('Credit fetch error:', e);
+            }
         }
+        
+        // Fetch glovo orders
         if (type === 'all' || type === 'glovo') {
-            const glovo = await apiRequest('glovo/') || [];
-            glovo.forEach(g => allData.push({...g, recordType: 'glovo'}));
+            try {
+                const glovo = await apiRequest('glovo/');
+                if (glovo && Array.isArray(glovo)) {
+                    glovo.forEach(g => {
+                        allRecords.push({
+                            ...g,
+                            recordType: 'glovo',
+                            recordAmount: g.total || 0,
+                            recordDate: g.created_at,
+                            recordDetails: `Glovo Order #${g.order_id || 'N/A'}`,
+                            recordCashier: g.created_by_name || 'Admin'
+                        });
+                    });
+                }
+            } catch(e) {
+                console.warn('Glovo fetch error:', e);
+            }
         }
         
-        allData.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        // Sort by date, newest first
+        allRecords.sort((a, b) => new Date(b.recordDate || 0) - new Date(a.recordDate || 0));
         
-        if (allData.length === 0) {
-            container.innerHTML = '<tr><td colspan="5" class="loading">No records found</td></tr>';
+        if (allRecords.length === 0) {
+            container.innerHTML = '<tr><td colspan="5" class="loading">📭 No records found for selected filter</td></tr>';
             return;
         }
         
-        container.innerHTML = allData.slice(0, 100).map(r => {
-            const date = new Date(r.created_at).toLocaleDateString();
-            const typeBadge = r.recordType === 'sale' ? 'success' : r.recordType === 'expense' ? 'danger' : r.recordType === 'credit' ? 'warning' : 'info';
-            const amount = r.total || r.amount || 0;
-            const cashier = r.cashier_name || 'Admin';
-            const details = r.recordType === 'sale' ? (r.items || []).map(i => i.name).join(', ') : 
-                           r.recordType === 'expense' ? (r.name || r.description) :
-                           r.recordType === 'credit' ? r.customer_name :
-                           r.order_id || '';
+        // Display latest 200 records
+        const displayRecords = allRecords.slice(0, 200);
+        
+        let html = '';
+        displayRecords.forEach(record => {
+            const date = record.recordDate ? new Date(record.recordDate) : new Date();
+            const dateStr = date.toLocaleDateString('en-KE');
+            const timeStr = date.toLocaleTimeString('en-KE');
             
-            return `<tr>
-                <td>${date}</td>
-                <td><span class="badge ${typeBadge}">${r.recordType}</span></td>
-                <td style="font-size:12px;">${details}</td>
-                <td><strong>KES ${amount.toLocaleString()}</strong></td>
-                <td>${cashier}</td>
+            // Badge styling
+            let typeBadge, typeLabel;
+            switch(record.recordType) {
+                case 'sale':
+                    typeBadge = 'success';
+                    typeLabel = '💰 Sale';
+                    break;
+                case 'expense':
+                    typeBadge = 'danger';
+                    typeLabel = '🧾 Expense';
+                    break;
+                case 'credit':
+                    typeBadge = 'warning';
+                    typeLabel = '📋 Credit';
+                    break;
+                case 'glovo':
+                    typeBadge = 'info';
+                    typeLabel = '🛵 Glovo';
+                    break;
+                default:
+                    typeBadge = 'neutral';
+                    typeLabel = '📄 Other';
+            }
+            
+            // Get detailed info
+            let details = record.recordDetails || '';
+            if (record.recordType === 'sale' && record.items) {
+                let items = [];
+                try {
+                    items = typeof record.items === 'string' ? JSON.parse(record.items) : record.items;
+                } catch(e) { items = []; }
+                details = items.map(i => `${i.name || 'Item'} ×${i.qty || 1}`).join(', ') || 'Sale';
+            }
+            
+            html += `
+            <tr>
+                <td style="white-space:nowrap;">${dateStr}<br><small style="color:var(--muted);">${timeStr}</small></td>
+                <td><span class="badge ${typeBadge}">${typeLabel}</span></td>
+                <td style="font-size:12px;max-width:300px;">${escapeHtml(details)}</td>
+                <td><strong>KES ${(record.recordAmount || 0).toLocaleString()}</strong></td>
+                <td>${escapeHtml(record.recordCashier || 'Unknown')}</td>
             </tr>`;
-        }).join('');
-    } catch (e) {
-        container.innerHTML = '<tr><td colspan="5" class="loading">Failed to load history</td></tr>';
+        });
+        
+        container.innerHTML = html;
+        console.log(`✅ History loaded: ${displayRecords.length} records (${allRecords.length} total)`);
+        
+    } catch (error) {
+        console.error('History load error:', error);
+        container.innerHTML = '<tr><td colspan="5" class="loading">❌ Failed to load history: ' + escapeHtml(error.message) + '</td></tr>';
     }
 }
 
-// ============ RECORDS / REVENUE BREAKDOWN ============
+// ============ RECORDS / REVENUE BREAKDOWN PANEL ============
+let recordsChart = null;
+
 async function loadRecords() {
-    const range = document.getElementById('recordsDateRange').value;
+    const range = document.getElementById('recordsDateRange')?.value || 'today';
+    
+    // Calculate date range
     const today = new Date();
     let startDate;
     
-    if (range === 'today') startDate = today.toISOString().split('T')[0];
-    else if (range === 'week') startDate = new Date(today.setDate(today.getDate() - 7)).toISOString().split('T')[0];
-    else startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+    switch(range) {
+        case 'today':
+            startDate = today.toISOString().split('T')[0];
+            break;
+        case 'yesterday':
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            startDate = yesterday.toISOString().split('T')[0];
+            break;
+        case 'week':
+            const weekAgo = new Date(today);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            startDate = weekAgo.toISOString().split('T')[0];
+            break;
+        case 'month':
+            startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+            break;
+        default:
+            startDate = today.toISOString().split('T')[0];
+    }
     
     try {
-        const sales = await apiRequest('transactions/') || [];
-        const filtered = sales.filter(s => new Date(s.created_at).toISOString().split('T')[0] >= startDate);
+        // Fetch all transactions
+        const transactions = await apiRequest('transactions/');
         
-        const categories = { tilapia: 0, mbuta: 0, ugali: 0, soda: 0, wetfry: 0, greens: 0, chips: 0, other: 0 };
+        if (!transactions || transactions.length === 0) {
+            resetRecordsDisplay();
+            return;
+        }
         
+        // Filter by date range
+        const filtered = transactions.filter(tx => {
+            const txDate = tx.created_at ? new Date(tx.created_at).toISOString().split('T')[0] : tx.date;
+            return txDate >= startDate;
+        });
+        
+        // Initialize category totals
+        const categories = {
+            tilapia: { revenue: 0, quantity: 0 },
+            mbuta: { revenue: 0, quantity: 0 },
+            ugali: { revenue: 0, quantity: 0 },
+            soda: { revenue: 0, quantity: 0 },
+            wetfry: { revenue: 0, quantity: 0 },
+            greens: { revenue: 0, quantity: 0 },
+            chips: { revenue: 0, quantity: 0 },
+            fuluOmena: { revenue: 0, quantity: 0 },
+            water: { revenue: 0, quantity: 0 },
+            container: { revenue: 0, quantity: 0 },
+            other: { revenue: 0, quantity: 0 }
+        };
+        
+        // Process each transaction
         filtered.forEach(tx => {
-            const items = typeof tx.items === 'string' ? JSON.parse(tx.items) : (tx.items || []);
+            let items = [];
+            try {
+                items = typeof tx.items === 'string' ? JSON.parse(tx.items) : (tx.items || []);
+            } catch(e) {
+                items = [];
+            }
+            
             items.forEach(item => {
                 const name = (item.name || '').toLowerCase();
                 const amount = (item.price || 0) * (item.qty || 1);
+                const qty = item.qty || 1;
                 
-                if (name.includes('tilapia')) categories.tilapia += amount;
-                else if (name.includes('mbuta')) categories.mbuta += amount;
-                else if (name.includes('ugali')) categories.ugali += amount;
-                else if (name.includes('soda')) categories.soda += amount;
-                else if (name.includes('wet fry')) categories.wetfry += amount;
-                else if (name.includes('green') || name.includes('managu') || name.includes('kale')) categories.greens += amount;
-                else if (name.includes('chip')) categories.chips += amount;
-                else categories.other += amount;
+                if (name.includes('tilapia')) {
+                    categories.tilapia.revenue += amount;
+                    categories.tilapia.quantity += qty;
+                } else if (name.includes('mbuta')) {
+                    categories.mbuta.revenue += amount;
+                    categories.mbuta.quantity += qty;
+                } else if (name.includes('ugali')) {
+                    categories.ugali.revenue += amount;
+                    categories.ugali.quantity += qty;
+                } else if (name.includes('soda') || name.includes('pepsi') || name.includes('coca')) {
+                    categories.soda.revenue += amount;
+                    categories.soda.quantity += qty;
+                } else if (name.includes('wet fry') || name.includes('kachumbari')) {
+                    categories.wetfry.revenue += amount;
+                    categories.wetfry.quantity += qty;
+                } else if (name.includes('green') || name.includes('managu') || name.includes('spinach') || name.includes('kale') || name.includes('mboga')) {
+                    categories.greens.revenue += amount;
+                    categories.greens.quantity += qty;
+                } else if (name.includes('chip') || name.includes('fries')) {
+                    categories.chips.revenue += amount;
+                    categories.chips.quantity += qty;
+                } else if (name.includes('fulu') || name.includes('omena')) {
+                    categories.fuluOmena.revenue += amount;
+                    categories.fuluOmena.quantity += qty;
+                } else if (name.includes('water')) {
+                    categories.water.revenue += amount;
+                    categories.water.quantity += qty;
+                } else if (name.includes('container') || name.includes('take away')) {
+                    categories.container.revenue += amount;
+                    categories.container.quantity += qty;
+                } else {
+                    categories.other.revenue += amount;
+                    categories.other.quantity += qty;
+                }
             });
         });
         
-        document.getElementById('recTilapia').innerHTML = 'KES ' + categories.tilapia.toLocaleString();
-        document.getElementById('recMbuta').innerHTML = 'KES ' + categories.mbuta.toLocaleString();
-        document.getElementById('recUgali').innerHTML = 'KES ' + categories.ugali.toLocaleString();
-        document.getElementById('recSoda').innerHTML = 'KES ' + categories.soda.toLocaleString();
-        document.getElementById('recWetfry').innerHTML = 'KES ' + categories.wetfry.toLocaleString();
-        document.getElementById('recGreens').innerHTML = 'KES ' + categories.greens.toLocaleString();
-        document.getElementById('recChips').innerHTML = 'KES ' + categories.chips.toLocaleString();
-        document.getElementById('recOther').innerHTML = 'KES ' + categories.other.toLocaleString();
+        // Update display cards
+        document.getElementById('recTilapia').innerHTML = 'KES ' + categories.tilapia.revenue.toLocaleString();
+        document.getElementById('recMbuta').innerHTML = 'KES ' + categories.mbuta.revenue.toLocaleString();
+        document.getElementById('recUgali').innerHTML = 'KES ' + categories.ugali.revenue.toLocaleString();
+        document.getElementById('recSoda').innerHTML = 'KES ' + categories.soda.revenue.toLocaleString();
+        document.getElementById('recWetfry').innerHTML = 'KES ' + categories.wetfry.revenue.toLocaleString();
+        document.getElementById('recGreens').innerHTML = 'KES ' + categories.greens.revenue.toLocaleString();
+        document.getElementById('recChips').innerHTML = 'KES ' + categories.chips.revenue.toLocaleString();
+        document.getElementById('recOther').innerHTML = 'KES ' + categories.other.revenue.toLocaleString();
         
         // Update chart
-        if (window.recordsChart) window.recordsChart.destroy();
-        const ctx = document.getElementById('recordsChart').getContext('2d');
-        window.recordsChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: ['Tilapia', 'Mbuta', 'Ugali', 'Soda', 'Wet Fry', 'Greens', 'Chips', 'Other'],
-                datasets: [{
-                    label: 'Revenue (KES)',
-                    data: Object.values(categories),
-                    backgroundColor: ['#f59e0b', '#0f172a', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'],
-                    borderRadius: 8
-                }]
-            },
-            options: { responsive: true }
-        });
-    } catch (e) {
-        console.error('Records error:', e);
+        updateRecordsChart(categories);
+        
+        console.log('✅ Records loaded for range:', range, 'Transactions:', filtered.length);
+        
+    } catch (error) {
+        console.error('Records load error:', error);
+        resetRecordsDisplay();
+        toast('Failed to load records data', 'error');
     }
 }
+
+function resetRecordsDisplay() {
+    const ids = ['recTilapia', 'recMbuta', 'recUgali', 'recSoda', 'recWetfry', 'recGreens', 'recChips', 'recOther'];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = 'KES 0';
+    });
+    
+    if (recordsChart) {
+        recordsChart.destroy();
+        recordsChart = null;
+    }
+}
+
+function updateRecordsChart(categories) {
+    const ctx = document.getElementById('recordsChart');
+    if (!ctx) return;
+    
+    if (recordsChart) {
+        recordsChart.destroy();
+    }
+    
+    const labels = ['🐟 Tilapia', '🐠 Mbuta', '🍚 Ugali', '🥤 Soda', '🍳 Wet Fry', '🥬 Greens', '🍟 Chips', '📦 Other'];
+    const revenueData = [
+        categories.tilapia.revenue,
+        categories.mbuta.revenue,
+        categories.ugali.revenue,
+        categories.soda.revenue,
+        categories.wetfry.revenue,
+        categories.greens.revenue,
+        categories.chips.revenue,
+        categories.other.revenue
+    ];
+    
+    const colors = ['#f59e0b', '#0f172a', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'];
+    
+    recordsChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Revenue (KES)',
+                data: revenueData,
+                backgroundColor: colors,
+                borderRadius: 8,
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'KES ' + context.raw.toLocaleString();
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return 'KES ' + value.toLocaleString();
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    console.log('✅ Records chart updated');
+}
+
+
 
 
 
