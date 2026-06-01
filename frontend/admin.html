@@ -919,6 +919,238 @@ flex-wrap:wrap;
   </div>
 </div>
 
+</div>
+
+<!-- SIDEBAR -->
+<nav class="sidebar" id="sidebar">
+  <div class="logo">🐟 FishFlow Pro</div>
+  <button class="nav-btn active" onclick="switchPanel('dashboard', this)">📊 Dashboard</button>
+  <button class="nav-btn" onclick="switchPanel('sales', this)">💰 Sales</button>
+  <button class="nav-btn" onclick="switchPanel('inventory', this)">📦 Inventory</button>
+  <button class="nav-btn" onclick="switchPanel('soda', this)">🥤 Soda Stock</button>
+  <button class="nav-btn" onclick="switchPanel('menuItems', this)">📋 Menu Items</button>
+  <button class="nav-btn" onclick="switchPanel('users', this)">👥 Users</button>
+  <button class="nav-btn" onclick="switchPanel('credit', this)">💳 Credit Sales</button>
+  <button class="nav-btn" onclick="switchPanel('expenses', this)">🧾 Expenses</button>
+  <button class="nav-btn" onclick="switchPanel('analytics', this)">📈 Analytics</button>
+  <button class="nav-btn" onclick="switchPanel('qrScanner', this)">📷 QR Scanner</button>
+</nav>
+
+<div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+
+<main class="main" id="main">
+  <header class="topbar">
+    <div class="left-top">
+      <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+      <h2 id="pageTitle" style="font-weight: 700;">Dashboard</h2>
+    </div>
+    <div class="user-box">
+      <span id="clock" style="font-size: 14px; color: var(--muted);"></span>
+      <div class="avatar" id="userAvatar" onclick="openProfileModal()" style="cursor: pointer;">A</div>
+      <div>
+        <strong id="userName" style="display: block;">Admin</strong>
+        <a href="#" onclick="openProfileModal()" style="font-size: 12px; color: var(--accent);">👤 My Profile</a>
+        <span style="margin: 0 5px;">|</span>
+        <a href="#" onclick="openChangePasswordModal()" style="font-size: 12px; color: var(--accent);">🔑 Change Password</a>
+        <span style="margin: 0 5px;">|</span>
+        <a href="#" onclick="logout()" style="font-size: 12px; color: var(--danger);">🚪 Logout</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="content">
+    <!-- DASHBOARD PANEL -->
+    <div class="panel active" id="dashboard">
+      <div class="cards">
+        <div class="card" onclick="switchPanel('sales')">
+          <h3>💰 Total Sales</h3>
+          <p id="totalSales">KES 0</p>
+        </div>
+        <div class="card">
+          <h3>💵 Cash at Hand</h3>
+          <p id="cashAtHand">KES 0</p>
+        </div>
+        <div class="card" onclick="switchPanel('expenses')">
+          <h3>🧾 Expenses</h3>
+          <p id="totalExpenses">KES 0</p>
+        </div>
+        <div class="card">
+          <h3>📊 Transactions</h3>
+          <p id="transactionCount">0</p>
+        </div>
+        <div class="card">
+          <h3>🐟 Tilapia Cash</h3>
+          <p id="tilapiaCash">KES 0</p>
+        </div>
+        <div class="card">
+          <h3>🐟 Tilapia MPesa</h3>
+          <p id="tilapiaMpesa">KES 0</p>
+        </div>
+        <div class="card">
+          <h3>🐠 Mbuta Cash</h3>
+          <p id="mbutaCash">KES 0</p>
+        </div>
+        <div class="card">
+          <h3>🐠 Mbuta MPesa</h3>
+          <p id="mbutaMpesa">KES 0</p>
+        </div>
+      </div>
+      <div class="chart-box">
+        <canvas id="salesChart"></canvas>
+      </div>
+    </div>
+
+    <!-- SALES PANEL -->
+    <div class="panel" id="sales">
+      <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-bottom: 20px;">
+        <button class="btn" onclick="refreshSales()">🔄 Refresh</button>
+        <div><label>Start Date:</label><input type="date" id="salesStartDate" style="padding: 8px; border-radius: 8px; border: 1px solid var(--border);"></div>
+        <div><label>End Date:</label><input type="date" id="salesEndDate" style="padding: 8px; border-radius: 8px; border: 1px solid var(--border);"></div>
+        <button class="btn" onclick="filterSalesByDate()" style="background: #3b82f6;">🔍 Filter</button>
+        <button class="btn" onclick="resetSalesFilter()" style="background: #64748b;">↩️ Reset</button>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Date</th><th>Time</th><th>Cashier</th><th>Shift</th><th>Method</th><th>Items</th><th>Total</th></tr></thead>
+          <tbody id="salesBody"><tr><td colspan="7" class="loading">Loading sales data...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- INVENTORY PANEL -->
+    <div class="panel" id="inventory">
+      <button class="btn" onclick="openStockModal()">➕ Add Stock</button>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Item</th><th>Added</th><th>Remaining</th><th>Purchase Price</th><th>Selling Price</th><th>Status</th></tr></thead>
+          <tbody id="inventoryBody"><tr><td colspan="6" class="loading">Loading inventory...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SODA PANEL -->
+    <div class="panel" id="soda">
+      <button class="btn" onclick="openSodaModal()">➕ Add Soda Stock</button>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Brand</th><th>Crates Added</th><th>Bottles Remaining</th><th>Bottles Sold</th><th>Revenue</th></tr></thead>
+          <tbody id="sodaBody"><tr><td colspan="5" class="loading">Loading soda inventory...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- MENU ITEMS PANEL -->
+    <div class="panel" id="menuItems">
+      <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-bottom: 20px;">
+        <button class="btn" onclick="openAddItemModal()">➕ Add New Item</button>
+        <div><label>Filter:</label>
+          <select id="categoryFilter" onchange="loadMenuItems()" style="padding: 8px; border-radius: 8px; border: 1px solid var(--border);">
+            <option value="all">All Categories</option>
+            <option value="tilapia">🐟 Tilapia</option>
+            <option value="mbuta">🐠 Mbuta</option>
+            <option value="ugali">🍚 Ugali</option>
+            <option value="wetfry">🍳 Wet Fry</option>
+            <option value="greens">🥬 Greens</option>
+            <option value="chips">🍟 Chips</option>
+            <option value="fuluOmena">🐟 Fulu/Omena</option>
+            <option value="soda">🥤 Soda</option>
+            <option value="water">💧 Water</option>
+            <option value="container">📦 Containers</option>
+            <option value="other">📋 Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Category</th><th>Name</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="menuItemsBody"><tr><td colspan="5" class="loading">Loading menu items...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- USERS PANEL -->
+    <div class="panel" id="users">
+      <button class="btn" onclick="openUserModal()">➕ Add User</button>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Shift</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="usersBody"><tr><td colspan="6" class="loading">Loading users...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CREDIT PANEL -->
+    <div class="panel" id="credit">
+      <button class="btn" onclick="openCreditModal()">💳 New Credit Sale</button>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Customer</th><th>Phone</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="creditBody"><tr><td colspan="7" class="loading">Loading credit sales...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- EXPENSES PANEL -->
+    <div class="panel" id="expenses">
+      <button class="btn" onclick="openExpenseModal()">🧾 Add Expense</button>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th></tr></thead>
+          <tbody id="expenseBody"><tr><td colspan="4" class="loading">Loading expenses...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ANALYTICS PANEL -->
+    <div class="panel" id="analytics">
+      <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
+        <select id="analyticsDateRange" style="padding: 10px; border-radius: 10px; border: 1px solid var(--border);">
+          <option value="today">Today</option><option value="yesterday">Yesterday</option>
+          <option value="week">Last 7 Days</option><option value="month">Last 30 Days</option>
+          <option value="custom">Custom Range</option>
+        </select>
+        <div id="customDateRange" style="display: none; gap: 10px; align-items: center;">
+          <input type="date" id="startDate"><span>to</span><input type="date" id="endDate">
+        </div>
+        <button class="btn" onclick="loadAnalytics()">🔄 Update</button>
+      </div>
+      <div class="cards" style="margin-bottom: 25px;">
+        <div class="card"><h3>💰 Total Revenue</h3><p id="analyticsTotalRevenue">KES 0</p></div>
+        <div class="card"><h3>📊 Total Transactions</h3><p id="analyticsTotalTransactions">0</p></div>
+        <div class="card"><h3>☀️ Day Shift Revenue</h3><p id="analyticsDayRevenue">KES 0</p></div>
+        <div class="card"><h3>🌙 Night Shift Revenue</h3><p id="analyticsNightRevenue">KES 0</p></div>
+        <div class="card"><h3>🥤 Pepsi Revenue</h3><p id="pepsiRevenue">KES 0</p><small id="pepsiQuantity">0 bottles</small></div>
+        <div class="card"><h3>🥤 Coca Cola Revenue</h3><p id="cocacolaRevenue">KES 0</p><small id="cocacolaQuantity">0 bottles</small></div>
+      </div>
+      <div class="grid-2" style="margin-bottom: 25px;">
+        <div class="chart-box"><h3 style="margin-bottom: 15px;">📊 Category Revenue</h3><canvas id="categoryRevenueChart"></canvas></div>
+        <div class="chart-box"><h3 style="margin-bottom: 15px;">🔄 Shift Comparison</h3><canvas id="shiftComparisonChart"></canvas></div>
+      </div>
+      <div class="chart-box" style="margin-bottom: 25px;"><h3 style="margin-bottom: 15px;">📈 Daily Sales Trend</h3><canvas id="dailyTrendChart"></canvas></div>
+      <div class="table-wrapper">
+        <h3 style="margin: 20px;">📋 Category Breakdown</h3>
+        <table>
+          <thead><tr><th>Category</th><th>Quantity</th><th>Revenue</th><th>% of Total</th><th>Day Shift</th><th>Night Shift</th></tr></thead>
+          <tbody id="categoryBreakdownBody"><tr><td colspan="6" class="loading">Loading analytics data...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- QR SCANNER PANEL -->
+    <div class="panel" id="qrScanner">
+      <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+        <button class="btn" onclick="startScanner()" style="background: #10b981;">▶️ Start Scanner</button>
+        <button class="btn" onclick="stopScanner()" style="background: #ef4444;">⏹ Stop Scanner</button>
+      </div>
+      <div id="reader" style="margin-bottom: 20px;"></div>
+      <div id="scanOverlay" style="display: none; border: 3px solid #10b981; border-radius: 16px; width: 300px; height: 300px; margin: 20px auto; position: relative; z-index: 50;"></div>
+      <div id="scanResult" style="text-align: center; padding: 15px; font-size: 16px;">📷 Scanner not started</div>
+    </div>
+  </div>
+</main>
+
+
+
 <script>
 // ============ CONFIGURATION ============
 const API_URL = 'https://bamburi-tilapia-fish.onrender.com/api'; 
