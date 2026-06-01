@@ -880,6 +880,22 @@ flex-wrap:wrap;
   </div>
 </div>
 
+<!-- GLOVO MODAL -->
+<div class="modal" id="glovoModal">
+  <div class="modal-content">
+    <h2>🛵 New Glovo Order</h2>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:15px;">Glovo orders affect inventory but NOT cash/mpesa sales</p>
+    <div id="glovoItemsContainer" style="max-height:300px;overflow-y:auto;margin-bottom:15px;"></div>
+    <div class="form-group"><label>Order Total (KES)</label><input type="number" id="glovoTotal" class="form-control" readonly></div>
+    <div class="form-group"><label>Glovo Order ID</label><input type="text" id="glovoOrderId" class="form-control" placeholder="e.g., GLO-12345"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="saveGlovoOrder()" style="background:#8b5cf6;">✅ Save Glovo Order</button>
+      <button class="btn" onclick="closeModal('glovoModal')" style="background:#64748b;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+
 <!-- PAY CREDIT MODAL -->
 <div class="modal" id="payCreditModal">
   <div class="modal-content">
@@ -934,6 +950,9 @@ flex-wrap:wrap;
   <button class="nav-btn" onclick="switchPanel('expenses', this)">🧾 Expenses</button>
   <button class="nav-btn" onclick="switchPanel('analytics', this)">📈 Analytics</button>
   <button class="nav-btn" onclick="switchPanel('qrScanner', this)">📷 QR Scanner</button>
+  <button class="nav-btn" onclick="switchPanel('glovo', this)">🛵 Glovo Orders</button>
+  <button class="nav-btn" onclick="switchPanel('history', this)">📜 History</button>
+  <button class="nav-btn" onclick="switchPanel('records', this)">📊 Records</button>
 </nav>
 
 <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
@@ -1150,6 +1169,66 @@ flex-wrap:wrap;
 </main>
 
 
+<!-- GLOVO PANEL -->
+<div class="panel" id="glovo">
+    <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+        <button class="btn" onclick="openGlovoModal()" style="background:#8b5cf6;">🛵 New Glovo Order</button>
+        <button class="btn" onclick="loadGlovoOrders()" style="background:#3b82f6;">🔄 Refresh</button>
+    </div>
+    <div class="cards" style="margin-bottom:20px;">
+        <div class="card"><h3>🛵 Today's Glovo</h3><p id="glovoTodayTotal">KES 0</p><small id="glovoTodayCount">0 orders</small></div>
+        <div class="card"><h3>📅 Month Glovo</h3><p id="glovoMonthTotal">KES 0</p><small id="glovoMonthCount">0 orders</small></div>
+    </div>
+    <div class="table-wrapper">
+        <table><thead><tr><th>Order #</th><th>Date</th><th>Time</th><th>Items</th><th>Total</th><th>Status</th></tr></thead>
+        <tbody id="glovoBody"><tr><td colspan="6" class="loading">Loading glovo orders...</td></tr></tbody></table>
+    </div>
+</div>
+
+<!-- HISTORY PANEL -->
+<div class="panel" id="history">
+    <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+        <select id="historyType" onchange="loadHistory()" style="padding:10px;border-radius:10px;border:1px solid var(--border);">
+            <option value="all">All Records</option>
+            <option value="sale">Sales</option>
+            <option value="expense">Expenses</option>
+            <option value="credit">Credit</option>
+            <option value="glovo">Glovo</option>
+        </select>
+        <button class="btn" onclick="loadHistory()">🔄 Refresh</button>
+    </div>
+    <div class="table-wrapper">
+        <table><thead><tr><th>Date</th><th>Type</th><th>Details</th><th>Amount</th><th>Cashier</th></tr></thead>
+        <tbody id="historyBody"><tr><td colspan="5" class="loading">Loading history...</td></tr></tbody></table>
+    </div>
+</div>
+
+<!-- RECORDS PANEL -->
+<div class="panel" id="records">
+    <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+        <select id="recordsDateRange" onchange="loadRecords()" style="padding:10px;border-radius:10px;border:1px solid var(--border);">
+            <option value="today">Today</option>
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+        </select>
+        <button class="btn" onclick="loadRecords()">🔄 Refresh</button>
+    </div>
+    <div class="cards" style="margin-bottom:20px;">
+        <div class="card"><h3>🐟 Tilapia Revenue</h3><p id="recTilapia">KES 0</p></div>
+        <div class="card"><h3>🐠 Mbuta Revenue</h3><p id="recMbuta">KES 0</p></div>
+        <div class="card"><h3>🍚 Ugali Revenue</h3><p id="recUgali">KES 0</p></div>
+        <div class="card"><h3>🥤 Soda Revenue</h3><p id="recSoda">KES 0</p></div>
+        <div class="card"><h3>🍳 Wet Fry Revenue</h3><p id="recWetfry">KES 0</p></div>
+        <div class="card"><h3>🥬 Greens Revenue</h3><p id="recGreens">KES 0</p></div>
+        <div class="card"><h3>🍟 Chips Revenue</h3><p id="recChips">KES 0</p></div>
+        <div class="card"><h3>📦 Other Revenue</h3><p id="recOther">KES 0</p></div>
+    </div>
+    <div class="chart-box" style="margin-bottom:20px;">
+        <canvas id="recordsChart"></canvas>
+    </div>
+</div>
+
+
 
 <script>
 // ============ CONFIGURATION ============
@@ -1167,6 +1246,7 @@ let categoryRevenueChart = null;
 let shiftComparisonChart = null;
 let dailyTrendChart = null;
 var scannedQRCodes = []; 
+let glovoCart = [];
 
 // ============ AUTH FUNCTIONS ============
 async function login() {
@@ -1293,7 +1373,239 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
     }
 }
 
-// Toggle partial amount field
+
+// ============ GLOVO ORDERS ============
+
+
+function openGlovoModal() {
+    loadMenuItemsForGlovo();
+    document.getElementById('glovoModal').classList.add('active');
+}
+
+async function loadMenuItemsForGlovo() {
+    const items = await apiRequest('items/');
+    const container = document.getElementById('glovoItemsContainer');
+    
+    if (!items || items.length === 0) {
+        container.innerHTML = '<p>No items available</p>';
+        return;
+    }
+    
+    glovoCart = [];
+    let html = '';
+    items.forEach(item => {
+        html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid #eee;">
+            <span>${item.name} - KES ${item.price}</span>
+            <div style="display:flex;align-items:center;gap:5px;">
+                <button class="btn-sm" onclick="addToGlovo('${item.id}', '${escapeHtml(item.name)}', ${item.price}, -1)" style="background:#ef4444;">-</button>
+                <span id="glovoQty_${item.id}">0</span>
+                <button class="btn-sm" onclick="addToGlovo('${item.id}', '${escapeHtml(item.name)}', ${item.price}, 1)" style="background:#10b981;">+</button>
+            </div>
+        </div>`;
+    });
+    container.innerHTML = html;
+}
+
+function addToGlovo(id, name, price, delta) {
+    const existing = glovoCart.find(i => i.id === id);
+    if (existing) {
+        existing.qty += delta;
+        if (existing.qty <= 0) glovoCart = glovoCart.filter(i => i.id !== id);
+    } else if (delta > 0) {
+        glovoCart.push({ id, name, price, qty: 1 });
+    }
+    
+    document.getElementById('glovoQty_' + id).textContent = existing ? existing.qty : 0;
+    
+    const total = glovoCart.reduce((s, i) => s + (i.price * i.qty), 0);
+    document.getElementById('glovoTotal').value = total;
+}
+
+async function saveGlovoOrder() {
+    const orderId = document.getElementById('glovoOrderId').value.trim();
+    const total = parseFloat(document.getElementById('glovoTotal').value);
+    
+    if (!orderId) { toast('Please enter Glovo Order ID', 'error'); return; }
+    if (glovoCart.length === 0) { toast('Please add items', 'error'); return; }
+    
+    try {
+        await apiRequest('glovo/', 'POST', {
+            order_id: orderId,
+            items: glovoCart,
+            total: total,
+            status: 'pending'
+        });
+        toast('✅ Glovo order saved');
+        closeModal('glovoModal');
+        loadGlovoOrders();
+        document.getElementById('glovoOrderId').value = '';
+        glovoCart = [];
+    } catch (e) {
+        toast('Failed to save glovo order: ' + e.message, 'error');
+    }
+}
+
+async function loadGlovoOrders() {
+    try {
+        const orders = await apiRequest('glovo/');
+        const container = document.getElementById('glovoBody');
+        
+        if (!orders || orders.length === 0) {
+            container.innerHTML = '<tr><td colspan="6" class="loading">No glovo orders</td></tr>';
+            return;
+        }
+        
+        let todayTotal = 0, todayCount = 0;
+        let monthTotal = 0, monthCount = 0;
+        const today = new Date().toISOString().split('T')[0];
+        const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+        
+        let html = '';
+        orders.forEach(o => {
+            const dateStr = new Date(o.created_at).toISOString().split('T')[0];
+            if (dateStr === today) { todayTotal += o.total; todayCount++; }
+            if (dateStr >= monthStart) { monthTotal += o.total; monthCount++; }
+            
+            html += `<tr>
+                <td>${o.order_id}</td>
+                <td>${new Date(o.created_at).toLocaleDateString()}</td>
+                <td>${new Date(o.created_at).toLocaleTimeString()}</td>
+                <td style="font-size:12px;">${(o.items || []).map(i => i.name + ' ×' + i.qty).join(', ')}</td>
+                <td><strong>KES ${(o.total || 0).toLocaleString()}</strong></td>
+                <td><span class="badge info">${o.status || 'pending'}</span></td>
+            </tr>`;
+        });
+        container.innerHTML = html;
+        
+        document.getElementById('glovoTodayTotal').innerHTML = 'KES ' + todayTotal.toLocaleString();
+        document.getElementById('glovoTodayCount').textContent = todayCount + ' orders';
+        document.getElementById('glovoMonthTotal').innerHTML = 'KES ' + monthTotal.toLocaleString();
+        document.getElementById('glovoMonthCount').textContent = monthCount + ' orders';
+    } catch (e) {
+        document.getElementById('glovoBody').innerHTML = '<tr><td colspan="6" class="loading">Failed to load</td></tr>';
+    }
+}
+
+// ============ HISTORY ============
+async function loadHistory() {
+    const type = document.getElementById('historyType').value;
+    const container = document.getElementById('historyBody');
+    
+    try {
+        let allData = [];
+        
+        if (type === 'all' || type === 'sale') {
+            const sales = await apiRequest('transactions/') || [];
+            sales.forEach(s => allData.push({...s, recordType: 'sale'}));
+        }
+        if (type === 'all' || type === 'expense') {
+            const expenses = await apiRequest('expenses/') || [];
+            expenses.forEach(e => allData.push({...e, recordType: 'expense'}));
+        }
+        if (type === 'all' || type === 'credit') {
+            const credits = await apiRequest('credit/') || [];
+            credits.forEach(c => allData.push({...c, recordType: 'credit'}));
+        }
+        if (type === 'all' || type === 'glovo') {
+            const glovo = await apiRequest('glovo/') || [];
+            glovo.forEach(g => allData.push({...g, recordType: 'glovo'}));
+        }
+        
+        allData.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        
+        if (allData.length === 0) {
+            container.innerHTML = '<tr><td colspan="5" class="loading">No records found</td></tr>';
+            return;
+        }
+        
+        container.innerHTML = allData.slice(0, 100).map(r => {
+            const date = new Date(r.created_at).toLocaleDateString();
+            const typeBadge = r.recordType === 'sale' ? 'success' : r.recordType === 'expense' ? 'danger' : r.recordType === 'credit' ? 'warning' : 'info';
+            const amount = r.total || r.amount || 0;
+            const cashier = r.cashier_name || 'Admin';
+            const details = r.recordType === 'sale' ? (r.items || []).map(i => i.name).join(', ') : 
+                           r.recordType === 'expense' ? (r.name || r.description) :
+                           r.recordType === 'credit' ? r.customer_name :
+                           r.order_id || '';
+            
+            return `<tr>
+                <td>${date}</td>
+                <td><span class="badge ${typeBadge}">${r.recordType}</span></td>
+                <td style="font-size:12px;">${details}</td>
+                <td><strong>KES ${amount.toLocaleString()}</strong></td>
+                <td>${cashier}</td>
+            </tr>`;
+        }).join('');
+    } catch (e) {
+        container.innerHTML = '<tr><td colspan="5" class="loading">Failed to load history</td></tr>';
+    }
+}
+
+// ============ RECORDS / REVENUE BREAKDOWN ============
+async function loadRecords() {
+    const range = document.getElementById('recordsDateRange').value;
+    const today = new Date();
+    let startDate;
+    
+    if (range === 'today') startDate = today.toISOString().split('T')[0];
+    else if (range === 'week') startDate = new Date(today.setDate(today.getDate() - 7)).toISOString().split('T')[0];
+    else startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+    
+    try {
+        const sales = await apiRequest('transactions/') || [];
+        const filtered = sales.filter(s => new Date(s.created_at).toISOString().split('T')[0] >= startDate);
+        
+        const categories = { tilapia: 0, mbuta: 0, ugali: 0, soda: 0, wetfry: 0, greens: 0, chips: 0, other: 0 };
+        
+        filtered.forEach(tx => {
+            const items = typeof tx.items === 'string' ? JSON.parse(tx.items) : (tx.items || []);
+            items.forEach(item => {
+                const name = (item.name || '').toLowerCase();
+                const amount = (item.price || 0) * (item.qty || 1);
+                
+                if (name.includes('tilapia')) categories.tilapia += amount;
+                else if (name.includes('mbuta')) categories.mbuta += amount;
+                else if (name.includes('ugali')) categories.ugali += amount;
+                else if (name.includes('soda')) categories.soda += amount;
+                else if (name.includes('wet fry')) categories.wetfry += amount;
+                else if (name.includes('green') || name.includes('managu') || name.includes('kale')) categories.greens += amount;
+                else if (name.includes('chip')) categories.chips += amount;
+                else categories.other += amount;
+            });
+        });
+        
+        document.getElementById('recTilapia').innerHTML = 'KES ' + categories.tilapia.toLocaleString();
+        document.getElementById('recMbuta').innerHTML = 'KES ' + categories.mbuta.toLocaleString();
+        document.getElementById('recUgali').innerHTML = 'KES ' + categories.ugali.toLocaleString();
+        document.getElementById('recSoda').innerHTML = 'KES ' + categories.soda.toLocaleString();
+        document.getElementById('recWetfry').innerHTML = 'KES ' + categories.wetfry.toLocaleString();
+        document.getElementById('recGreens').innerHTML = 'KES ' + categories.greens.toLocaleString();
+        document.getElementById('recChips').innerHTML = 'KES ' + categories.chips.toLocaleString();
+        document.getElementById('recOther').innerHTML = 'KES ' + categories.other.toLocaleString();
+        
+        // Update chart
+        if (window.recordsChart) window.recordsChart.destroy();
+        const ctx = document.getElementById('recordsChart').getContext('2d');
+        window.recordsChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Tilapia', 'Mbuta', 'Ugali', 'Soda', 'Wet Fry', 'Greens', 'Chips', 'Other'],
+                datasets: [{
+                    label: 'Revenue (KES)',
+                    data: Object.values(categories),
+                    backgroundColor: ['#f59e0b', '#0f172a', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'],
+                    borderRadius: 8
+                }]
+            },
+            options: { responsive: true }
+        });
+    } catch (e) {
+        console.error('Records error:', e);
+    }
+}
+
+
+
 // ============ CREDIT PAYMENT FIXES ============
 function togglePaymentFields() {
     const paymentType = document.getElementById('paymentType').value;
@@ -1422,6 +1734,15 @@ function switchPanel(panel, btn) {
   if (panel === 'analytics') {
     loadAnalytics();
   }
+  if (panel === 'glovo') { 
+    loadGlovoOrders();
+  }
+  if (panel === 'history') { 
+    loadHistory(); 
+  }
+  if (panel === 'records') { 
+    loadRecords(); 
+  }
 }
 
 function toast(message, type = 'success') {
@@ -1448,8 +1769,13 @@ async function loadDashboard() {
     const data = await apiRequest('dashboard/admin/');
     if (data && data.today) {
       document.getElementById('totalSales').innerHTML = 'KES ' + (data.today.total_sales || 0).toLocaleString();
-      document.getElementById('totalExpenses').innerHTML = 'KES ' + (data.today.total_expenses || 0).toLocaleString();
-      document.getElementById('cashAtHand').innerHTML = 'KES ' + (data.today.cash_at_hand || 0).toLocaleString();
+      
+      // Cash at hand = cash sales - expenses
+      const cashSales = data.today.cash_sales || 0;
+      const expenses = data.today.total_expenses || 0;
+      const cashAtHand = cashSales - expenses;
+      document.getElementById('cashAtHand').innerHTML = 'KES ' + cashAtHand.toLocaleString();
+      document.getElementById('totalExpenses').innerHTML = 'KES ' + expenses.toLocaleString();
       document.getElementById('transactionCount').innerHTML = data.today.transaction_count || 0;
       
       // Fish breakdown
