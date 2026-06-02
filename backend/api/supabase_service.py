@@ -548,3 +548,15 @@ class SupabaseDB:
         except:
             pass
         return None
+    
+    @classmethod
+    def get_all_tx(cls):
+        """Get ALL transactions (not just today)"""
+        if not cls._ok(): return []
+        try:
+            r = requests.get(f'{cls.BASE}/rest/v1/transactions', 
+                           headers=cls._h(), 
+                           params={'order': 'created_at.desc', 'limit': '500'})
+            return r.json() if r.status_code == 200 else []
+        except:
+            return []

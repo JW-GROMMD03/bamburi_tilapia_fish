@@ -935,6 +935,44 @@ flex-wrap:wrap;
   </div>
 </div>
 
+<!-- GLOVO ITEM MODAL -->
+<div class="modal" id="glovoItemModal">
+  <div class="modal-content">
+    <h2 id="glovoItemModalTitle">➕ Add Glovo Menu Item</h2>
+    <input type="hidden" id="editGlovoItemId">
+    <div class="form-group">
+      <label>Category *</label>
+      <select id="glovoItemCategory" class="form-control">
+        <option value="tilapia">🐟 Tilapia</option>
+        <option value="mbuta">🐠 Mbuta</option>
+        <option value="ugali">🍚 Ugali</option>
+        <option value="wetfry">🍳 Wet Fry</option>
+        <option value="greens">🥬 Greens</option>
+        <option value="chips">🍟 Chips</option>
+        <option value="soda">🥤 Soda</option>
+        <option value="water">💧 Water</option>
+        <option value="other">📋 Other</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Item Name</label>
+      <input type="text" id="glovoItemName" class="form-control" placeholder="e.g., Tilapia Whole">
+    </div>
+    <div class="form-group">
+      <label>Our Selling Price (KES)</label>
+      <input type="number" id="glovoItemOurPrice" class="form-control" placeholder="Price we sell at shop">
+    </div>
+    <div class="form-group">
+      <label>Glovo Price (KES)</label>
+      <input type="number" id="glovoItemGlovoPrice" class="form-control" placeholder="Price on Glovo app">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="saveGlovoItem()" style="background:#8b5cf6;">💾 Save Item</button>
+      <button class="btn" onclick="closeModal('glovoItemModal')" style="background:#64748b;">Cancel</button>
+    </div>
+  </div>
+</div>
+
 </div>
 
 <!-- SIDEBAR -->
@@ -950,6 +988,7 @@ flex-wrap:wrap;
   <button class="nav-btn" onclick="switchPanel('expenses', this)">🧾 Expenses</button>
   <button class="nav-btn" onclick="switchPanel('analytics', this)">📈 Analytics</button>
   <button class="nav-btn" onclick="switchPanel('qrScanner', this)">📷 QR Scanner</button>
+  <button class="nav-btn" onclick="switchPanel('glovoItems', this)">🛵 Glovo Menu</button>
   <button class="nav-btn" onclick="switchPanel('glovo', this)">🛵 Glovo Orders</button>
   <button class="nav-btn" onclick="switchPanel('history', this)">📜 History</button>
   <button class="nav-btn" onclick="switchPanel('records', this)">📊 Records</button>
@@ -1165,8 +1204,20 @@ flex-wrap:wrap;
       <div id="scanOverlay" style="display: none; border: 3px solid #10b981; border-radius: 16px; width: 300px; height: 300px; margin: 20px auto; position: relative; z-index: 50;"></div>
       <div id="scanResult" style="text-align: center; padding: 15px; font-size: 16px;">📷 Scanner not started</div>
     </div>
-  </div>
-</main>
+
+        <!-- GLOVO MENU ITEMS PANEL -->
+    <div class="panel" id="glovoItems">
+      <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-bottom: 20px;">
+        <button class="btn" onclick="openGlovoItemModal()" style="background:#8b5cf6;">➕ Add Glovo Item</button>
+        <button class="btn" onclick="loadGlovoItems()" style="background:#3b82f6;">🔄 Refresh</button>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Category</th><th>Name</th><th>Our Price</th><th>Glovo Price</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="glovoItemsBody"><tr><td colspan="6" class="loading">Loading glovo menu items...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
 
 
 <!-- GLOVO PANEL -->
@@ -1227,6 +1278,7 @@ flex-wrap:wrap;
         <canvas id="recordsChart"></canvas>
     </div>
 </div>
+</main>
 
 
 
@@ -1247,6 +1299,7 @@ let shiftComparisonChart = null;
 let dailyTrendChart = null;
 var scannedQRCodes = []; 
 let glovoCart = [];
+let glovoMenuItems = [];
 
 // ============ AUTH FUNCTIONS ============
 async function login() {
@@ -1373,6 +1426,171 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
     }
 }
 
+
+// ============ GLOVO MENU ITEMS MANAGEMENT ============
+
+
+async function loadGlovoItems() {
+    try {
+        // Load from localStorage or API
+        let items = [];
+        try {
+            items = await apiRequest('glovo-items/');
+        } catch(e) {
+            items = JSON.parse(localStorage.getItem('fishflow_glovo_items') || '[]');
+        }
+        glovoMenuItems = items;
+        renderGlovoItems(items);
+    } catch(e) {
+        document.getElementById('glovoItemsBody').innerHTML = '<tr><td colspan="6" class="loading">Failed to load</td></tr>';
+    }
+}
+
+function renderGlovoItems(items) {
+    const container = document.getElementById('glovoItemsBody');
+    if (!items || items.length === 0) {
+        container.innerHTML = '<tr><td colspan="6" class="loading">No Glovo items. Add some!</td></tr>';
+        return;
+    }
+    container.innerHTML = items.map(item => `
+        <tr>
+            <td>${getCategoryIcon(item.category)} ${item.category}</td>
+            <td><strong>${escapeHtml(item.name)}</strong></td>
+            <td>KES ${(item.our_price || 0).toLocaleString()}</td>
+            <td>KES ${(item.glovo_price || 0).toLocaleString()}</td>
+            <td><span class="badge ${item.is_active !== false ? 'success' : 'danger'}">${item.is_active !== false ? 'Active' : 'Inactive'}</span></td>
+            <td class="action-buttons">
+                <button class="btn-sm" onclick="editGlovoItem('${item.id}')" style="background:#3b82f6;">✏️</button>
+                <button class="btn-sm" onclick="toggleGlovoItem('${item.id}')" style="background:${item.is_active !== false ? '#f59e0b' : '#10b981'}">${item.is_active !== false ? '🔒' : '✅'}</button>
+                <button class="btn-sm" onclick="deleteGlovoItem('${item.id}')" style="background:#ef4444;">🗑️</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function openGlovoItemModal() {
+    document.getElementById('glovoItemModalTitle').textContent = '➕ Add Glovo Menu Item';
+    document.getElementById('editGlovoItemId').value = '';
+    document.getElementById('glovoItemCategory').value = 'tilapia';
+    document.getElementById('glovoItemName').value = '';
+    document.getElementById('glovoItemOurPrice').value = '';
+    document.getElementById('glovoItemGlovoPrice').value = '';
+    document.getElementById('glovoItemModal').classList.add('active');
+}
+
+function editGlovoItem(id) {
+    const item = glovoMenuItems.find(i => i.id == id);
+    if (!item) return;
+    document.getElementById('glovoItemModalTitle').textContent = '✏️ Edit Glovo Item';
+    document.getElementById('editGlovoItemId').value = item.id;
+    document.getElementById('glovoItemCategory').value = item.category;
+    document.getElementById('glovoItemName').value = item.name;
+    document.getElementById('glovoItemOurPrice').value = item.our_price;
+    document.getElementById('glovoItemGlovoPrice').value = item.glovo_price;
+    document.getElementById('glovoItemModal').classList.add('active');
+}
+
+async function saveGlovoItem() {
+    const id = document.getElementById('editGlovoItemId').value;
+    const itemData = {
+        category: document.getElementById('glovoItemCategory').value,
+        name: document.getElementById('glovoItemName').value.trim(),
+        our_price: parseInt(document.getElementById('glovoItemOurPrice').value) || 0,
+        glovo_price: parseInt(document.getElementById('glovoItemGlovoPrice').value) || 0,
+        is_active: true
+    };
+    
+    if (!itemData.name || !itemData.glovo_price) {
+        toast('Please fill all fields', 'error');
+        return;
+    }
+    
+    // Save to localStorage
+    let items = JSON.parse(localStorage.getItem('fishflow_glovo_items') || '[]');
+    if (id) {
+        items = items.map(i => i.id == id ? {...i, ...itemData, id: parseInt(id)} : i);
+    } else {
+        itemData.id = Date.now();
+        items.push(itemData);
+    }
+    localStorage.setItem('fishflow_glovo_items', JSON.stringify(items));
+    
+    // Try API
+    try { await apiRequest('glovo-items/', 'POST', itemData); } catch(e) {}
+    
+    toast('✅ Glovo item saved');
+    closeModal('glovoItemModal');
+    loadGlovoItems();
+}
+
+async function toggleGlovoItem(id) {
+    let items = JSON.parse(localStorage.getItem('fishflow_glovo_items') || '[]');
+    items = items.map(i => i.id == id ? {...i, is_active: !i.is_active} : i);
+    localStorage.setItem('fishflow_glovo_items', JSON.stringify(items));
+    loadGlovoItems();
+}
+
+async function deleteGlovoItem(id) {
+    if (!confirm('Delete this Glovo item?')) return;
+    let items = JSON.parse(localStorage.getItem('fishflow_glovo_items') || '[]');
+    items = items.filter(i => i.id != id);
+    localStorage.setItem('fishflow_glovo_items', JSON.stringify(items));
+    loadGlovoItems();
+    toast('🗑️ Glovo item deleted');
+}
+
+// Update loadMenuItemsForGlovo to use Glovo-specific items
+async function loadMenuItemsForGlovo() {
+    try {
+        // Load Glovo-specific items first
+        let items = JSON.parse(localStorage.getItem('fishflow_glovo_items') || '[]');
+        
+        // Filter active only
+        items = items.filter(item => item.is_active !== false);
+        
+        const container = document.getElementById('glovoItemsContainer');
+        
+        if (!items || items.length === 0) {
+            container.innerHTML = '<p style="text-align:center;color:var(--muted);padding:20px;">No Glovo menu items. Add them in Glovo Menu panel.</p>';
+            return;
+        }
+        
+        const categories = {};
+        items.forEach(item => {
+            if (!categories[item.category]) categories[item.category] = [];
+            categories[item.category].push(item);
+        });
+        
+        glovoCart = [];
+        let html = '';
+        
+        for (const [category, catItems] of Object.entries(categories)) {
+            html += `<h4 style="margin:10px 0 5px;color:#8b5cf6;font-size:14px;">${getCategoryIcon(category)} ${category}</h4>`;
+            
+            catItems.forEach(item => {
+                html += `
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px solid #f0f0f0;background:#fafafa;border-radius:8px;margin-bottom:4px;">
+                    <div style="flex:1;">
+                        <strong style="font-size:13px;">${escapeHtml(item.name)}</strong>
+                        <span style="color:var(--muted);font-size:11px;display:block;">Shop: KES ${(item.our_price || 0).toLocaleString()} | Glovo: KES ${(item.glovo_price || 0).toLocaleString()}</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <button class="btn-sm" onclick="addToGlovo('${item.id}', '${escapeHtml(item.name)}', ${item.glovo_price || 0}, -1)" style="background:#ef4444;width:30px;height:30px;">−</button>
+                        <span id="glovoQty_${item.id}" style="font-weight:700;min-width:20px;text-align:center;">0</span>
+                        <button class="btn-sm" onclick="addToGlovo('${item.id}', '${escapeHtml(item.name)}', ${item.glovo_price || 0}, 1)" style="background:#8b5cf6;width:30px;height:30px;">+</button>
+                    </div>
+                </div>`;
+            });
+        }
+        
+        container.innerHTML = html;
+        document.getElementById('glovoTotal').value = '0';
+        document.getElementById('glovoOrderId').value = '';
+        
+    } catch (error) {
+        document.getElementById('glovoItemsContainer').innerHTML = '<p style="color:red;">Failed to load Glovo items</p>';
+    }
+}
 
 // ============ GLOVO ORDERS ============
 
@@ -2173,6 +2391,9 @@ function switchPanel(panel, btn) {
   if (panel === 'analytics') {
     loadAnalytics();
   }
+  if (panel === 'glovoItems') {
+    loadGlovoItems();
+  }
   if (panel === 'glovo') { 
     loadGlovoOrders();
   }
@@ -2237,33 +2458,54 @@ let currentSalesFilter = { startDate: null, endDate: null };
 // Load sales with date filter
 async function loadSales() {
   try {
-    // Set default dates (last 7 days)
+   
+    // Set default dates for current business day
     if (!document.getElementById('salesStartDate').value) {
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - 7);
-      document.getElementById('salesStartDate').value = startDate.toISOString().split('T')[0];
-      document.getElementById('salesEndDate').value = endDate.toISOString().split('T')[0];
+      const now = new Date();
+      const businessDay = getBusinessDayStart();
+      document.getElementById('salesStartDate').value = businessDay.toISOString().split('T')[0];
+      document.getElementById('salesEndDate').value = now.toISOString().split('T')[0];
     }
     
-    // Fetch transactions from API
+    // Fetch ALL transactions
     const transactions = await apiRequest('transactions/');
     allSalesData = transactions || [];
     
-    // Apply date filter if active
+    // Apply date filter
     let filteredData = allSalesData;
     if (currentSalesFilter.startDate && currentSalesFilter.endDate) {
       filteredData = allSalesData.filter(t => {
-        const txDate = new Date(t.time).toISOString().split('T')[0];
+        const txDate = t.created_at 
+          ? new Date(t.created_at).toISOString().split('T')[0]
+          : (t.date || '').toString().split('T')[0];
         return txDate >= currentSalesFilter.startDate && txDate <= currentSalesFilter.endDate;
+      });
+    } else {
+      // Default: show current business day
+      const businessDay = getBusinessDayStart().toISOString().split('T')[0];
+      filteredData = allSalesData.filter(t => {
+        const txDate = t.created_at 
+          ? new Date(t.created_at).toISOString().split('T')[0]
+          : (t.date || '').toString().split('T')[0];
+        return txDate >= businessDay;
       });
     }
     
     renderSalesTable(filteredData);
   } catch (error) {
     console.error('Sales load error:', error);
-    document.getElementById('salesBody').innerHTML = '<tr><td colspan="7" class="loading">Failed to load sales data</td></tr>';
+    document.getElementById('salesBody').innerHTML = '<tr><td colspan="8" class="loading">Failed to load sales data</td></tr>';
   }
+}
+
+// Add business day helper
+function getBusinessDayStart() {
+  const now = new Date();
+  if (now.getHours() < 9 || (now.getHours() === 9 && now.getMinutes() < 30)) {
+    now.setDate(now.getDate() - 1);
+  }
+  now.setHours(9, 30, 0, 0);
+  return now;
 }
 
 // Render sales table
@@ -2271,58 +2513,76 @@ function renderSalesTable(transactions) {
   const container = document.getElementById('salesBody');
   
   if (!transactions || transactions.length === 0) {
-    container.innerHTML = '<tr><td colspan="7" class="loading">No sales recorded in this period</td></tr>';
+    container.innerHTML = '<tr><td colspan="8" class="loading">No sales recorded in this period</td></tr>';
     return;
   }
   
-  // Calculate summary
-  let totalSales = 0;
-  let cashTotal = 0;
-  let mpesaTotal = 0;
+  let totalSales = 0, cashTotal = 0, mpesaTotal = 0;
+  let dayShiftTotal = 0, nightShiftTotal = 0;
   
   let html = '';
   transactions.forEach(t => {
     let items = [];
     try { 
       items = typeof t.items === 'string' ? JSON.parse(t.items) : (t.items || []); 
-    } catch(e) { 
-      items = []; 
-    }
+    } catch(e) { items = []; }
     
-    const dateStr = new Date(t.time).toLocaleDateString('en-KE');
-    const timeStr = new Date(t.time).toLocaleTimeString('en-KE');
-    const shiftClass = t.shift === 'night' ? 'danger' : 'warning';
-    const shiftText = t.shift || 'day';
-    const methodClass = t.method === 'mpesa' ? 'info' : 'success';
+    // Use created_at instead of t.time
+    const txDate = t.created_at ? new Date(t.created_at) : (t.date ? new Date(t.date) : new Date());
+    const dateStr = txDate.toLocaleDateString('en-KE');
+    const timeStr = txDate.toLocaleTimeString('en-KE');
+    
+    //  Correct shift detection - check the actual shift field
+    const shiftValue = (t.shift || 'day').toLowerCase();
+    const shiftClass = shiftValue === 'night' ? 'info' : 'warning';
+    const shiftDisplay = shiftValue === 'night' ? '🌙 Night' : '☀️ Day';
+    
+    // Method display
+    const method = (t.method || 'cash').toLowerCase();
+    const methodClass = method === 'mpesa' ? 'info' : 'success';
+    const methodDisplay = method === 'mpesa' ? '📱 M-Pesa' : '💵 Cash';
+    
+    // Cashier name
+    const cashierName = t.cashier_name || t.cashier || 'Unknown';
+    
     const txTotal = t.total || 0;
-    
     totalSales += txTotal;
-    if (t.method === 'cash') cashTotal += txTotal;
-    if (t.method === 'mpesa') mpesaTotal += txTotal;
+    if (method === 'cash') cashTotal += txTotal;
+    if (method === 'mpesa') mpesaTotal += txTotal;
+    if (shiftValue === 'day') dayShiftTotal += txTotal;
+    else nightShiftTotal += txTotal;
     
     html += `<tr>
       <td><strong>${dateStr}</strong></td>
       <td>${timeStr}</td>
-      <td><span class="badge info">${escapeHtml(t.cashier_name || t.cashier || 'Unknown')}</span></td>
-      <td><span class="badge ${shiftClass}">${shiftText === 'day' ? '☀️ Day' : '🌙 Night'}</span></td>
-      <td><span class="badge ${methodClass}">${t.method === 'mpesa' ? '📱 M-Pesa' : '💵 Cash'}</span></td>
-      <td style="font-size: 12px;">${items.map(i => `${escapeHtml(i.name)} ×${i.qty || 1}`).join(', ')}</td>
+      <td><span class="badge info">${escapeHtml(cashierName)}</span></td>
+      <td><span class="badge ${shiftClass}">${shiftDisplay}</span></td>
+      <td><span class="badge ${methodClass}">${methodDisplay}</span></td>
+      <td style="font-size: 12px;">${items.map(i => `${escapeHtml(i.name || 'Item')} ×${i.qty || 1}`).join(', ')}</td>
       <td><strong>KES ${txTotal.toLocaleString()}</strong></td>
     </tr>`;
   });
   
-  // Add summary row
+  // Summary rows
   html += `<tr style="background: #f0fdf4; font-weight: bold;">
-    <td colspan="6" style="text-align: right;"><strong>Total Sales:</strong></td>
+    <td colspan="6" style="text-align: right;">💰 Total Sales:</td>
     <td><strong>KES ${totalSales.toLocaleString()}</strong></td>
   </tr>`;
   html += `<tr style="background: #fef3c7;">
-    <td colspan="6" style="text-align: right;"><strong>💵 Cash Total:</strong></td>
+    <td colspan="6" style="text-align: right;">💵 Cash Total:</td>
     <td><strong>KES ${cashTotal.toLocaleString()}</strong></td>
   </tr>`;
   html += `<tr style="background: #dbeafe;">
-    <td colspan="6" style="text-align: right;"><strong>📱 M-Pesa Total:</strong></td>
+    <td colspan="6" style="text-align: right;">📱 M-Pesa Total:</td>
     <td><strong>KES ${mpesaTotal.toLocaleString()}</strong></td>
+  </tr>`;
+  html += `<tr style="background: #fdf2f8;">
+    <td colspan="6" style="text-align: right;">☀️ Day Shift:</td>
+    <td><strong>KES ${dayShiftTotal.toLocaleString()}</strong></td>
+  </tr>`;
+  html += `<tr style="background: #ede9fe;">
+    <td colspan="6" style="text-align: right;">🌙 Night Shift:</td>
+    <td><strong>KES ${nightShiftTotal.toLocaleString()}</strong></td>
   </tr>`;
   
   container.innerHTML = html;
@@ -2338,24 +2598,19 @@ function filterSalesByDate() {
     return;
   }
   
-  if (startDate > endDate) {
-    toast('Start date cannot be after end date', 'error');
-    return;
-  }
-  
   currentSalesFilter.startDate = startDate;
   currentSalesFilter.endDate = endDate;
   
-  let filteredData = allSalesData;
-  if (currentSalesFilter.startDate && currentSalesFilter.endDate) {
-    filteredData = allSalesData.filter(t => {
-      const txDate = new Date(t.time).toISOString().split('T')[0];
-      return txDate >= currentSalesFilter.startDate && txDate <= currentSalesFilter.endDate;
-    });
-  }
+  // FIX: Use created_at for date comparison
+  let filteredData = allSalesData.filter(t => {
+    const txDate = t.created_at 
+      ? new Date(t.created_at).toISOString().split('T')[0]
+      : (t.date || '').toString().split('T')[0];
+    return txDate >= startDate && txDate <= endDate;
+  });
   
   renderSalesTable(filteredData);
-  toast(`Showing sales from ${startDate} to ${endDate}`, 'info');
+  toast(`Showing ${filteredData.length} sales from ${startDate} to ${endDate}`, 'info');
 }
 
 // Reset sales filter

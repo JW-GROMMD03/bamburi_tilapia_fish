@@ -27,7 +27,7 @@ qr_approvals = {}
 def transactions(request):
     if request.method == 'GET':
         d = request.query_params.get('date', str(date.today()))
-        return Response(SupabaseDB.get_tx(d))
+        return Response(SupabaseDB.get_all_tx())
     try:
         data = request.data
         tx = {
