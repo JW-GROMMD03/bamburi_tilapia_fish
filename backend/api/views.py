@@ -40,9 +40,10 @@ def transactions(request):
             'items': json.dumps(data.get('items', [])),
             'cashier_id': str(data.get('cashier_id', '')),
             'cashier_name': str(data.get('cashier_name', '')),
+            'shift': str(data.get('shift', 'day')), 
             'created_at': datetime.now().isoformat()
         }
-         print(f"📝 Saving TX - Cashier: {tx['cashier_name']}, Shift: {tx['shift']}")
+        print(f"📝 Saving TX - Cashier: {tx['cashier_name']}, Shift: {tx['shift']}")
         r = SupabaseDB.save_tx(tx)
         if r: return Response(r, status=status.HTTP_201_CREATED)
         return Response({'error':'Save failed'}, status=400)
