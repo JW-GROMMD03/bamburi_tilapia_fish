@@ -38,8 +38,11 @@ def transactions(request):
             'cash_amount': data.get('cashAmt', 0),
             'mpesa_amount': data.get('mpesaAmt', 0),
             'items': json.dumps(data.get('items', [])),
+            'cashier_id': str(data.get('cashier_id', '')),
+            'cashier_name': str(data.get('cashier_name', '')),
             'created_at': datetime.now().isoformat()
         }
+         print(f"📝 Saving TX - Cashier: {tx['cashier_name']}, Shift: {tx['shift']}")
         r = SupabaseDB.save_tx(tx)
         if r: return Response(r, status=status.HTTP_201_CREATED)
         return Response({'error':'Save failed'}, status=400)

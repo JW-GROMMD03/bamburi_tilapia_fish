@@ -278,15 +278,33 @@ class SupabaseDB:
     def save_tx(cls, data):
         if not cls._ok(): return None
         try:
-            r = requests.post(f'{cls.BASE}/rest/v1/transactions', headers=cls._h(), json=data)
+            # Ensure all fields are present
+            tx_data = {
+                'date': data.get('date', str(date.today())),
+                'time': data.get('time', ''),
+                'total': data.get('total', 0),
+                'method': data.get('method', 'cash'),
+                'cash_amount': data.get('cash_amount', data.get('cashAmt', 0)),
+                'mpesa_amount': data.get('mpesa_amount', data.get('mpesaAmt', 0)),
+                'items': data.get('items', '[]'),
+                'cashier_id': str(data.get('cashier_id', '')),
+                'cashier_name': str(data.get('cashier_name', '')),
+                'shift': str(data.get('shift', 'day')),
+                'created_at': data.get('created_at', datetime.now().isoformat())
+            }
+            print(f"💾 Saving TX to Supabase - Cashier: {tx_data['cashier_name']}")
+            r = requests.post(f'{cls.BASE}/rest/v1/transactions', headers=cls._h(), json=tx_data)
             if r.status_code in [200, 201]:
                 res = r.json()
                 result = res[0] if isinstance(res, list) else res
+                print(f"✅ TX saved: {result.get('id')}")
                 cls._update_inventory(data.get('items', []))
                 cls.log_audit(data.get('cashier_id'), 'sale', f"Sale: {data.get('total')}/=")
                 return result
-        except:
-            pass
+            else:
+                print(f"❌ Save failed: {r.status_code} - {r.text[:200]}")
+        except Exception as e:
+            print(f"❌ Save error: {e}")
         return None
     
     @classmethod
