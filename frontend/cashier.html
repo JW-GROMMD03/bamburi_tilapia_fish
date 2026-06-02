@@ -1193,28 +1193,31 @@ async function deleteForever(id) {
 // ============ DASHBOARD & ANALYSIS ============
 
 async function updateDashboard() {
-  // Get ALL transactions then filter for current shift
   var t = await apiCall('transactions/') || [];
   var e = await apiCall('expenses/') || [];
   
-  // FIX: Only show current shift's transactions
-  var now = new Date();
-  var shiftStart = getShiftStartTime();
+  // DEBUG: Log what we're comparing
+  console.log('User ID:', user.id);
+  console.log('User name:', user.full_name);
+  console.log('Total transactions:', t.length);
+  if (t.length > 0) {
+    console.log('First TX cashier_id:', t[0].cashier_id);
+    console.log('First TX cashier_name:', t[0].cashier_name);
+  }
   
-  // Filter transactions by time (only current shift)
+  // FIX: Match by cashier_name OR cashier_id (more flexible)
   var myShiftTx = t.filter(function(tx) {
-    var txTime = tx.created_at ? new Date(tx.created_at) : new Date(tx.date + ' ' + (tx.time || ''));
-    // Also filter by cashier_id to only show this cashier's sales
-    return txTime >= shiftStart && tx.cashier_id === user.id;
+    var matchesId = (tx.cashier_id === user.id);
+    var matchesName = (tx.cashier_name === user.full_name);
+    return matchesId || matchesName;
   });
   
-  // Filter expenses by current shift
+  console.log('My transactions found:', myShiftTx.length);
+  
   var myShiftExp = e.filter(function(ex) {
-    var exTime = ex.created_at ? new Date(ex.created_at) : new Date();
-    return exTime >= shiftStart;
+    return ex.created_by === user.id;
   });
   
-  // Calculate category stats from current shift only
   var cat = {
     tilapia: { pieces: 0, amount: 0 }, mbuta: { pieces: 0, amount: 0 },
     ugali: { pieces: 0, amount: 0 }, wetfry: { pieces: 0, amount: 0 },
@@ -1226,8 +1229,8 @@ async function updateDashboard() {
   };
   
   myShiftTx.forEach(function(tx) {
-    var i = typeof tx.items === 'string' ? JSON.parse(tx.items) : (tx.items || []);
-    i.forEach(function(x) {
+    var items = typeof tx.items === 'string' ? JSON.parse(tx.items) : (tx.items || []);
+    items.forEach(function(x) {
       var n = (x.name || '').toLowerCase();
       var c = 'other';
       if (n.includes('pepsi')) c = 'pepsi';
@@ -1249,8 +1252,8 @@ async function updateDashboard() {
   });
   
   var totalSales = myShiftTx.reduce(function(s, x) { return s + (x.total || 0); }, 0);
-  var cashSales = myShiftTx.filter(function(x) { return x.method === 'cash'; }).reduce(function(s, x) { return s + (x.total || 0); }, 0);
-  var mpesaSales = myShiftTx.filter(function(x) { return x.method === 'mpesa'; }).reduce(function(s, x) { return s + (x.total || 0); }, 0);
+  var cashSales = myShiftTx.filter(function(x) { return (x.method || '').toLowerCase() === 'cash'; })
+                           .reduce(function(s, x) { return s + (x.total || 0); }, 0);
   var totalExp = myShiftExp.reduce(function(s, x) { return s + (x.amount || 0); }, 0);
   var cashAtHand = cashSales - totalExp;
   
@@ -1278,7 +1281,6 @@ async function updateDashboard() {
   document.getElementById('containerPcs').textContent = cat.container.pieces;
   document.getElementById('containerAmt').textContent = cat.container.amount.toLocaleString() + '/=';
   document.getElementById('totalSalesDisplay').textContent = totalSales.toLocaleString();
-  // FIX: Show Cash at Hand
   document.getElementById('totalExpensesDisplay').textContent = '💵 Cash: ' + cashAtHand.toLocaleString() + '/=';
 }
 
