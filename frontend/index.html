@@ -741,27 +741,25 @@
                     localStorage.setItem('fishflow_user', JSON.stringify(profile));
                     
                     // Verify role
-                    const userRole = profile.role || data.user?.role || 'cashier';
-                    
-                    if (userRole !== selectedRole && userRole !== 'admin') {
-                        showError(`This account is registered as <strong>${userRole}</strong>. Please select the correct role.`);
-                        btn.classList.remove('loading');
-                        btn.querySelector('.btn-text').textContent = '🔐 Sign In to Dashboard';
-                        btn.disabled = false;
-                        return;
-                    }
-                    
-                    // Success!
-                    showSuccess(`Welcome back! Redirecting to ${userRole} dashboard...`);
-                    
-                    // Redirect based on role
-                    setTimeout(() => {
-                        if (userRole === 'admin') {
-                            window.location.href = 'admin.html';
-                        } else {
-                            window.location.href = 'cashier.html';
-                        }
-                    }, 1000);
+
+const userRole = (profile.role || data.user?.role || 'cashier').toLowerCase();
+
+// If the user selected a different role, warn them but still let them in with correct role
+if (userRole !== selectedRole && selectedRole !== userRole) {
+    console.log(`⚠️ User selected "${selectedRole}" but actual role is "${userRole}". Redirecting correctly.`);
+}
+
+// Success! Always redirect based on the ACTUAL role from server
+showSuccess(`Welcome back! Redirecting to ${userRole} dashboard...`);
+
+// Redirect based on ACTUAL role from database
+setTimeout(() => {
+    if (userRole === 'admin' || userRole === 'manager') {
+        window.location.href = 'admin.html';
+    } else {
+        window.location.href = 'cashier.html';
+    }
+}, 1000);
                     
                 } else {
                     const errorMsg = data.error || data.message || 'Invalid email or password';

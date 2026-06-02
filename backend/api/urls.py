@@ -81,7 +81,7 @@ urlpatterns = [
     
     path('dashboard/analytics/', views.analytics_dashboard, name='analytics-dashboard'),
 
-    # Menu sync endpoints - FIXED (removed duplicate menu/items/)
+    # Menu sync endpoints 
     path('menu/version/', views.menu_version, name='menu-version'),
     path('menu/items/', views.get_menu_items, name='menu-items-sync'),
     path('menu/refresh/', views.force_menu_refresh, name='menu-refresh'),
