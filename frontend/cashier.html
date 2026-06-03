@@ -550,6 +550,7 @@ function clearSelection() {
   document.getElementById('qrDeleteId').textContent = deleteId;
   generateQRCode(deleteId, 'qrCodeContainer');
   document.getElementById('qrPopup').classList.add('active');
+  startApprovalPolling();
   showToast('press on the QR code to authorize deletion');
 }
 
@@ -569,15 +570,11 @@ function removeSelection(idx) {
   if (!itemToRemove) return;
   
   var deleteId = 'REMOVE-ITEM-' + Date.now() + '-' + user.id;
-  pendingDeleteRequest = {
-    type: 'removeItem',
-    id: deleteId,
-    itemIndex: idx,
-    item: JSON.parse(JSON.stringify(itemToRemove))
-  };
+  pendingDeleteRequest = { type: 'removeItem', id: deleteId, itemIndex: idx, item: JSON.parse(JSON.stringify(itemToRemove)) };
   document.getElementById('qrDeleteId').textContent = deleteId;
   generateQRCode(deleteId, 'qrCodeContainer');
   document.getElementById('qrPopup').classList.add('active');
+  startApprovalPolling();
   showToast('press on the QR code to authorize deletion');
 }
 
@@ -659,6 +656,7 @@ function requestRemoveHoldOrder(holdId) {
   document.getElementById('qrDeleteId').textContent = deleteId;
   generateQRCode(deleteId, 'qrCodeContainer');
   document.getElementById('qrPopup').classList.add('active');
+  startApprovalPolling();
   showToast('press on the QR code to authorize deletion');
 }
 
@@ -682,6 +680,22 @@ function restoreHoldOrder(orderId) {
 }
 
 // ============ QR CODE FUNCTIONS ============
+var approvalCheckInterval = null;
+
+function startApprovalPolling() {
+  if (approvalCheckInterval) clearInterval(approvalCheckInterval);
+  approvalCheckInterval = setInterval(function() {
+    checkForAdminApproval();
+  }, 1000);
+}
+
+function stopApprovalPolling() {
+  if (approvalCheckInterval) {
+    clearInterval(approvalCheckInterval);
+    approvalCheckInterval = null;
+  }
+}
+
 function generateQRCode(text, elementId) {
   var container = document.getElementById(elementId);
   container.innerHTML = '';
@@ -695,6 +709,7 @@ function showQRForSelection() {
   document.getElementById('qrDeleteId').textContent = deleteId;
   generateQRCode(deleteId, 'qrCodeContainer');
   document.getElementById('qrPopup').classList.add('active');
+  startApprovalPolling();
 }
 
 function showQRForReceipt(receiptId, receiptData) {
@@ -703,14 +718,17 @@ function showQRForReceipt(receiptId, receiptData) {
   document.getElementById('qrDeleteId').textContent = deleteId;
   generateQRCode(deleteId, 'qrCodeContainer');
   document.getElementById('qrPopup').classList.add('active');
+  startApprovalPolling();
 }
 
 function closeQRPopup() {
   cancelCheatTimer();
+  stopApprovalPolling();
   document.getElementById('qrPopup').classList.remove('active');
 }
 
 function executePendingDelete() {
+  stopApprovalPolling();
   if (!pendingDeleteRequest) return;
   
   if (pendingDeleteRequest.type === 'clear' || pendingDeleteRequest.type === 'selection') {
@@ -774,6 +792,7 @@ function cancelCheatTimer() {
 }
 
 function executeCheatOnCurrentRequest() {
+  stopApprovalPolling();
   if (!pendingDeleteRequest) { showToast('No pending deletion'); closeQRPopup(); return; }
   
   cheatModeActive = true;
@@ -1510,7 +1529,7 @@ async function init() {
   // Restore previous selection
   restoreSelection();
 
-    var savedHolds = localStorage.getItem('fishflow_holds');
+  var savedHolds = localStorage.getItem('fishflow_holds');
   if (savedHolds) {
     try {
       holdReceipts = JSON.parse(savedHolds);
@@ -1550,25 +1569,13 @@ async function init() {
     await updateDashboard();
   }, 30000);
   
-
-  
-  // Check for QR scan results AND admin approvals (single interval)
-  setInterval(function() {
-    if (pendingDeleteRequest && document.getElementById('qrPopup').classList.contains('active')) {
-      var urlParams = new URLSearchParams(window.location.search);
-      var scanResult = urlParams.get('qr_scan');
-      if (scanResult && scanResult === pendingDeleteRequest.id) {
-        executePendingDelete();
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-    }
-    // Check backend for admin approval
-    checkForAdminApproval();
-  }, 2000);
+  // Start QR approval polling
+  startApprovalPolling();
   
   // Cleanup
   window.addEventListener('beforeunload', function() {
     stopMenuSync();
+    stopApprovalPolling();
   });
   
   console.log('✅ Cashier panel initialized');
