@@ -284,7 +284,17 @@ window.receiptsList = [];
 var charts = {};
 
 // ============ UTILITY FUNCTIONS ============
-function getToday() { return new Date().toISOString().split('T')[0]; }
+// FIX: Business day starts at 0930, ends at 0930 next day
+function getBusinessDay() {
+  var now = new Date();
+  if (now.getHours() < 9 || (now.getHours() === 9 && now.getMinutes() < 30)) {
+    now.setDate(now.getDate() - 1);
+  }
+  return now.toISOString().split('T')[0];
+}
+
+function getToday() { return getBusinessDay(); }
+
 
 function showToast(msg) {
   var t = document.getElementById('toast');
@@ -419,6 +429,7 @@ function renderDynamicMenu() {
   }
   
   // ============ SODA SECTION ============
+ // ============ SODA SECTION - PEPSI & COCA COLA ONLY ============
   var pepsiItems = menuItems.filter(function(i) {
     if (i.category !== 'soda' || i.is_active === false) return false;
     var brand = (i.soda_brand || '').toLowerCase();
@@ -430,48 +441,33 @@ function renderDynamicMenu() {
     if (i.category !== 'soda' || i.is_active === false) return false;
     var brand = (i.soda_brand || '').toLowerCase();
     var name = (i.name || '').toLowerCase();
-    return brand === 'cocacola' || name.includes('coca') || name.includes('coke');
+    return brand === 'cocacola' || brand === 'coca' || brand === 'coke' || 
+           name.includes('coca') || name.includes('coke');
   });
   
-  var otherSodaItems = menuItems.filter(function(i) {
-    if (i.category !== 'soda' || i.is_active === false) return false;
-    var name = (i.name || '').toLowerCase();
-    var isPepsi = name.includes('pepsi');
-    var isCoca = name.includes('coca') || name.includes('coke');
-    var brand = (i.soda_brand || '').toLowerCase();
-    var isBranded = brand === 'pepsi' || brand === 'cocacola';
-    return !isPepsi && !isCoca && !isBranded;
-  });
+  // 🥤 SODA SECTION HEADER
+  if (pepsiItems.length > 0 || cocaItems.length > 0) {
+    html += '<div class="section-title">🥤 Soda (' + (pepsiItems.length + cocaItems.length) + ')</div>';
+  }
   
   // 🔵 PEPSI
   if (pepsiItems.length > 0) {
-    html += '<div class="section-title" style="color:#0066cc;border-bottom:2px solid #0066cc;">🔵 Pepsi (' + pepsiItems.length + ')</div>';
+    html += '<div style="color:#0066cc;font-weight:700;font-size:0.7rem;margin:6px 0 2px;">🔵 Pepsi</div>';
     html += '<div class="item-grid">';
     pepsiItems.forEach(function(item) {
       html += '<span class="item-chip" style="background:#e0f0ff;border-color:#0066cc;" onclick="addItem(\'' + 
-              escapeHtml(item.name) + '\',' + item.price + ')">' + escapeHtml(item.name) + ' <strong>' + item.price + '/=</strong></span>';
+              escapeHtml(item.name) + '\',' + item.price + ')">' + item.price + '/=</span>';
     });
     html += '</div>';
   }
   
   // 🔴 COCA COLA
   if (cocaItems.length > 0) {
-    html += '<div class="section-title" style="color:#cc0000;border-bottom:2px solid #cc0000;">🔴 Coca Cola (' + cocaItems.length + ')</div>';
+    html += '<div style="color:#cc0000;font-weight:700;font-size:0.7rem;margin:6px 0 2px;">🔴 Coca Cola</div>';
     html += '<div class="item-grid">';
     cocaItems.forEach(function(item) {
       html += '<span class="item-chip" style="background:#ffe0e0;border-color:#cc0000;" onclick="addItem(\'' + 
-              escapeHtml(item.name) + '\',' + item.price + ')">' + escapeHtml(item.name) + ' <strong>' + item.price + '/=</strong></span>';
-    });
-    html += '</div>';
-  }
-  
-  // 🥤 OTHER SODA
-  if (otherSodaItems.length > 0) {
-    html += '<div class="section-title">🥤 Other Soda (' + otherSodaItems.length + ')</div>';
-    html += '<div class="item-grid">';
-    otherSodaItems.forEach(function(item) {
-      html += '<span class="item-chip" onclick="addItem(\'' + escapeHtml(item.name) + '\',' + item.price + ')">' + 
-              escapeHtml(item.name) + ' <strong>' + item.price + '/=</strong></span>';
+              escapeHtml(item.name) + '\',' + item.price + ')">' + item.price + '/=</span>';
     });
     html += '</div>';
   }
@@ -1534,17 +1530,7 @@ async function init() {
     await updateDashboard();
   }, 30000);
   
-  // Reset at midnight
-setInterval(function() {
-    var now = new Date();
-    if (now.getHours() === 0 && now.getMinutes() === 0) {
-      selItems = [];
-      updateSel();
-      holdReceipts = [];
-      updateHoldBadge();
-      localStorage.removeItem('fishflow_holds'); // Clear saved holds at midnight
-    }
-}, 60000);
+
   
   // Check for QR scan results AND admin approvals (single interval)
   setInterval(function() {

@@ -31,7 +31,7 @@ def transactions(request):
     try:
         data = request.data
         tx = {
-            'date': str(data.get('date', date.today())),
+            'date': get_business_day(),
             'time': data.get('time', ''),
             'total': data.get('total', 0),
             'method': data.get('method', 'cash'),
@@ -64,7 +64,7 @@ def expenses(request):
     try:
         data = request.data
         ex = {
-            'date': str(data.get('date', date.today())),
+            'date': get_business_day(),
             'time': data.get('time', ''),
             'name': data.get('name', ''),
             'amount': data.get('amount', 0),
