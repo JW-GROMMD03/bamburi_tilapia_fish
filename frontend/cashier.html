@@ -381,11 +381,8 @@ function renderDynamicMenu() {
   
   if (!menuItems || menuItems.length === 0) {
     container.innerHTML = '<div style="text-align:center;padding:20px;color:#888;">' +
-      '<p style="font-size:2rem;">📋</p>' +
-      '<p>No menu items available</p>' +
-      '<p style="font-size:0.7rem;">Contact admin to add items or check connection</p>' +
-      '<button class="btn btn-outline btn-sm" onclick="refreshMenuItems()">🔄 Retry</button>' +
-      '</div>';
+      '<p style="font-size:2rem;">📋</p><p>No menu items available</p>' +
+      '<button class="btn btn-outline btn-sm" onclick="refreshMenuItems()">🔄 Retry</button></div>';
     return;
   }
   
@@ -394,7 +391,6 @@ function renderDynamicMenu() {
     {key: 'mbuta', name: '🐠 Mbuta'},
     {key: 'ugali', name: '🍚 Ugali'},
     {key: 'wetfry', name: '🍳 Wet Fry & Kachumbari'},
-    //{key: 'soda', name: '🥤 Soda'},
     {key: 'greens', name: '🥬 Greens'},
     {key: 'chips', name: '🍟 Chips'},
     {key: 'fuluOmena', name: '🐟 Fulu & Omena'},
@@ -404,92 +400,83 @@ function renderDynamicMenu() {
   ];
   
   var html = '';
-  var activeItemCount = 0;
   
   for (var c = 0; c < categories.length; c++) {
     var cat = categories[c];
     var catItems = menuItems.filter(function(i) {
       return i.category === cat.key && i.is_active !== false;
     });
-    
     if (catItems.length > 0) {
-      activeItemCount += catItems.length;
-      html += '<div class="section-title ' + (cat.class || '') + '">' + cat.name + 
-              ' <span style="font-size:0.65rem;color:#888;">(' + catItems.length + ')</span></div>';
+      html += '<div class="section-title ' + (cat.class || '') + '">' + cat.name + ' (' + catItems.length + ')</div>';
       html += '<div class="item-grid">';
-      
       for (var j = 0; j < catItems.length; j++) {
         var item = catItems[j];
-        var chipClass = (cat.key === 'tilapia') ? 'tilapia-chip' : '';
-        html += '<span class="item-chip ' + chipClass + '" onclick="addItem(\'' + 
-                escapeHtml(item.name) + '\',' + item.price + ')">' + 
-                escapeHtml(item.name) + ' <strong>' + item.price + '/=</strong></span>';
+        html += '<span class="item-chip ' + (cat.key==='tilapia'?'tilapia-chip':'') + '" onclick="addItem(\'' + 
+                escapeHtml(item.name) + '\',' + item.price + ')">' + escapeHtml(item.name) + ' <strong>' + item.price + '/=</strong></span>';
       }
       html += '</div>';
     }
   }
   
-  if (activeItemCount === 0) {
-    html = '<div style="text-align:center;padding:20px;color:#888;">' +
-           '<p>No active menu items found</p>' +
-           '<button class="btn btn-outline btn-sm" onclick="refreshMenuItems()">🔄 Refresh</button>' +
-           '</div>';
-  }
-  
-   var pepsiItems = menuItems.filter(function(i) {
-    return (i.category === 'soda' && i.soda_brand === 'pepsi') || 
-           (i.name && i.name.toLowerCase().includes('pepsi'));
+  // ============ SODA SECTION ============
+  var pepsiItems = menuItems.filter(function(i) {
+    if (i.category !== 'soda' || i.is_active === false) return false;
+    var brand = (i.soda_brand || '').toLowerCase();
+    var name = (i.name || '').toLowerCase();
+    return brand === 'pepsi' || name.includes('pepsi');
   });
+  
   var cocaItems = menuItems.filter(function(i) {
-    return (i.category === 'soda' && i.soda_brand === 'cocacola') || 
-           (i.name && (i.name.toLowerCase().includes('coca') || i.name.toLowerCase().includes('coke')));
-  });
-  var otherSodaItems = menuItems.filter(function(i) {
-    return i.category === 'soda' && 
-           !i.name.toLowerCase().includes('pepsi') && 
-           !i.name.toLowerCase().includes('coca') && 
-           !i.name.toLowerCase().includes('coke');
+    if (i.category !== 'soda' || i.is_active === false) return false;
+    var brand = (i.soda_brand || '').toLowerCase();
+    var name = (i.name || '').toLowerCase();
+    return brand === 'cocacola' || name.includes('coca') || name.includes('coke');
   });
   
-  // Pepsi section
+  var otherSodaItems = menuItems.filter(function(i) {
+    if (i.category !== 'soda' || i.is_active === false) return false;
+    var name = (i.name || '').toLowerCase();
+    var isPepsi = name.includes('pepsi');
+    var isCoca = name.includes('coca') || name.includes('coke');
+    var brand = (i.soda_brand || '').toLowerCase();
+    var isBranded = brand === 'pepsi' || brand === 'cocacola';
+    return !isPepsi && !isCoca && !isBranded;
+  });
+  
+  // 🔵 PEPSI
   if (pepsiItems.length > 0) {
-    html += '<div class="section-title" style="color:#0066cc;">🔵 Pepsi <span style="font-size:0.65rem;color:#888;">(' + pepsiItems.length + ')</span></div>';
+    html += '<div class="section-title" style="color:#0066cc;border-bottom:2px solid #0066cc;">🔵 Pepsi (' + pepsiItems.length + ')</div>';
     html += '<div class="item-grid">';
     pepsiItems.forEach(function(item) {
       html += '<span class="item-chip" style="background:#e0f0ff;border-color:#0066cc;" onclick="addItem(\'' + 
-              escapeHtml(item.name) + '\',' + item.price + ')">' + 
-              escapeHtml(item.name) + ' <strong>' + item.price + '/=</strong></span>';
+              escapeHtml(item.name) + '\',' + item.price + ')">' + escapeHtml(item.name) + ' <strong>' + item.price + '/=</strong></span>';
     });
     html += '</div>';
   }
   
-  // Coca Cola section
+  // 🔴 COCA COLA
   if (cocaItems.length > 0) {
-    html += '<div class="section-title" style="color:#cc0000;">🔴 Coca Cola <span style="font-size:0.65rem;color:#888;">(' + cocaItems.length + ')</span></div>';
+    html += '<div class="section-title" style="color:#cc0000;border-bottom:2px solid #cc0000;">🔴 Coca Cola (' + cocaItems.length + ')</div>';
     html += '<div class="item-grid">';
     cocaItems.forEach(function(item) {
       html += '<span class="item-chip" style="background:#ffe0e0;border-color:#cc0000;" onclick="addItem(\'' + 
-              escapeHtml(item.name) + '\',' + item.price + ')">' + 
+              escapeHtml(item.name) + '\',' + item.price + ')">' + escapeHtml(item.name) + ' <strong>' + item.price + '/=</strong></span>';
+    });
+    html += '</div>';
+  }
+  
+  // 🥤 OTHER SODA
+  if (otherSodaItems.length > 0) {
+    html += '<div class="section-title">🥤 Other Soda (' + otherSodaItems.length + ')</div>';
+    html += '<div class="item-grid">';
+    otherSodaItems.forEach(function(item) {
+      html += '<span class="item-chip" onclick="addItem(\'' + escapeHtml(item.name) + '\',' + item.price + ')">' + 
               escapeHtml(item.name) + ' <strong>' + item.price + '/=</strong></span>';
     });
     html += '</div>';
   }
   
-  // Other soda
-  if (otherSodaItems.length > 0) {
-    html += '<div class="section-title">🥤 Other Soda <span style="font-size:0.65rem;color:#888;">(' + otherSodaItems.length + ')</span></div>';
-    html += '<div class="item-grid">';
-    otherSodaItems.forEach(function(item) {
-      html += '<span class="item-chip" onclick="addItem(\'' + 
-              escapeHtml(item.name) + '\',' + item.price + ')">' + 
-              escapeHtml(item.name) + ' <strong>' + item.price + '/=</strong></span>';
-    });
-    html += '</div>';
-  }
-
   container.innerHTML = html;
-
-
 }
 
 function refreshMenuItems() {
@@ -1363,10 +1350,72 @@ function updateShiftTimer() {
 }
 
 async function submitShiftReport() {
-  var tx = await apiCall('transactions/') || [];
-  var total = tx.reduce(function(s, t) { return s + (t.total || 0); }, 0);
-  var rpt = 'SHIFT REPORT - ' + user.full_name + '\nDate: ' + getToday() + '\nShift: ' + user.shift + '\nTotal Sales: Ksh ' + total.toLocaleString() + '/=\nTransactions: ' + tx.length;
-  showToast('✅ Report sent to admin!');
+  var t = await apiCall('transactions/') || [];
+  
+  // Filter for current cashier
+  var myTx = t.filter(function(tx) {
+    return tx.cashier_id === user.id || tx.cashier_name === user.full_name;
+  });
+  
+  var totalSales = myTx.reduce(function(s, t) { return s + (t.total || 0); }, 0);
+  var cashSales = myTx.filter(function(x) { return x.method === 'cash'; }).reduce(function(s, x) { return s + (x.total || 0); }, 0);
+  var mpesaSales = myTx.filter(function(x) { return x.method === 'mpesa'; }).reduce(function(s, x) { return s + (x.total || 0); }, 0);
+  
+  var categories = {};
+  myTx.forEach(function(tx) {
+    var items = typeof tx.items === 'string' ? JSON.parse(tx.items) : (tx.items || []);
+    items.forEach(function(x) {
+      var n = (x.name || '').toLowerCase();
+      var cat = 'Other';
+      if (n.includes('tilapia')) cat = '🐟 Tilapia';
+      else if (n.includes('mbuta')) cat = '🐠 Mbuta';
+      else if (n.includes('ugali')) cat = '🍚 Ugali';
+      else if (n.includes('pepsi')) cat = '🔵 Pepsi';
+      else if (n.includes('coca') || n.includes('coke')) cat = '🔴 Coca Cola';
+      else if (n.includes('soda')) cat = '🥤 Soda';
+      else if (n.includes('wet fry')) cat = '🍳 Wet Fry';
+      else if (n.includes('green') || n.includes('managu')) cat = '🥬 Greens';
+      else if (n.includes('chip')) cat = '🍟 Chips';
+      else if (n.includes('water')) cat = '💧 Water';
+      if (!categories[cat]) categories[cat] = { qty: 0, amt: 0 };
+      categories[cat].qty += (x.qty || 1);
+      categories[cat].amt += (x.price || 0) * (x.qty || 1);
+    });
+  });
+  
+  var now = new Date();
+  var rpt = '═══════════════════════════\n';
+  rpt += '🐟 FISHFLOW PRO - SHIFT REPORT\n';
+  rpt += '═══════════════════════════\n\n';
+  rpt += '👤 Cashier: ' + user.full_name + '\n';
+  rpt += '📅 Date: ' + now.toLocaleDateString('en-KE') + '\n';
+  rpt += '🕐 Time: ' + now.toLocaleTimeString('en-KE') + '\n';
+  rpt += '🔄 Shift: ' + (user.shift === 'night' ? '🌙 Night' : '☀️ Day') + '\n\n';
+  rpt += '───────────────────────────\n';
+  rpt += '📊 SALES SUMMARY\n';
+  rpt += '───────────────────────────\n';
+  rpt += '💰 Total Sales: KES ' + totalSales.toLocaleString() + '/=\n';
+  rpt += '💵 Cash Sales: KES ' + cashSales.toLocaleString() + '/=\n';
+  rpt += '📱 M-Pesa Sales: KES ' + mpesaSales.toLocaleString() + '/=\n';
+  rpt += '📋 Transactions: ' + myTx.length + '\n\n';
+  rpt += '───────────────────────────\n';
+  rpt += '📦 CATEGORY BREAKDOWN\n';
+  rpt += '───────────────────────────\n';
+  for (var k in categories) {
+    rpt += k + ': ' + categories[k].qty + ' pcs | KES ' + categories[k].amt.toLocaleString() + '/=\n';
+  }
+  rpt += '\n═══════════════════════════\n';
+  rpt += '✅ End of Report\n';
+  rpt += '═══════════════════════════';
+  
+  showToast('✅ Report generated!');
+  
+  // Copy to clipboard
+  try {
+    await navigator.clipboard.writeText(rpt);
+    showToast('📋 Report copied to clipboard!');
+  } catch(e) {}
+  
   window.open('https://wa.me/254792988239?text=' + encodeURIComponent(rpt), '_blank');
 }
 

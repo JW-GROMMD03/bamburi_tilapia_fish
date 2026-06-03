@@ -3804,6 +3804,13 @@ async function saveMenuItem() {
     const name = document.getElementById('itemName').value.trim();
     const price = parseFloat(document.getElementById('itemPrice').value);
     
+    // Get soda brand if category is soda
+    let sodaBrand = null;
+    if (category === 'soda') {
+        const brandSelect = document.getElementById('sodaBrand');
+        sodaBrand = brandSelect ? brandSelect.value : null;
+    }
+    
     if (!name || !price || price <= 0) {
         toast('Please enter valid item name and price', 'error');
         return;
@@ -3813,16 +3820,17 @@ async function saveMenuItem() {
         category: category,
         name: name,
         price: price,
+        soda_brand: sodaBrand,  // FIX: Include soda_brand
         is_active: true
     };
     
+    console.log('Saving item with soda_brand:', sodaBrand);
+    
     try {
         if (itemId) {
-            // Update existing item - use PUT to items/<id>/
             await apiRequest(`items/${itemId}/`, 'PUT', itemData);
             toast('✅ Item updated! Cashiers will see changes.');
         } else {
-            // Create new item - use POST to items/
             await apiRequest('items/', 'POST', itemData);
             toast('✅ Item added! Available to cashiers.');
         }
