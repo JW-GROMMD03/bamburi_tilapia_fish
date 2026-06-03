@@ -935,40 +935,60 @@ if (r) {
 async function checkForAdminApproval() {
   if (!pendingDeleteRequest) return;
   
+  console.log('🔍 Checking approval for:', pendingDeleteRequest.id);
+  
   try {
+    // Method 1: Check QR check endpoint (in-memory)
     var response = await fetch(API_BASE + '/qr/check/?qr_id=' + pendingDeleteRequest.id, {
       headers: { 'Authorization': 'Bearer ' + token }
     });
     
-    if (!response.ok) return;
-    
-    var data = await response.json();
-    
-    if (data.approved) {
-      console.log('✅ Admin approved deletion!');
-      executePendingDelete();
+    if (response.ok) {
+      var data = await response.json();
+      console.log('QR check response:', data);
+      if (data.approved) {
+        console.log('✅ Admin approved via QR check!');
+        executePendingDelete();
+        return;
+      }
     }
-  } catch (e) {
-    // Also check trash as fallback
-    try {
-      var trashResponse = await fetch(API_BASE + '/trash/', {
-        headers: { 'Authorization': 'Bearer ' + token }
-      });
-      if (!trashResponse.ok) return;
-      
+    
+    // Method 2: Check trash for any matching QR approval
+    var trashResponse = await fetch(API_BASE + '/trash/', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    
+    if (trashResponse.ok) {
       var trashItems = await trashResponse.json();
+      console.log('Trash items for approval check:', trashItems.length);
       
       for (var i = 0; i < trashItems.length; i++) {
         var item = trashItems[i];
-        if (item.item_type === 'qr_delete_approved' && 
-            item.description && 
-            item.description.includes(pendingDeleteRequest.id)) {
-          console.log('✅ Admin approved deletion (trash check)!');
-          executePendingDelete();
-          return;
+        // Check if this trash item is a QR approval
+        if (item.item_type === 'qr_delete_approved') {
+          var desc = item.description || '';
+          var dataObj = item.data || {};
+          
+          // Handle both string and object data
+          if (typeof dataObj === 'string') {
+            try { dataObj = JSON.parse(dataObj); } catch(e) { dataObj = {}; }
+          }
+          
+          var approvedQR = dataObj.qr_code || '';
+          
+          console.log('Found QR approval in trash:', approvedQR, 'Looking for:', pendingDeleteRequest.id);
+          
+          // Check if this matches our pending request
+          if (approvedQR === pendingDeleteRequest.id || desc.includes(pendingDeleteRequest.id)) {
+            console.log('✅ Admin approved via trash check!');
+            executePendingDelete();
+            return;
+          }
         }
       }
-    } catch (e2) { /* silent */ }
+    }
+  } catch (e) {
+    console.log('Approval check error:', e);
   }
 }
 
