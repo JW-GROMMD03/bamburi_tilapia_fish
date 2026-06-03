@@ -2,7 +2,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from datetime import date, datetime, timedelta
 
-from .utils import get_business_day
+from .views import get_business_day
 from .supabase_service import SupabaseDB
 import json
 
@@ -80,7 +80,7 @@ def admin_dashboard(request):
 @api_view(['GET'])
 def manager_dashboard(request):
     """Manager dashboard - operational overview"""
-    today = str(date.today())
+    today = get_business_day()
     
     transactions = SupabaseDB.get_tx(today)
     expenses = SupabaseDB.get_exp(today)

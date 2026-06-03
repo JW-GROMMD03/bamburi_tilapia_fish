@@ -20,7 +20,7 @@ from django.views.decorators.http import require_GET
 from django.views.decorators.http import require_GET, require_POST
 import hashlib
 from datetime import datetime
-from .views import get_business_day
+
 
 qr_approvals = {}
 
