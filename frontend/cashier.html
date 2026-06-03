@@ -416,6 +416,9 @@ function renderDynamicMenu() {
     var catItems = menuItems.filter(function(i) {
       return i.category === cat.key && i.is_active !== false;
     });
+    // SORT by price ascending (smallest first)
+    catItems.sort(function(a, b) { return (a.price || 0) - (b.price || 0); });
+    
     if (catItems.length > 0) {
       html += '<div class="section-title ' + (cat.class || '') + '">' + cat.name + ' (' + catItems.length + ')</div>';
       html += '<div class="item-grid">';
@@ -428,14 +431,14 @@ function renderDynamicMenu() {
     }
   }
   
-  // ============ SODA SECTION ============
- // ============ SODA SECTION - PEPSI & COCA COLA ONLY ============
+  // ============ SODA SECTION - PEPSI & COCA COLA ONLY ============
   var pepsiItems = menuItems.filter(function(i) {
     if (i.category !== 'soda' || i.is_active === false) return false;
     var brand = (i.soda_brand || '').toLowerCase();
     var name = (i.name || '').toLowerCase();
     return brand === 'pepsi' || name.includes('pepsi');
   });
+  pepsiItems.sort(function(a, b) { return (a.price || 0) - (b.price || 0); });
   
   var cocaItems = menuItems.filter(function(i) {
     if (i.category !== 'soda' || i.is_active === false) return false;
@@ -444,6 +447,7 @@ function renderDynamicMenu() {
     return brand === 'cocacola' || brand === 'coca' || brand === 'coke' || 
            name.includes('coca') || name.includes('coke');
   });
+  cocaItems.sort(function(a, b) { return (a.price || 0) - (b.price || 0); });
   
   // 🥤 SODA SECTION HEADER
   if (pepsiItems.length > 0 || cocaItems.length > 0) {
