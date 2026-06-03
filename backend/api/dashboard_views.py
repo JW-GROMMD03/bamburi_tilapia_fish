@@ -2,13 +2,13 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from datetime import date, datetime, timedelta
 
-from backend.api.views import get_business_day
+from .views import get_business_day
 from .supabase_service import SupabaseDB
 import json
 
 @api_view(['GET'])
 def admin_dashboard(request):
-    from .views import get_business_day
+    
     """Admin dashboard - complete overview"""
     today = get_business_day()
     
