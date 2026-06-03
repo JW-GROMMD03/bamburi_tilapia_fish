@@ -2523,9 +2523,17 @@ function renderSalesTable(transactions) {
   let html = '';
   transactions.forEach(t => {
     let items = [];
-    try { 
-      items = typeof t.items === 'string' ? JSON.parse(t.items) : (t.items || []); 
-    } catch(e) { items = []; }
+        try { 
+      if (typeof t.items === 'string') {
+        items = JSON.parse(t.items);
+      } else if (Array.isArray(t.items)) {
+        items = t.items;
+      } else {
+        items = [];
+      }
+    } catch(e) { 
+      items = []; 
+    } 
     
     // Use created_at instead of t.time
     const txDate = t.created_at ? new Date(t.created_at) : (t.date ? new Date(t.date) : new Date());
