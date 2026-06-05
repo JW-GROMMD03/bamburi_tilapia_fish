@@ -1071,15 +1071,24 @@ async function loadCredits() {
     }).join('');
 }
 
-// ============ BILLS / RECEIPTS ============
 async function renderBills() {
   var t = await apiCall('transactions/') || [];
-  window.receiptsList = t;
-  t.sort(function(a, b) { return new Date(b.created_at || 0) - new Date(a.created_at || 0); });
+  var shiftStart = getShiftStartTime();
   
-  document.getElementById('receiptContainer').innerHTML = t.length === 0 ?
-    '<p style="color:#888;">No receipts</p>' :
-    t.map(function(x) {
+  // Filter for current cashier AND current shift
+  var myTx = t.filter(function(tx) {
+    var matchesCashier = (tx.cashier_id === user.id) || (tx.cashier_name === user.full_name);
+    var txTime = tx.created_at ? new Date(tx.created_at) : new Date();
+    var isCurrentShift = txTime >= shiftStart;
+    return matchesCashier && isCurrentShift;
+  });
+  
+  window.receiptsList = myTx;
+  myTx.sort(function(a, b) { return new Date(b.created_at || 0) - new Date(a.created_at || 0); });
+  
+  document.getElementById('receiptContainer').innerHTML = myTx.length === 0 ?
+    '<p style="color:#888;">No receipts this shift</p>' :
+    myTx.map(function(x) {
       var i = typeof x.items === 'string' ? JSON.parse(x.items) : (x.items || []);
       return '<div class="receipt-card"><strong>🧾 #' + (x.id || '---') + '</strong> | ' + (x.time || '') +
         ' <span class="payment-badge ' + (x.method === 'mpesa' ? 'mpesa-badge' : x.method === 'partial' ? 'mixed-badge' : 'cash-badge') + '">' +
@@ -1216,32 +1225,34 @@ async function deleteForever(id) {
   }
 }
 
-// ============ DASHBOARD & ANALYSIS ============
 
+// ============ DASHBOARD - CURRENT SHIFT ONLY ============
 async function updateDashboard() {
   var t = await apiCall('transactions/') || [];
   var e = await apiCall('expenses/') || [];
   
-  // DEBUG: Log what we're comparing
-  console.log('User ID:', user.id);
-  console.log('User name:', user.full_name);
-  console.log('Total transactions:', t.length);
-  if (t.length > 0) {
-    console.log('First TX cashier_id:', t[0].cashier_id);
-    console.log('First TX cashier_name:', t[0].cashier_name);
-  }
+  // Get current shift start time
+  var shiftStart = getShiftStartTime();
   
-  // FIX: Match by cashier_name OR cashier_id (more flexible)
+  console.log('Shift start:', shiftStart.toISOString());
+  console.log('User ID:', user.id, 'User name:', user.full_name);
+  console.log('Total transactions:', t.length);
+  
+  // FIX: Filter by BOTH cashier AND time (current shift only)
   var myShiftTx = t.filter(function(tx) {
-    var matchesId = (tx.cashier_id === user.id);
-    var matchesName = (tx.cashier_name === user.full_name);
-    return matchesId || matchesName;
+    var matchesCashier = (tx.cashier_id === user.id) || (tx.cashier_name === user.full_name);
+    // Check if transaction is from current shift
+    var txTime = tx.created_at ? new Date(tx.created_at) : new Date();
+    var isCurrentShift = txTime >= shiftStart;
+    return matchesCashier && isCurrentShift;
   });
   
-  console.log('My transactions found:', myShiftTx.length);
+  console.log('My shift transactions:', myShiftTx.length);
   
+  // Filter expenses by current shift
   var myShiftExp = e.filter(function(ex) {
-    return ex.created_by === user.id;
+    var exTime = ex.created_at ? new Date(ex.created_at) : new Date();
+    return exTime >= shiftStart;
   });
   
   var cat = {
@@ -1393,7 +1404,9 @@ async function submitShiftReport() {
   
   // Filter for current cashier
   var myTx = t.filter(function(tx) {
-    return tx.cashier_id === user.id || tx.cashier_name === user.full_name;
+    var matchesCashier = (tx.cashier_id === user.id) || (tx.cashier_name === user.full_name);
+    var txTime = tx.created_at ? new Date(tx.created_at) : new Date();
+    return matchesCashier && txTime >= getShiftStartTime();
   });
   
   var totalSales = myTx.reduce(function(s, t) { return s + (t.total || 0); }, 0);
