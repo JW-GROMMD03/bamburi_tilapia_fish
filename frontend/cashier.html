@@ -1400,16 +1400,64 @@ function updateShiftTimer() {
 }
 
 async function submitShiftReport() {
-  var t = await apiCall('transactions/') || [];
+  // First, check if a report was already submitted for this shift
+  var shiftKey = getToday() + '_' + user.shift;
+  var lastReport = localStorage.getItem('fishflow_report_' + shiftKey);
   
-  // Filter for current cashier
+  if (lastReport) {
+    try {
+      lastReport = JSON.parse(lastReport);
+    } catch(e) { lastReport = null; }
+  }
+  
+  // Get current shift transactions
+  var t = await apiCall('transactions/') || [];
+  var shiftStart = getShiftStartTime();
+  
   var myTx = t.filter(function(tx) {
     var matchesCashier = (tx.cashier_id === user.id) || (tx.cashier_name === user.full_name);
     var txTime = tx.created_at ? new Date(tx.created_at) : new Date();
-    return matchesCashier && txTime >= getShiftStartTime();
+    return matchesCashier && txTime >= shiftStart;
   });
   
-  var totalSales = myTx.reduce(function(s, t) { return s + (t.total || 0); }, 0);
+  var currentTotalSales = myTx.reduce(function(s, t) { return s + (t.total || 0); }, 0);
+  
+  // Check if report was already submitted
+  if (lastReport && lastReport.totalSales !== undefined) {
+    // Check if sales have changed since last report
+    if (currentTotalSales === lastReport.totalSales) {
+      // No change - ask if they still want to submit
+      var proceed = confirm(
+        '⚠️ REPORT ALREADY SUBMITTED\n\n' +
+        'A report was already submitted for this shift.\n' +
+        'No new sales have been recorded since the last report.\n\n' +
+        'Previous report: KES ' + lastReport.totalSales.toLocaleString() + '/=\n' +
+        'Current total: KES ' + currentTotalSales.toLocaleString() + '/=\n\n' +
+        'Do you still want to submit again?'
+      );
+      if (!proceed) {
+        showToast('❌ Report cancelled');
+        return;
+      }
+    } else {
+      // Sales changed - allow resubmit
+      var proceed2 = confirm(
+        '📋 REPORT UPDATE\n\n' +
+        'A report was already submitted but sales have changed.\n\n' +
+        'Previous: KES ' + lastReport.totalSales.toLocaleString() + '/=\n' +
+        'Current: KES ' + currentTotalSales.toLocaleString() + '/=\n' +
+        'Difference: KES ' + (currentTotalSales - lastReport.totalSales).toLocaleString() + '/=\n\n' +
+        'Submit updated report?'
+      );
+      if (!proceed2) {
+        showToast('❌ Report cancelled');
+        return;
+      }
+    }
+  }
+  
+  // Calculate report data
+  var totalSales = currentTotalSales;
   var cashSales = myTx.filter(function(x) { return x.method === 'cash'; }).reduce(function(s, x) { return s + (x.total || 0); }, 0);
   var mpesaSales = myTx.filter(function(x) { return x.method === 'mpesa'; }).reduce(function(s, x) { return s + (x.total || 0); }, 0);
   
@@ -1435,6 +1483,14 @@ async function submitShiftReport() {
     });
   });
   
+  // Save report to localStorage
+  localStorage.setItem('fishflow_report_' + shiftKey, JSON.stringify({
+    totalSales: totalSales,
+    transactionCount: myTx.length,
+    submittedAt: new Date().toISOString(),
+    cashier: user.full_name
+  }));
+  
   var now = new Date();
   var rpt = '═══════════════════════════\n';
   rpt += '🐟 FISHFLOW PRO - SHIFT REPORT\n';
@@ -1442,7 +1498,7 @@ async function submitShiftReport() {
   rpt += '👤 Cashier: ' + user.full_name + '\n';
   rpt += '📅 Date: ' + now.toLocaleDateString('en-KE') + '\n';
   rpt += '🕐 Time: ' + now.toLocaleTimeString('en-KE') + '\n';
-  rpt += '🔄 Shift: ' + (user.shift === 'night' ? '🌙 Night' : '☀️ Day') + '\n\n';
+  rpt += '🔄 Shift: ' + (user.shift === 'night' ? '🌙 Night (22:00-09:30)' : '☀️ Day (09:30-22:00)') + '\n\n';
   rpt += '───────────────────────────\n';
   rpt += '📊 SALES SUMMARY\n';
   rpt += '───────────────────────────\n';
