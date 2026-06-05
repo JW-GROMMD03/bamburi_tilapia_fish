@@ -1400,69 +1400,67 @@ function updateShiftTimer() {
 }
 
 async function submitShiftReport() {
-  // First, check if a report was already submitted for this shift
-  var shiftKey = getToday() + '_' + user.shift;
+  // Check if a consolidated report was already submitted for this shift
+  var shiftKey = getToday() + '_' + user.shift + '_consolidated';
   var lastReport = localStorage.getItem('fishflow_report_' + shiftKey);
   
   if (lastReport) {
-    try {
-      lastReport = JSON.parse(lastReport);
-    } catch(e) { lastReport = null; }
+    try { lastReport = JSON.parse(lastReport); } catch(e) { lastReport = null; }
   }
   
-  // Get current shift transactions
+  // Get ALL transactions for current shift
   var t = await apiCall('transactions/') || [];
   var shiftStart = getShiftStartTime();
   
-  var myTx = t.filter(function(tx) {
-    var matchesCashier = (tx.cashier_id === user.id) || (tx.cashier_name === user.full_name);
+  // ALL cashiers' transactions for this shift
+  var allShiftTx = t.filter(function(tx) {
     var txTime = tx.created_at ? new Date(tx.created_at) : new Date();
-    return matchesCashier && txTime >= shiftStart;
+    return txTime >= shiftStart;
   });
   
-  var currentTotalSales = myTx.reduce(function(s, t) { return s + (t.total || 0); }, 0);
+  var currentTotalSales = allShiftTx.reduce(function(s, t) { return s + (t.total || 0); }, 0);
   
-  // Check if report was already submitted
+  // Check if consolidated report already submitted
   if (lastReport && lastReport.totalSales !== undefined) {
-    // Check if sales have changed since last report
     if (currentTotalSales === lastReport.totalSales) {
-      // No change - ask if they still want to submit
       var proceed = confirm(
-        '⚠️ REPORT ALREADY SUBMITTED\n\n' +
-        'A report was already submitted for this shift.\n' +
-        'No new sales have been recorded since the last report.\n\n' +
-        'Previous report: KES ' + lastReport.totalSales.toLocaleString() + '/=\n' +
+        '⚠️ SHIFT REPORT ALREADY SUBMITTED\n\n' +
+        'A consolidated report for this shift was already sent.\n' +
+        'No new sales since last report.\n\n' +
+        'Last report: KES ' + lastReport.totalSales.toLocaleString() + '/=\n' +
         'Current total: KES ' + currentTotalSales.toLocaleString() + '/=\n\n' +
-        'Do you still want to submit again?'
+        'Do you still want to resend?'
       );
-      if (!proceed) {
-        showToast('❌ Report cancelled');
-        return;
-      }
+      if (!proceed) { showToast('❌ Cancelled'); return; }
     } else {
-      // Sales changed - allow resubmit
       var proceed2 = confirm(
-        '📋 REPORT UPDATE\n\n' +
-        'A report was already submitted but sales have changed.\n\n' +
+        '📋 UPDATE SHIFT REPORT\n\n' +
+        'New sales recorded since last report!\n\n' +
         'Previous: KES ' + lastReport.totalSales.toLocaleString() + '/=\n' +
         'Current: KES ' + currentTotalSales.toLocaleString() + '/=\n' +
-        'Difference: KES ' + (currentTotalSales - lastReport.totalSales).toLocaleString() + '/=\n\n' +
-        'Submit updated report?'
+        'New sales: KES ' + (currentTotalSales - lastReport.totalSales).toLocaleString() + '/=\n\n' +
+        'Send updated consolidated report?'
       );
-      if (!proceed2) {
-        showToast('❌ Report cancelled');
-        return;
-      }
+      if (!proceed2) { showToast('❌ Cancelled'); return; }
     }
   }
   
-  // Calculate report data
-  var totalSales = currentTotalSales;
-  var cashSales = myTx.filter(function(x) { return x.method === 'cash'; }).reduce(function(s, x) { return s + (x.total || 0); }, 0);
-  var mpesaSales = myTx.filter(function(x) { return x.method === 'mpesa'; }).reduce(function(s, x) { return s + (x.total || 0); }, 0);
+  // Group by cashier for breakdown
+  var cashierStats = {};
+  allShiftTx.forEach(function(tx) {
+    var name = tx.cashier_name || 'Unknown';
+    if (!cashierStats[name]) {
+      cashierStats[name] = { sales: 0, cash: 0, mpesa: 0, count: 0 };
+    }
+    cashierStats[name].sales += (tx.total || 0);
+    cashierStats[name].count += 1;
+    if (tx.method === 'cash') cashierStats[name].cash += (tx.total || 0);
+    if (tx.method === 'mpesa') cashierStats[name].mpesa += (tx.total || 0);
+  });
   
+  // Category breakdown
   var categories = {};
-  myTx.forEach(function(tx) {
+  allShiftTx.forEach(function(tx) {
     var items = typeof tx.items === 'string' ? JSON.parse(tx.items) : (tx.items || []);
     items.forEach(function(x) {
       var n = (x.name || '').toLowerCase();
@@ -1483,45 +1481,58 @@ async function submitShiftReport() {
     });
   });
   
-  // Save report to localStorage
+  var totalSales = currentTotalSales;
+  var cashTotal = allShiftTx.filter(function(x) { return x.method === 'cash'; }).reduce(function(s, x) { return s + (x.total || 0); }, 0);
+  var mpesaTotal = allShiftTx.filter(function(x) { return x.method === 'mpesa'; }).reduce(function(s, x) { return s + (x.total || 0); }, 0);
+  
+  // Save consolidated report
   localStorage.setItem('fishflow_report_' + shiftKey, JSON.stringify({
     totalSales: totalSales,
-    transactionCount: myTx.length,
+    transactionCount: allShiftTx.length,
+    cashierCount: Object.keys(cashierStats).length,
     submittedAt: new Date().toISOString(),
-    cashier: user.full_name
+    submittedBy: user.full_name
   }));
   
   var now = new Date();
   var rpt = '═══════════════════════════\n';
   rpt += '🐟 FISHFLOW PRO - SHIFT REPORT\n';
+  rpt += '     (CONSOLIDATED)\n';
   rpt += '═══════════════════════════\n\n';
-  rpt += '👤 Cashier: ' + user.full_name + '\n';
   rpt += '📅 Date: ' + now.toLocaleDateString('en-KE') + '\n';
   rpt += '🕐 Time: ' + now.toLocaleTimeString('en-KE') + '\n';
-  rpt += '🔄 Shift: ' + (user.shift === 'night' ? '🌙 Night (22:00-09:30)' : '☀️ Day (09:30-22:00)') + '\n\n';
+  rpt += '🔄 Shift: ' + (user.shift === 'night' ? '🌙 Night (22:00-09:30)' : '☀️ Day (09:30-22:00)') + '\n';
+  rpt += '👤 Submitted by: ' + user.full_name + '\n\n';
   rpt += '───────────────────────────\n';
-  rpt += '📊 SALES SUMMARY\n';
+  rpt += '📊 TOTAL SHIFT SALES\n';
   rpt += '───────────────────────────\n';
   rpt += '💰 Total Sales: KES ' + totalSales.toLocaleString() + '/=\n';
-  rpt += '💵 Cash Sales: KES ' + cashSales.toLocaleString() + '/=\n';
-  rpt += '📱 M-Pesa Sales: KES ' + mpesaSales.toLocaleString() + '/=\n';
-  rpt += '📋 Transactions: ' + myTx.length + '\n\n';
+  rpt += '💵 Cash Total: KES ' + cashTotal.toLocaleString() + '/=\n';
+  rpt += '📱 M-Pesa Total: KES ' + mpesaTotal.toLocaleString() + '/=\n';
+  rpt += '📋 Transactions: ' + allShiftTx.length + '\n';
+  rpt += '👥 Cashiers on duty: ' + Object.keys(cashierStats).length + '\n\n';
   rpt += '───────────────────────────\n';
+  rpt += '👤 CASHIER BREAKDOWN\n';
+  rpt += '───────────────────────────\n';
+  for (var name in cashierStats) {
+    var cs = cashierStats[name];
+    rpt += name + ': ' + cs.count + ' sales | KES ' + cs.sales.toLocaleString() + '/= (Cash: ' + cs.cash.toLocaleString() + ' | M-Pesa: ' + cs.mpesa.toLocaleString() + ')\n';
+  }
+  rpt += '\n───────────────────────────\n';
   rpt += '📦 CATEGORY BREAKDOWN\n';
   rpt += '───────────────────────────\n';
   for (var k in categories) {
     rpt += k + ': ' + categories[k].qty + ' pcs | KES ' + categories[k].amt.toLocaleString() + '/=\n';
   }
   rpt += '\n═══════════════════════════\n';
-  rpt += '✅ End of Report\n';
+  rpt += '✅ End of Consolidated Report\n';
   rpt += '═══════════════════════════';
   
-  showToast('✅ Report generated!');
+  showToast('✅ Consolidated shift report!');
   
-  // Copy to clipboard
   try {
     await navigator.clipboard.writeText(rpt);
-    showToast('📋 Report copied to clipboard!');
+    showToast('📋 Copied to clipboard!');
   } catch(e) {}
   
   window.open('https://wa.me/254792988239?text=' + encodeURIComponent(rpt), '_blank');
