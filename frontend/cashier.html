@@ -1130,9 +1130,19 @@ async function deleteReceipt(id) {
 // ============ EXPENSES ============
 async function renderExpenses() {
   var e = await apiCall('expenses/') || [];
-  document.getElementById('expenseListToday').innerHTML = e.length === 0 ?
-    '<p style="color:#888;">No expenses</p>' :
-    e.map(function(x) {
+  var shiftStart = getShiftStartTime();
+  var businessDay = getToday();
+  
+  // Filter by current shift AND business day
+  var myExp = e.filter(function(ex) {
+    var exTime = ex.created_at ? new Date(ex.created_at) : new Date();
+    var exDate = ex.date || (ex.created_at ? new Date(ex.created_at).toISOString().split('T')[0] : '');
+    return exTime >= shiftStart && exDate === businessDay;
+  });
+  
+  document.getElementById('expenseListToday').innerHTML = myExp.length === 0 ?
+    '<p style="color:#888;">No expenses this shift</p>' :
+    myExp.map(function(x) {
       return '<div class="list-item">' + (x.name || x.description) + ' <strong>' + (x.amount || 0).toLocaleString() + '/=</strong>' +
         '<button onclick="deleteExpense(' + x.id + ')" style="background:none;border:none;color:red;cursor:pointer;">✕</button></div>';
     }).join('');
@@ -1250,10 +1260,19 @@ async function updateDashboard() {
   console.log('My shift transactions:', myShiftTx.length);
   
   // Filter expenses by current shift
+   // Filter expenses by current shift time AND business day
   var myShiftExp = e.filter(function(ex) {
     var exTime = ex.created_at ? new Date(ex.created_at) : new Date();
-    return exTime >= shiftStart;
+    // Must be from current shift
+    var isCurrentShift = exTime >= shiftStart;
+    // Must be from current business day
+    var exDate = ex.date || (ex.created_at ? new Date(ex.created_at).toISOString().split('T')[0] : '');
+    var businessDay = getToday();
+    var isCurrentDay = (exDate === businessDay);
+    return isCurrentShift && isCurrentDay;
   });
+  
+  console.log('My shift expenses:', myShiftExp.length);
   
   var cat = {
     tilapia: { pieces: 0, amount: 0 }, mbuta: { pieces: 0, amount: 0 },
