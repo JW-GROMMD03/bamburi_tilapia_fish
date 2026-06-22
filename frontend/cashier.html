@@ -1339,30 +1339,160 @@ function getShiftStartTime() {
 
 async function renderAnalysis() {
   var t = await apiCall('transactions/') || [];
+  var shiftStart = getShiftStartTime();
+  
+  // Filter for current shift only
+  var myTx = t.filter(function(tx) {
+    var matchesCashier = (tx.cashier_id === user.id) || (tx.cashier_name === user.full_name);
+    var txTime = tx.created_at ? new Date(tx.created_at) : new Date();
+    return matchesCashier && txTime >= shiftStart;
+  });
+  
+  if (myTx.length === 0) {
+    document.getElementById('categoryBreakdown').innerHTML = '<p style="color:#888;text-align:center;">No sales this shift</p>';
+    // Clear chart
+    var chartCanvas = document.getElementById('tilapiaPriceChart');
+    if (chartCanvas) {
+      var ctx = chartCanvas.getContext('2d');
+      ctx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+      if (charts.tilapiaPrice) { charts.tilapiaPrice.destroy(); charts.tilapiaPrice = null; }
+    }
+    return;
+  }
+  
+  // ============ CATEGORY BREAKDOWN ============
   var cat = {};
-  t.forEach(function(tx) {
-    var i = typeof tx.items === 'string' ? JSON.parse(tx.items) : (tx.items || []);
-    i.forEach(function(x) {
+  // Track tilapia prices for chart
+  var tilapiaPrices = {};
+  
+  myTx.forEach(function(tx) {
+    var items = typeof tx.items === 'string' ? JSON.parse(tx.items) : (tx.items || []);
+    items.forEach(function(x) {
       var n = (x.name || '').toLowerCase();
+      var price = x.price || 0;
+      var qty = x.qty || 1;
+      
+      // Categorize
       var c = 'Other';
-      if (n.includes('tilapia')) c = 'Tilapia';
-      else if (n.includes('mbuta')) c = 'Mbuta';
-      else if (n.includes('ugali')) c = 'Ugali';
-      else if (n.includes('wet fry')) c = 'Wet Fry';
-      else if (n.includes('soda')) c = 'Soda';
-      else if (n.includes('greens')) c = 'Greens';
-      else if (n.includes('chips')) c = 'Chips';
-      else if (n.includes('water')) c = 'Water';
-      cat[c] = (cat[c] || 0) + (x.price || 0) * (x.qty || 1);
+      if (n.includes('tilapia')) {
+        c = '🐟 Tilapia';
+        // Track tilapia prices
+        var priceKey = price.toString();
+        tilapiaPrices[priceKey] = (tilapiaPrices[priceKey] || 0) + qty;
+      } else if (n.includes('mbuta')) c = '🐠 Mbuta';
+      else if (n.includes('ugali')) c = '🍚 Ugali';
+      else if (n.includes('pepsi')) c = '🔵 Pepsi';
+      else if (n.includes('coca') || n.includes('coke')) c = '🔴 Coca Cola';
+      else if (n.includes('soda')) c = '🥤 Soda';
+      else if (n.includes('wet fry') || n.includes('kachumbari')) c = '🍳 Wet Fry';
+      else if (n.includes('green') || n.includes('managu') || n.includes('spinach') || n.includes('kale')) c = '🥬 Greens';
+      else if (n.includes('chip')) c = '🍟 Chips';
+      else if (n.includes('water')) c = '💧 Water';
+      else if (n.includes('container') || n.includes('take away')) c = '📦 Containers';
+      else if (n.includes('fulu') || n.includes('omena')) c = '🐟 Fulu/Omena';
+      else if (n.includes('bag')) c = '🛍️ Bag';
+      
+      cat[c] = (cat[c] || 0) + (price * qty);
     });
   });
   
-  var bd = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">';
-  for (var k in cat) {
-    bd += '<div class="category-stats"><strong>' + k + '</strong><br>' + cat[k].toLocaleString() + '/=</div>';
+  // Sort categories by revenue (highest first)
+  var sortedCats = Object.keys(cat).sort(function(a, b) { return cat[b] - cat[a]; });
+  
+  var totalRevenue = myTx.reduce(function(s, tx) { return s + (tx.total || 0); }, 0);
+  
+  var bd = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">';
+  for (var i = 0; i < sortedCats.length; i++) {
+    var k = sortedCats[i];
+    var pct = totalRevenue > 0 ? ((cat[k] / totalRevenue) * 100).toFixed(1) : 0;
+    bd += '<div style="background:#f8fafd;padding:8px;border-radius:8px;border-left:4px solid #0b3954;">' +
+      '<strong>' + k + '</strong><br>' +
+      '<span style="font-size:0.8rem;font-weight:700;">KES ' + cat[k].toLocaleString() + '/=</span><br>' +
+      '<span style="font-size:0.6rem;color:#888;">' + pct + '% of total</span>' +
+      '</div>';
   }
   bd += '</div>';
-  document.getElementById('categoryBreakdown').innerHTML = bd || 'No sales';
+  
+  // Show totals
+  bd += '<div style="margin-top:10px;padding:10px;background:#0b3954;color:white;border-radius:10px;text-align:center;">' +
+    '<strong>💰 Total Revenue: KES ' + totalRevenue.toLocaleString() + '/=</strong> | ' +
+    '📋 Transactions: ' + myTx.length +
+    '</div>';
+  
+  document.getElementById('categoryBreakdown').innerHTML = bd;
+  
+  // ============ TILAPIA PRICE DISTRIBUTION CHART ============
+  var chartCanvas = document.getElementById('tilapiaPriceChart');
+  if (!chartCanvas) return;
+  
+  // Destroy old chart if exists
+  if (charts.tilapiaPrice) {
+    charts.tilapiaPrice.destroy();
+    charts.tilapiaPrice = null;
+  }
+  
+  // Sort prices
+  var priceKeys = Object.keys(tilapiaPrices).sort(function(a, b) { return parseInt(a) - parseInt(b); });
+  var priceValues = priceKeys.map(function(k) { return tilapiaPrices[k]; });
+  var priceLabels = priceKeys.map(function(k) { return 'KES ' + k + '/='; });
+  
+  if (priceKeys.length === 0) {
+    // No tilapia sold - show empty chart with message
+    var ctx = chartCanvas.getContext('2d');
+    ctx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+    ctx.font = '12px Segoe UI';
+    ctx.fillStyle = '#888';
+    ctx.textAlign = 'center';
+    ctx.fillText('No tilapia sold this shift', chartCanvas.width/2, chartCanvas.height/2);
+    return;
+  }
+  
+  var ctx = chartCanvas.getContext('2d');
+  charts.tilapiaPrice = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: priceLabels,
+      datasets: [{
+        label: 'Pieces Sold',
+        data: priceValues,
+        backgroundColor: priceKeys.map(function(k) {
+          var p = parseInt(k);
+          if (p <= 250) return '#f59e0b';
+          if (p <= 400) return '#e67e22';
+          if (p <= 600) return '#d35400';
+          return '#0b3954';
+        }),
+        borderRadius: 6,
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              return ctx.raw + ' pieces sold';
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { stepSize: 1, precision: 0 },
+          title: { display: true, text: 'Pieces' }
+        },
+        x: {
+          title: { display: true, text: 'Price' }
+        }
+      }
+    }
+  });
+  
+  console.log('✅ Analysis rendered: ' + myTx.length + ' transactions, ' + sortedCats.length + ' categories');
 }
 
 // ============ SHIFT MANAGEMENT ============
