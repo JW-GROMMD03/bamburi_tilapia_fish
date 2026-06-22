@@ -1350,7 +1350,6 @@ async function renderAnalysis() {
   
   if (myTx.length === 0) {
     document.getElementById('categoryBreakdown').innerHTML = '<p style="color:#888;text-align:center;">No sales this shift</p>';
-    // Clear chart
     var chartCanvas = document.getElementById('tilapiaPriceChart');
     if (chartCanvas) {
       var ctx = chartCanvas.getContext('2d');
@@ -1362,7 +1361,6 @@ async function renderAnalysis() {
   
   // ============ CATEGORY BREAKDOWN ============
   var cat = {};
-  // Track tilapia prices for chart
   var tilapiaPrices = {};
   
   myTx.forEach(function(tx) {
@@ -1372,11 +1370,9 @@ async function renderAnalysis() {
       var price = x.price || 0;
       var qty = x.qty || 1;
       
-      // Categorize
       var c = 'Other';
       if (n.includes('tilapia')) {
         c = '🐟 Tilapia';
-        // Track tilapia prices
         var priceKey = price.toString();
         tilapiaPrices[priceKey] = (tilapiaPrices[priceKey] || 0) + qty;
       } else if (n.includes('mbuta')) c = '🐠 Mbuta';
@@ -1396,9 +1392,7 @@ async function renderAnalysis() {
     });
   });
   
-  // Sort categories by revenue (highest first)
   var sortedCats = Object.keys(cat).sort(function(a, b) { return cat[b] - cat[a]; });
-  
   var totalRevenue = myTx.reduce(function(s, tx) { return s + (tx.total || 0); }, 0);
   
   var bd = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">';
@@ -1413,7 +1407,6 @@ async function renderAnalysis() {
   }
   bd += '</div>';
   
-  // Show totals
   bd += '<div style="margin-top:10px;padding:10px;background:#0b3954;color:white;border-radius:10px;text-align:center;">' +
     '<strong>💰 Total Revenue: KES ' + totalRevenue.toLocaleString() + '/=</strong> | ' +
     '📋 Transactions: ' + myTx.length +
@@ -1425,69 +1418,66 @@ async function renderAnalysis() {
   var chartCanvas = document.getElementById('tilapiaPriceChart');
   if (!chartCanvas) return;
   
-  // Destroy old chart if exists
   if (charts.tilapiaPrice) {
     charts.tilapiaPrice.destroy();
     charts.tilapiaPrice = null;
   }
   
-  // Sort prices
-  var priceKeys = Object.keys(tilapiaPrices).sort(function(a, b) { return parseInt(a) - parseInt(b); });
-  var priceValues = priceKeys.map(function(k) { return tilapiaPrices[k]; });
-  var priceLabels = priceKeys.map(function(k) { return 'KES ' + k + '/='; });
+  // Group prices into ranges
+  var priceRanges = { '200-300': 0, '301-400': 0, '401-500': 0, '501-700': 0, '701+': 0 };
+  Object.keys(tilapiaPrices).forEach(function(price) {
+    var p = parseInt(price);
+    var qty = tilapiaPrices[price];
+    if (p <= 300) priceRanges['200-300'] += qty;
+    else if (p <= 400) priceRanges['301-400'] += qty;
+    else if (p <= 500) priceRanges['401-500'] += qty;
+    else if (p <= 700) priceRanges['501-700'] += qty;
+    else priceRanges['701+'] += qty;
+  });
   
-  if (priceKeys.length === 0) {
-    // No tilapia sold - show empty chart with message
+  var labels = [], data = [];
+  Object.keys(priceRanges).forEach(function(range) {
+    if (priceRanges[range] > 0) {
+      labels.push('KES ' + range + '/=');
+      data.push(priceRanges[range]);
+    }
+  });
+  
+  if (labels.length === 0) {
     var ctx = chartCanvas.getContext('2d');
     ctx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
-    ctx.font = '12px Segoe UI';
+    ctx.font = '11px Segoe UI';
     ctx.fillStyle = '#888';
     ctx.textAlign = 'center';
-    ctx.fillText('No tilapia sold this shift', chartCanvas.width/2, chartCanvas.height/2);
+    ctx.fillText('No tilapia sold this shift', chartCanvas.width/2, 30);
     return;
   }
+  
+  chartCanvas.parentElement.style.height = '180px';
+  chartCanvas.style.height = '180px';
   
   var ctx = chartCanvas.getContext('2d');
   charts.tilapiaPrice = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: priceLabels,
+      labels: labels,
       datasets: [{
-        label: 'Pieces Sold',
-        data: priceValues,
-        backgroundColor: priceKeys.map(function(k) {
-          var p = parseInt(k);
-          if (p <= 250) return '#f59e0b';
-          if (p <= 400) return '#e67e22';
-          if (p <= 600) return '#d35400';
-          return '#0b3954';
-        }),
-        borderRadius: 6,
-        borderWidth: 0
+        label: 'Pieces',
+        data: data,
+        backgroundColor: ['#f59e0b', '#e67e22', '#d35400', '#0f172a', '#64748b'],
+        borderRadius: 4,
+        borderWidth: 0,
+        barPercentage: 0.6,
+        categoryPercentage: 0.7
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) {
-              return ctx.raw + ' pieces sold';
-            }
-          }
-        }
-      },
+      plugins: { legend: { display: false } },
       scales: {
-        y: {
-          beginAtZero: true,
-          ticks: { stepSize: 1, precision: 0 },
-          title: { display: true, text: 'Pieces' }
-        },
-        x: {
-          title: { display: true, text: 'Price' }
-        }
+        y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0, font: { size: 10 } }, grid: { color: '#f0f0f0' } },
+        x: { ticks: { font: { size: 9 }, maxRotation: 45 }, grid: { display: false } }
       }
     }
   });
