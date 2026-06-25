@@ -2,7 +2,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from datetime import date, datetime, timedelta
 
-from .views import get_business_day
+from .utils import get_business_day
 from .supabase_service import SupabaseDB
 import json
 

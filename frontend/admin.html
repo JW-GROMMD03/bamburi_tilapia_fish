@@ -2509,11 +2509,12 @@ function getBusinessDayStart() {
 }
 
 // Render sales table
+// Render sales table
 function renderSalesTable(transactions) {
   const container = document.getElementById('salesBody');
   
   if (!transactions || transactions.length === 0) {
-    container.innerHTML = '<tr><td colspan="8" class="loading">No sales recorded in this period</td></tr>';
+    container.innerHTML = '<tr><td colspan="7" class="loading">No sales recorded in this period</td></tr>';
     return;
   }
   
@@ -2523,7 +2524,7 @@ function renderSalesTable(transactions) {
   let html = '';
   transactions.forEach(t => {
     let items = [];
-        try { 
+    try { 
       if (typeof t.items === 'string') {
         items = JSON.parse(t.items);
       } else if (Array.isArray(t.items)) {
@@ -2533,14 +2534,19 @@ function renderSalesTable(transactions) {
       }
     } catch(e) { 
       items = []; 
-    } 
+    }
+    
+    // Safety check before calling .map
+    if (!Array.isArray(items)) {
+      items = [];
+    }
     
     // Use created_at instead of t.time
     const txDate = t.created_at ? new Date(t.created_at) : (t.date ? new Date(t.date) : new Date());
     const dateStr = txDate.toLocaleDateString('en-KE');
     const timeStr = txDate.toLocaleTimeString('en-KE');
     
-    //  Correct shift detection - check the actual shift field
+    // Correct shift detection
     const shiftValue = (t.shift || 'day').toLowerCase();
     const shiftClass = shiftValue === 'night' ? 'info' : 'warning';
     const shiftDisplay = shiftValue === 'night' ? '🌙 Night' : '☀️ Day';
@@ -2560,38 +2566,51 @@ function renderSalesTable(transactions) {
     if (shiftValue === 'day') dayShiftTotal += txTotal;
     else nightShiftTotal += txTotal;
     
-    html += `<tr>
-      <td><strong>${dateStr}</strong></td>
-      <td>${timeStr}</td>
-      <td><span class="badge info">${escapeHtml(cashierName)}</span></td>
-      <td><span class="badge ${shiftClass}">${shiftDisplay}</span></td>
-      <td><span class="badge ${methodClass}">${methodDisplay}</span></td>
-      <td style="font-size: 12px;">${items.map(i => `${escapeHtml(i.name || 'Item')} ×${i.qty || 1}`).join(', ')}</td>
-      <td><strong>KES ${txTotal.toLocaleString()}</strong></td>
-    </tr>`;
+    // Build items display safely
+    var itemsDisplay = '';
+    try {
+      itemsDisplay = items.map(function(i) {
+        if (typeof i === 'string') return escapeHtml(i);
+        var name = i.name || i.item_name || 'Item';
+        var qty = i.qty || 1;
+        return escapeHtml(name) + ' ×' + qty;
+      }).join(', ');
+    } catch(e) {
+      itemsDisplay = String(items);
+    }
+    
+    html += '<tr>' +
+      '<td><strong>' + dateStr + '</strong></td>' +
+      '<td>' + timeStr + '</td>' +
+      '<td><span class="badge info">' + escapeHtml(cashierName) + '</span></td>' +
+      '<td><span class="badge ' + shiftClass + '">' + shiftDisplay + '</span></td>' +
+      '<td><span class="badge ' + methodClass + '">' + methodDisplay + '</span></td>' +
+      '<td style="font-size: 12px;">' + itemsDisplay + '</td>' +
+      '<td><strong>KES ' + txTotal.toLocaleString() + '</strong></td>' +
+    '</tr>';
   });
   
   // Summary rows
-  html += `<tr style="background: #f0fdf4; font-weight: bold;">
-    <td colspan="6" style="text-align: right;">💰 Total Sales:</td>
-    <td><strong>KES ${totalSales.toLocaleString()}</strong></td>
-  </tr>`;
-  html += `<tr style="background: #fef3c7;">
-    <td colspan="6" style="text-align: right;">💵 Cash Total:</td>
-    <td><strong>KES ${cashTotal.toLocaleString()}</strong></td>
-  </tr>`;
-  html += `<tr style="background: #dbeafe;">
-    <td colspan="6" style="text-align: right;">📱 M-Pesa Total:</td>
-    <td><strong>KES ${mpesaTotal.toLocaleString()}</strong></td>
-  </tr>`;
-  html += `<tr style="background: #fdf2f8;">
-    <td colspan="6" style="text-align: right;">☀️ Day Shift:</td>
-    <td><strong>KES ${dayShiftTotal.toLocaleString()}</strong></td>
-  </tr>`;
-  html += `<tr style="background: #ede9fe;">
-    <td colspan="6" style="text-align: right;">🌙 Night Shift:</td>
-    <td><strong>KES ${nightShiftTotal.toLocaleString()}</strong></td>
-  </tr>`;
+  html += '<tr style="background: #f0fdf4; font-weight: bold;">' +
+    '<td colspan="6" style="text-align: right;">💰 Total Sales:</td>' +
+    '<td><strong>KES ' + totalSales.toLocaleString() + '</strong></td>' +
+  '</tr>';
+  html += '<tr style="background: #fef3c7;">' +
+    '<td colspan="6" style="text-align: right;">💵 Cash Total:</td>' +
+    '<td><strong>KES ' + cashTotal.toLocaleString() + '</strong></td>' +
+  '</tr>';
+  html += '<tr style="background: #dbeafe;">' +
+    '<td colspan="6" style="text-align: right;">📱 M-Pesa Total:</td>' +
+    '<td><strong>KES ' + mpesaTotal.toLocaleString() + '</strong></td>' +
+  '</tr>';
+  html += '<tr style="background: #fdf2f8;">' +
+    '<td colspan="6" style="text-align: right;">☀️ Day Shift:</td>' +
+    '<td><strong>KES ' + dayShiftTotal.toLocaleString() + '</strong></td>' +
+  '</tr>';
+  html += '<tr style="background: #ede9fe;">' +
+    '<td colspan="6" style="text-align: right;">🌙 Night Shift:</td>' +
+    '<td><strong>KES ' + nightShiftTotal.toLocaleString() + '</strong></td>' +
+  '</tr>';
   
   container.innerHTML = html;
 }

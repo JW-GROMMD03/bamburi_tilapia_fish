@@ -24,25 +24,7 @@ from datetime import datetime
 
 qr_approvals = {}
 
-# ============ BUSINESS DAY HELPERS ============
-def get_business_day():
-    """Business day starts at 0930 and ends at 0930 next day.
-    The date belongs to the day shift."""
-    now = datetime.now()
-    if now.hour < 9 or (now.hour == 9 and now.minute < 30):
-        # Before 0930 - belongs to previous day
-        return (now - timedelta(days=1)).strftime('%Y-%m-%d')
-    return now.strftime('%Y-%m-%d')
-
-def get_current_shift():
-    """Returns 'day' or 'night' based on current time"""
-    now = datetime.now()
-    h = now.hour
-    m = now.minute
-    total_min = h * 60 + m
-    if total_min >= 570 and total_min < 1320:  # 0930-2200
-        return 'day'
-    return 'night'
+from .utils import get_business_day, get_current_shift
 
 @api_view(['GET','POST'])
 def transactions(request):
@@ -568,8 +550,19 @@ def analytics_dashboard(request):
                     items = json.loads(items)
                 except:
                     items = []
+                    
+            if not isinstance(items, list):
+                items = []
             
             for item in items:
+                if isinstance(item, str):
+                    try:
+                        item = json.loads(item)
+                    except:
+                        continue
+                if not isinstance(item, dict):
+                    continue
+                    
                 item_name = item.get('name', '').lower()
                 item_price = item.get('price', 0)
                 item_qty = item.get('qty', 1)
