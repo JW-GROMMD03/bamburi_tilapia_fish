@@ -1547,37 +1547,52 @@ async function submitShiftReport() {
     try { lastReport = JSON.parse(lastReport); } catch(e) { lastReport = null; }
   }
   
-  // Get ALL transactions for current shift
+  // Get ALL transactions
   var t = await apiCall('transactions/') || [];
   var shiftStart = getShiftStartTime();
+  var businessDay = getToday();
   
-  // ALL cashiers' transactions for this shift
+  // ALL cashiers' transactions for this shift - filter by BOTH time AND business day
   var allShiftTx = t.filter(function(tx) {
     var txTime = tx.created_at ? new Date(tx.created_at) : new Date();
-    return txTime >= shiftStart;
+    var txDate = tx.date || (tx.created_at ? new Date(tx.created_at).toISOString().split('T')[0] : '');
+    // Transaction must be from current shift time AND current business day
+    return txTime >= shiftStart && txDate === businessDay;
+  });
+  
+  // Get expenses for current shift
+  var e = await apiCall('expenses/') || [];
+  var allShiftExp = e.filter(function(ex) {
+    var exTime = ex.created_at ? new Date(ex.created_at) : new Date();
+    var exDate = ex.date || (ex.created_at ? new Date(ex.created_at).toISOString().split('T')[0] : '');
+    return exTime >= shiftStart && exDate === businessDay;
   });
   
   var currentTotalSales = allShiftTx.reduce(function(s, t) { return s + (t.total || 0); }, 0);
+  var totalExpenses = allShiftExp.reduce(function(s, e) { return s + (e.amount || 0); }, 0);
+  
+  console.log('Report - Shift transactions:', allShiftTx.length, 'Expenses:', allShiftExp.length);
+  console.log('Report - Total Sales:', currentTotalSales, 'Total Expenses:', totalExpenses);
   
   // Check if consolidated report already submitted
   if (lastReport && lastReport.totalSales !== undefined) {
-    if (currentTotalSales === lastReport.totalSales) {
+    if (currentTotalSales === lastReport.totalSales && totalExpenses === (lastReport.totalExpenses || 0)) {
       var proceed = confirm(
         '⚠️ SHIFT REPORT ALREADY SUBMITTED\n\n' +
-        'A consolidated report for this shift was already sent.\n' +
-        'No new sales since last report.\n\n' +
+        'No new sales or expenses since last report.\n\n' +
         'Last report: KES ' + lastReport.totalSales.toLocaleString() + '/=\n' +
         'Current total: KES ' + currentTotalSales.toLocaleString() + '/=\n\n' +
         'Do you still want to resend?'
       );
       if (!proceed) { showToast('❌ Cancelled'); return; }
     } else {
+      var diffSales = currentTotalSales - lastReport.totalSales;
+      var diffExp = totalExpenses - (lastReport.totalExpenses || 0);
       var proceed2 = confirm(
         '📋 UPDATE SHIFT REPORT\n\n' +
-        'New sales recorded since last report!\n\n' +
-        'Previous: KES ' + lastReport.totalSales.toLocaleString() + '/=\n' +
-        'Current: KES ' + currentTotalSales.toLocaleString() + '/=\n' +
-        'New sales: KES ' + (currentTotalSales - lastReport.totalSales).toLocaleString() + '/=\n\n' +
+        'Changes since last report:\n' +
+        'Sales: ' + (diffSales >= 0 ? '+' : '') + 'KES ' + diffSales.toLocaleString() + '/=\n' +
+        'Expenses: ' + (diffExp >= 0 ? '+' : '') + 'KES ' + diffExp.toLocaleString() + '/=\n\n' +
         'Send updated consolidated report?'
       );
       if (!proceed2) { showToast('❌ Cancelled'); return; }
@@ -1597,7 +1612,7 @@ async function submitShiftReport() {
     if (tx.method === 'mpesa') cashierStats[name].mpesa += (tx.total || 0);
   });
   
-  // Category breakdown
+  // Category breakdown from sales
   var categories = {};
   allShiftTx.forEach(function(tx) {
     var items = typeof tx.items === 'string' ? JSON.parse(tx.items) : (tx.items || []);
@@ -1620,61 +1635,136 @@ async function submitShiftReport() {
     });
   });
   
+  // Expense breakdown
+  var expenseCats = {};
+  allShiftExp.forEach(function(ex) {
+    var cat = ex.category || 'other';
+    if (!expenseCats[cat]) expenseCats[cat] = 0;
+    expenseCats[cat] += (ex.amount || 0);
+  });
+  
   var totalSales = currentTotalSales;
   var cashTotal = allShiftTx.filter(function(x) { return x.method === 'cash'; }).reduce(function(s, x) { return s + (x.total || 0); }, 0);
   var mpesaTotal = allShiftTx.filter(function(x) { return x.method === 'mpesa'; }).reduce(function(s, x) { return s + (x.total || 0); }, 0);
+  var cashAtHand = cashTotal - totalExpenses;
   
   // Save consolidated report
   localStorage.setItem('fishflow_report_' + shiftKey, JSON.stringify({
     totalSales: totalSales,
+    totalExpenses: totalExpenses,
+    cashAtHand: cashAtHand,
     transactionCount: allShiftTx.length,
+    expenseCount: allShiftExp.length,
     cashierCount: Object.keys(cashierStats).length,
     submittedAt: new Date().toISOString(),
     submittedBy: user.full_name
   }));
   
   var now = new Date();
-  var rpt = '═══════════════════════════\n';
-  rpt += '🐟 BAMBURI TILAPIA - SHIFT REPORT\n';
-  rpt += '     (CONSOLIDATED)\n';
-  rpt += '═══════════════════════════\n\n';
-  rpt += '📅 Date: ' + now.toLocaleDateString('en-KE') + '\n';
-  rpt += '🕐 Time: ' + now.toLocaleTimeString('en-KE') + '\n';
-  rpt += '🔄 Shift: ' + (user.shift === 'night' ? '🌙 Night (22:00-09:30)' : '☀️ Day (09:30-22:00)') + '\n';
-  rpt += '👤 Submitted by: ' + user.full_name + '\n\n';
-  rpt += '───────────────────────────\n';
-  rpt += '📊 TOTAL SHIFT SALES\n';
-  rpt += '───────────────────────────\n';
-  rpt += '💰 Total Sales: KES ' + totalSales.toLocaleString() + '/=\n';
-  rpt += '💵 Cash Total: KES ' + cashTotal.toLocaleString() + '/=\n';
-  rpt += '📱 M-Pesa Total: KES ' + mpesaTotal.toLocaleString() + '/=\n';
-  rpt += '📋 Transactions: ' + allShiftTx.length + '\n';
-  rpt += '👥 Cashiers on duty: ' + Object.keys(cashierStats).length + '\n\n';
-  rpt += '───────────────────────────\n';
-  rpt += '👤 CASHIER BREAKDOWN\n';
-  rpt += '───────────────────────────\n';
+  var shiftName = user.shift === 'night' ? '🌙 Night (22:00-09:30)' : '☀️ Day (09:30-22:00)';
+  
+  // Build HTML report for PDF
+  var htmlContent = '<html><head><meta charset="UTF-8"><style>' +
+    'body{font-family:Arial,sans-serif;padding:20px;color:#1e293b}' +
+    'h1{text-align:center;color:#0f172a;border-bottom:3px solid #f59e0b;padding-bottom:10px}' +
+    'h2{color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:5px;margin-top:20px}' +
+    'table{width:100%;border-collapse:collapse;margin:10px 0}' +
+    'th{background:#0f172a;color:white;padding:8px;text-align:left;font-size:12px}' +
+    'td{padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:11px}' +
+    '.total-row{background:#f0fdf4;font-weight:bold}' +
+    '.summary-box{background:#f8fafd;border:2px solid #0f172a;border-radius:8px;padding:12px;margin:10px 0}' +
+    '.footer{text-align:center;margin-top:30px;padding-top:15px;border-top:2px solid #f59e0b;font-size:10px;color:#64748b}' +
+    '</style></head><body>' +
+    '<h1>🐟 BAMBURI TILAPIA FISH HOTEL<br>SHIFT REPORT (CONSOLIDATED)</h1>' +
+    '<div class="summary-box">' +
+    '<p><strong>📅 Date:</strong> ' + now.toLocaleDateString('en-KE') + ' | <strong>🕐 Time:</strong> ' + now.toLocaleTimeString('en-KE') + '</p>' +
+    '<p><strong>🔄 Shift:</strong> ' + shiftName + ' | <strong>👤 Submitted by:</strong> ' + user.full_name + '</p>' +
+    '<p><strong>👥 Cashiers on duty:</strong> ' + Object.keys(cashierStats).length + ' | <strong>📋 Transactions:</strong> ' + allShiftTx.length + '</p>' +
+    '</div>' +
+    '<h2>📊 SALES SUMMARY</h2>' +
+    '<table><tr><th>Metric</th><th>Amount</th></tr>' +
+    '<tr><td>💰 Total Sales</td><td><strong>KES ' + totalSales.toLocaleString() + '/=</strong></td></tr>' +
+    '<tr><td>💵 Cash Sales</td><td>KES ' + cashTotal.toLocaleString() + '/=</td></tr>' +
+    '<tr><td>📱 M-Pesa Sales</td><td>KES ' + mpesaTotal.toLocaleString() + '/=</td></tr>' +
+    '<tr><td>🧾 Total Expenses</td><td>KES ' + totalExpenses.toLocaleString() + '/=</td></tr>' +
+    '<tr class="total-row"><td>💵 Cash at Hand</td><td><strong>KES ' + cashAtHand.toLocaleString() + '/=</strong></td></tr>' +
+    '</table>' +
+    '<h2>👤 CASHIER BREAKDOWN</h2>' +
+    '<table><tr><th>Cashier</th><th>Sales</th><th>Cash</th><th>M-Pesa</th><th>Count</th></tr>';
+  
   for (var name in cashierStats) {
     var cs = cashierStats[name];
-    rpt += name + ': ' + cs.count + ' sales | KES ' + cs.sales.toLocaleString() + '/= (Cash: ' + cs.cash.toLocaleString() + ' | M-Pesa: ' + cs.mpesa.toLocaleString() + ')\n';
+    htmlContent += '<tr><td>' + name + '</td><td>KES ' + cs.sales.toLocaleString() + '/=</td><td>KES ' + cs.cash.toLocaleString() + '/=</td><td>KES ' + cs.mpesa.toLocaleString() + '/=</td><td>' + cs.count + '</td></tr>';
   }
-  rpt += '\n───────────────────────────\n';
-  rpt += '📦 CATEGORY BREAKDOWN\n';
-  rpt += '───────────────────────────\n';
-  for (var k in categories) {
-    rpt += k + ': ' + categories[k].qty + ' pcs | KES ' + categories[k].amt.toLocaleString() + '/=\n';
+  
+  htmlContent += '</table>' +
+    '<h2>📦 CATEGORY BREAKDOWN (SALES)</h2>' +
+    '<table><tr><th>Category</th><th>Quantity</th><th>Amount</th></tr>';
+  
+  var sortedCats = Object.keys(categories).sort(function(a, b) { return categories[b].amt - categories[a].amt; });
+  for (var i = 0; i < sortedCats.length; i++) {
+    var k = sortedCats[i];
+    htmlContent += '<tr><td>' + k + '</td><td>' + categories[k].qty + ' pcs</td><td>KES ' + categories[k].amt.toLocaleString() + '/=</td></tr>';
   }
-  rpt += '\n═══════════════════════════\n';
-  rpt += '✅ End of Consolidated Report\n';
-  rpt += '═══════════════════════════';
   
-  showToast('✅ Consolidated shift report!');
+  htmlContent += '</table>';
   
-  try {
-    await navigator.clipboard.writeText(rpt);
-    showToast('📋 Copied to clipboard!');
-  } catch(e) {}
+  if (allShiftExp.length > 0) {
+    htmlContent += '<h2>🧾 EXPENSES BREAKDOWN</h2>' +
+      '<table><tr><th>Category</th><th>Amount</th></tr>';
+    for (var cat in expenseCats) {
+      htmlContent += '<tr><td>' + cat + '</td><td>KES ' + expenseCats[cat].toLocaleString() + '/=</td></tr>';
+    }
+    htmlContent += '<tr class="total-row"><td><strong>Total Expenses</strong></td><td><strong>KES ' + totalExpenses.toLocaleString() + '/=</strong></td></tr></table>';
+  }
   
-  window.open('https://wa.me/254792988239?text=' + encodeURIComponent(rpt), '_blank');
+  htmlContent += '<div class="footer"><p>Generated by FishFlow Pro • ' + now.toLocaleString() + '</p><p>BAMBURI TILAPIA FISH HOTEL - Official Shift Report</p></div></body></html>';
+  
+  showToast('✅ Consolidated shift report generated!');
+  
+  // Download as PDF
+  downloadPDF(htmlContent, 'Shift_Report_' + getToday() + '_' + user.shift + '.pdf');
+  
+  // Also send to WhatsApp
+  var textRpt = '🐟 BAMBURI TILAPIA - SHIFT REPORT (CONSOLIDATED)\n';
+  textRpt += '═══════════════════════════\n\n';
+  textRpt += '📅 Date: ' + now.toLocaleDateString('en-KE') + '\n';
+  textRpt += '🕐 Time: ' + now.toLocaleTimeString('en-KE') + '\n';
+  textRpt += '🔄 Shift: ' + shiftName + '\n';
+  textRpt += '👤 By: ' + user.full_name + '\n\n';
+  textRpt += '💰 Total Sales: KES ' + totalSales.toLocaleString() + '/=\n';
+  textRpt += '💵 Cash: KES ' + cashTotal.toLocaleString() + '/=\n';
+  textRpt += '📱 M-Pesa: KES ' + mpesaTotal.toLocaleString() + '/=\n';
+  textRpt += '🧾 Expenses: KES ' + totalExpenses.toLocaleString() + '/=\n';
+  textRpt += '💵 Cash at Hand: KES ' + cashAtHand.toLocaleString() + '/=\n';
+  textRpt += '📋 Transactions: ' + allShiftTx.length + '\n';
+  textRpt += '👥 Cashiers: ' + Object.keys(cashierStats).length + '\n';
+  textRpt += '═══════════════════════════\n';
+  textRpt += '✅ Full PDF report downloaded';
+  
+  window.open('https://wa.me/254792988239?text=' + encodeURIComponent(textRpt), '_blank');
+}
+
+// PDF Download function 
+function downloadPDF(htmlContent, filename) {
+  // Create a blob from the HTML content
+  var blob = new Blob([htmlContent], { type: 'text/html' });
+  var url = URL.createObjectURL(blob);
+  
+  // Create download link
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  
+  // Cleanup
+  setTimeout(function() {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
+  
+  showToast('📥 PDF report downloaded!');
 }
 
 // ============ NAVIGATION ============
