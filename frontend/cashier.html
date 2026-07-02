@@ -131,11 +131,12 @@
   <div class="dashboard-grid" id="categorySalesSummary">
     <div class="stat-card"><div class="stat-label">🐟 Tilapia</div><div class="stat-value" id="tilapiaPcs">0</div><div class="stat-highlight" id="tilapiaAmt">0/=</div></div>
     <div class="stat-card"><div class="stat-label">🐠 Mbuta</div><div class="stat-value" id="mbutaPcs">0</div><div class="stat-highlight" id="mbutaAmt">0/=</div></div>
+    <div class="stat-card"><div class="stat-label">🐟 Obambo</div><div class="stat-value" id="obamboPcs">0</div><div class="stat-highlight" id="obamboAmt">0/=</div></div>
     <div class="stat-card"><div class="stat-label">🍚 Ugali</div><div class="stat-value" id="ugaliPcs">0</div><div class="stat-highlight" id="ugaliAmt">0/=</div></div>
     <div class="stat-card"><div class="stat-label">🍳 Wet Fry</div><div class="stat-value" id="wetfryPcs">0</div><div class="stat-highlight" id="wetfryAmt">0/=</div></div>
     <div class="stat-card"><div class="stat-label">🥤 Soda</div><div class="stat-value" id="sodaPcs">0</div><div class="stat-highlight" id="sodaAmt">0/=</div></div>
     <div class="stat-card"><div class="stat-label">🥬 Greens</div><div class="stat-value" id="greensPcs">0</div><div class="stat-highlight" id="greensAmt">0/=</div></div>
-    <div class="stat-card"><div class="stat-label">🍟 Chips</div><div class="stat-value" id="chipsPcs">0</div><div class="stat-highlight" id="chipsAmt">0/=</div></div>
+    <div class="stat-card"><div class="stat-label">🍟 Chips</div><div class="stat-value" id="chipsPcs">0</div><div class="stat-highlight" id="chipsAmt">0/=</ div></ div>
     <div class="stat-card"><div class="stat-label">🛍️ Bag</div><div class="stat-value" id="bagPcs">0</div><div class="stat-highlight" id="bagAmt">0/=</div></div>
     <div class="stat-card"><div class="stat-label">🐟 Fulu/Omena</div><div class="stat-value" id="fuluOmenaPcs">0</div><div class="stat-highlight" id="fuluOmenaAmt">0/=</div></div>
     <div class="stat-card"><div class="stat-label">💧 Water</div><div class="stat-value" id="waterPcs">0</div><div class="stat-highlight" id="waterAmt">0/=</div></div>
@@ -399,6 +400,7 @@ function renderDynamicMenu() {
   var categories = [
     {key: 'tilapia', name: '🐟 Tilapia', class: 'tilapia-title'},
     {key: 'mbuta', name: '🐠 Mbuta'},
+    {key: 'obambo', name: '🐟 Obambo'},
     {key: 'ugali', name: '🍚 Ugali'},
     {key: 'wetfry', name: '🍳 Wet Fry & Kachumbari'},
     {key: 'greens', name: '🥬 Greens'},
@@ -1275,7 +1277,7 @@ async function updateDashboard() {
   console.log('My shift expenses:', myShiftExp.length);
   
   var cat = {
-    tilapia: { pieces: 0, amount: 0 }, mbuta: { pieces: 0, amount: 0 },
+    tilapia: { pieces: 0, amount: 0 }, mbuta: { pieces: 0, amount: 0 },obambo: { pieces: 0, amount: 0 },
     ugali: { pieces: 0, amount: 0 }, wetfry: { pieces: 0, amount: 0 },
     soda: { pieces: 0, amount: 0 }, greens: { pieces: 0, amount: 0 },
     chips: { pieces: 0, amount: 0 }, bag: { pieces: 0, amount: 0 },
@@ -1293,6 +1295,7 @@ async function updateDashboard() {
       else if (n.includes('coca') || n.includes('coke')) c = 'cocacola';
       else if (n.includes('tilapia')) c = 'tilapia';
       else if (n.includes('mbuta')) c = 'mbuta';
+      else if (n.includes('obambo')) c = 'obambo';
       else if (n.includes('ugali')) c = 'ugali';
       else if (n.includes('wet fry') || n.includes('kachumbari')) c = 'wetfry';
       else if (n.includes('soda')) c = 'soda';
@@ -1318,6 +1321,8 @@ async function updateDashboard() {
   document.getElementById('tilapiaAmt').textContent = cat.tilapia.amount.toLocaleString() + '/=';
   document.getElementById('mbutaPcs').textContent = cat.mbuta.pieces;
   document.getElementById('mbutaAmt').textContent = cat.mbuta.amount.toLocaleString() + '/=';
+  document.getElementById('obamboPcs').textContent = cat.obambo.pieces;
+  document.getElementById('obamboAmt').textContent = cat.obambo.amount.toLocaleString() + '/=';
   document.getElementById('ugaliPcs').textContent = cat.ugali.pieces;
   document.getElementById('ugaliAmt').textContent = cat.ugali.amount.toLocaleString() + '/=';
   document.getElementById('wetfryPcs').textContent = cat.wetfry.pieces;
@@ -1399,6 +1404,7 @@ async function renderAnalysis() {
         var priceKey = price.toString();
         tilapiaPrices[priceKey] = (tilapiaPrices[priceKey] || 0) + qty;
       } else if (n.includes('mbuta')) c = '🐠 Mbuta';
+      else if (n.includes('obambo')) c = '🐡 Obambo';
       else if (n.includes('ugali')) c = '🍚 Ugali';
       else if (n.includes('pepsi')) c = '🔵 Pepsi';
       else if (n.includes('coca') || n.includes('coke')) c = '🔴 Coca Cola';
@@ -1621,6 +1627,7 @@ async function submitShiftReport() {
       var cat = 'Other';
       if (n.includes('tilapia')) cat = '🐟 Tilapia';
       else if (n.includes('mbuta')) cat = '🐠 Mbuta';
+      else if (n.includes('obambo')) cat = '🐡 Obambo';
       else if (n.includes('ugali')) cat = '🍚 Ugali';
       else if (n.includes('pepsi')) cat = '🔵 Pepsi';
       else if (n.includes('coca') || n.includes('coke')) cat = '🔴 Coca Cola';

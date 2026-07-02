@@ -828,6 +828,7 @@ flex-wrap:wrap;
       <select id="itemCategory" class="form-control">
         <option value="tilapia">🐟 Tilapia</option>
         <option value="mbuta">🐠 Mbuta</option>
+        <option value="obambo">🐟 Obambo</option>
         <option value="ugali">🍚 Ugali</option>
         <option value="wetfry">🍳 Wet Fry / Kachumbari</option>
         <option value="greens">🥬 Greens</option>
@@ -945,6 +946,7 @@ flex-wrap:wrap;
       <select id="glovoItemCategory" class="form-control">
         <option value="tilapia">🐟 Tilapia</option>
         <option value="mbuta">🐠 Mbuta</option>
+        <option value="obambo">🐟 Obambo</option>
         <option value="ugali">🍚 Ugali</option>
         <option value="wetfry">🍳 Wet Fry</option>
         <option value="greens">🥬 Greens</option>
@@ -1052,6 +1054,14 @@ flex-wrap:wrap;
           <h3>🐠 Mbuta MPesa</h3>
           <p id="mbutaMpesa">KES 0</p>
         </div>
+        <div class="card">
+          <h3>🐟 Obambo Cash</h3>
+          <p id="obamboCash">KES 0</p>
+        </div>
+        <div class="card">
+          <h3>🐟 Obambo MPesa</h3>
+          <p id="obamboMpesa">KES 0</p>
+        </div>
       </div>
       <div class="chart-box">
         <canvas id="salesChart"></canvas>
@@ -1106,6 +1116,7 @@ flex-wrap:wrap;
             <option value="all">All Categories</option>
             <option value="tilapia">🐟 Tilapia</option>
             <option value="mbuta">🐠 Mbuta</option>
+            <option value="obambo">🐟 Obambo</option>
             <option value="ugali">🍚 Ugali</option>
             <option value="wetfry">🍳 Wet Fry</option>
             <option value="greens">🥬 Greens</option>
@@ -1267,6 +1278,7 @@ flex-wrap:wrap;
     <div class="cards" style="margin-bottom:20px;">
         <div class="card"><h3>🐟 Tilapia Revenue</h3><p id="recTilapia">KES 0</p></div>
         <div class="card"><h3>🐠 Mbuta Revenue</h3><p id="recMbuta">KES 0</p></div>
+        <div class="card"><h3>🐟 Obambo Revenue</h3><p id="recObambo">KES 0</p></div>
         <div class="card"><h3>🍚 Ugali Revenue</h3><p id="recUgali">KES 0</p></div>
         <div class="card"><h3>🥤 Soda Revenue</h3><p id="recSoda">KES 0</p></div>
         <div class="card"><h3>🍳 Wet Fry Revenue</h3><p id="recWetfry">KES 0</p></div>
@@ -2098,6 +2110,7 @@ async function loadRecords() {
         const categories = {
             tilapia: { revenue: 0, quantity: 0 },
             mbuta: { revenue: 0, quantity: 0 },
+            obambo: { revenue: 0, quantity: 0 },
             ugali: { revenue: 0, quantity: 0 },
             soda: { revenue: 0, quantity: 0 },
             wetfry: { revenue: 0, quantity: 0 },
@@ -2129,6 +2142,11 @@ async function loadRecords() {
                 } else if (name.includes('mbuta')) {
                     categories.mbuta.revenue += amount;
                     categories.mbuta.quantity += qty;
+                    
+                } else if (name.includes('obambo')) {
+                    categories.obambo.revenue += amount;
+                    categories.obambo.quantity += qty;
+
                 } else if (name.includes('ugali')) {
                     categories.ugali.revenue += amount;
                     categories.ugali.quantity += qty;
@@ -2163,6 +2181,7 @@ async function loadRecords() {
         // Update display cards
         document.getElementById('recTilapia').innerHTML = 'KES ' + categories.tilapia.revenue.toLocaleString();
         document.getElementById('recMbuta').innerHTML = 'KES ' + categories.mbuta.revenue.toLocaleString();
+        document.getElementById('recObambo').innerHTML = 'KES ' + categories.obambo.revenue.toLocaleString();
         document.getElementById('recUgali').innerHTML = 'KES ' + categories.ugali.revenue.toLocaleString();
         document.getElementById('recSoda').innerHTML = 'KES ' + categories.soda.revenue.toLocaleString();
         document.getElementById('recWetfry').innerHTML = 'KES ' + categories.wetfry.revenue.toLocaleString();
@@ -2183,7 +2202,7 @@ async function loadRecords() {
 }
 
 function resetRecordsDisplay() {
-    const ids = ['recTilapia', 'recMbuta', 'recUgali', 'recSoda', 'recWetfry', 'recGreens', 'recChips', 'recOther'];
+    const ids = ['recTilapia', 'recMbuta', 'recObambo', 'recUgali', 'recSoda', 'recWetfry', 'recGreens', 'recChips', 'recOther'];
     ids.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.innerHTML = 'KES 0';
@@ -2203,19 +2222,13 @@ function updateRecordsChart(categories) {
         recordsChart.destroy();
     }
     
-    const labels = ['🐟 Tilapia', '🐠 Mbuta', '🍚 Ugali', '🥤 Soda', '🍳 Wet Fry', '🥬 Greens', '🍟 Chips', '📦 Other'];
+    const labels = ['🐟 Tilapia', '🐠 Mbuta', '🐟 Obambo', '🍚 Ugali', '🥤 Soda', '🍳 Wet Fry', '🥬 Greens', '🍟 Chips', '📦 Other'];
     const revenueData = [
-        categories.tilapia.revenue,
-        categories.mbuta.revenue,
-        categories.ugali.revenue,
-        categories.soda.revenue,
-        categories.wetfry.revenue,
-        categories.greens.revenue,
-        categories.chips.revenue,
-        categories.other.revenue
+        categories.tilapia.revenue, categories.mbuta.revenue, categories.obambo.revenue,
+        categories.ugali.revenue, categories.soda.revenue, categories.wetfry.revenue,
+        categories.greens.revenue, categories.chips.revenue, categories.other.revenue
     ];
-    
-    const colors = ['#f59e0b', '#0f172a', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'];
+    const colors = ['#f59e0b', '#0f172a', '#059669', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'];
     
     recordsChart = new Chart(ctx, {
         type: 'bar',
@@ -2444,6 +2457,8 @@ async function loadDashboard() {
         document.getElementById('tilapiaMpesa').innerHTML = 'KES ' + (data.fish_breakdown.tilapia?.mpesa || 0).toLocaleString();
         document.getElementById('mbutaCash').innerHTML = 'KES ' + (data.fish_breakdown.mbuta?.cash || 0).toLocaleString();
         document.getElementById('mbutaMpesa').innerHTML = 'KES ' + (data.fish_breakdown.mbuta?.mpesa || 0).toLocaleString();
+                document.getElementById('obamboCash').innerHTML = 'KES ' + (data.fish_breakdown?.obambo?.cash || 0).toLocaleString();
+        document.getElementById('obamboMpesa').innerHTML = 'KES ' + (data.fish_breakdown?.obambo?.mpesa || 0).toLocaleString();
       }
     }
   } catch (error) {
@@ -3204,6 +3219,7 @@ const backgroundColor = categoryLabels.map(label => {
   if (label === 'soda') return '#3b82f6';
   if (label === 'tilapia') return '#0f172a';
   if (label === 'mbuta') return '#1e293b';
+  if (label === 'obambo') return '#059669';
   if (label === 'ugali') return '#f59e0b';
   if (label === 'greens') return '#10b981';
   return '#64748b';
@@ -3322,7 +3338,7 @@ function updateCategoryBreakdown(breakdown) {
 // Get display name for categories
 function getCategoryDisplayName(category) {
   const names = {
-    'tilapia': '🐟 Tilapia', 'mbuta': '🐠 Mbuta', 'ugali': '🍚 Ugali',
+    'tilapia': '🐟 Tilapia', 'mbuta': '🐠 Mbuta', 'obambo': '🐟 Obambo', 'ugali': '🍚 Ugali',
     'wetfry': '🍳 Wet Fry', 'greens': '🥬 Greens', 'chips': '🍟 Chips',
     'fuluOmena': '🐟 Fulu/Omena', 'soda': '🥤 Soda', 'water': '💧 Water',
     'container': '📦 Containers', 'other': '📋 Other'
@@ -3776,7 +3792,7 @@ function renderMenuItems(items) {
 // Get category icon
 function getCategoryIcon(category) {
     const icons = {
-        'tilapia': '🐟', 'mbuta': '🐠', 'ugali': '🍚', 'wetfry': '🍳',
+        'tilapia': '🐟', 'mbuta': '🐠', 'obambo': '🐟', 'ugali': '🍚', 'wetfry': '🍳',
         'greens': '🥬', 'chips': '🍟', 'fuluOmena': '🐟', 'soda': '🥤',
         'water': '💧', 'container': '📦', 'other': '📋'
     };

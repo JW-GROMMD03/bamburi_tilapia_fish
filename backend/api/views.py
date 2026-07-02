@@ -353,6 +353,7 @@ def get_items(request):
     items = {
         'tilapia': [{'name': f'Tilapia {p}/=', 'price': p} for p in [200,250,300,350,400,450,500,550,600,650,700,750,800,850,900,950]],
         'mbuta': [{'name': f'Mbuta {p}/=', 'price': p} for p in [150,200,250,300,350,400,450]],
+        'obambo': [{'name': f'Obambo {p}/=', 'price': p} for p in [200,250,300,350,400,450,500,550,600,650,700]],
         'ugali': [{'name': n, 'price': int(p)} for n, p in [i.split(':') for i in ['Brown Ugali:100','White Ugali:50']]],
         'wetfry': [{'name': n, 'price': int(p)} for n, p in [i.split(':') for i in ['Wet Fry:100','Kachumbari:50']]],
         'soda': [{'name': n, 'price': int(p)} for n, p in [i.split(':') for i in ['Soda:50','Soda:60','Soda:70','Soda 2L:200']]],
@@ -646,6 +647,8 @@ def detect_category(item_name):
         return 'tilapia'
     elif 'mbuta' in item_lower:
         return 'mbuta'
+    elif 'obambo' in item_lower:
+        return 'obambo'
     elif 'ugali' in item_lower:
         return 'ugali'
     elif 'wet fry' in item_lower or 'kachumbari' in item_lower:
@@ -882,6 +885,18 @@ def create_default_menu_items():
         {'category': 'mbuta', 'name': 'Mbuta 200/=', 'price': 200, 'is_active': True},
         {'category': 'mbuta', 'name': 'Mbuta 250/=', 'price': 250, 'is_active': True},
         {'category': 'mbuta', 'name': 'Mbuta 300/=', 'price': 300, 'is_active': True},
+        # Obambo
+        {'category': 'obambo', 'name': 'Obambo 200/=', 'price': 200, 'is_active': True},
+        {'category': 'obambo', 'name': 'Obambo 250/=', 'price': 250, 'is_active': True},
+        {'category': 'obambo', 'name': 'Obambo 300/=', 'price': 300, 'is_active': True},
+        {'category': 'obambo', 'name': 'Obambo 350/=', 'price': 350, 'is_active': True},
+        {'category': 'obambo', 'name': 'Obambo 400/=', 'price': 400, 'is_active': True},
+        {'category': 'obambo', 'name': 'Obambo 450/=', 'price': 450, 'is_active': True},
+        {'category': 'obambo', 'name': 'Obambo 500/=', 'price': 500, 'is_active': True},
+        {'category': 'obambo', 'name': 'Obambo 550/=', 'price': 550, 'is_active': True},
+        {'category': 'obambo', 'name': 'Obambo 600/=', 'price': 600, 'is_active': True},
+        {'category': 'obambo', 'name': 'Obambo 650/=', 'price': 650, 'is_active': True},
+        {'category': 'obambo', 'name': 'Obambo 700/=', 'price': 700, 'is_active': True},
         # Ugali
         {'category': 'ugali', 'name': 'Brown Ugali', 'price': 100, 'is_active': True},
         {'category': 'ugali', 'name': 'White Ugali', 'price': 50, 'is_active': True},
@@ -942,6 +957,17 @@ def get_default_menu_items():
         {'id': 9, 'category': 'mbuta', 'name': 'Mbuta 200/=', 'price': 200, 'is_active': True},
         {'id': 10, 'category': 'mbuta', 'name': 'Mbuta 250/=', 'price': 250, 'is_active': True},
         {'id': 11, 'category': 'mbuta', 'name': 'Mbuta 300/=', 'price': 300, 'is_active': True},
+        {'id': 47, 'category': 'obambo', 'name': 'Obambo 200/=', 'price': 200, 'is_active': True},
+        {'id': 48, 'category': 'obambo', 'name': 'Obambo 250/=', 'price': 250, 'is_active': True},
+        {'id': 49, 'category': 'obambo', 'name': 'Obambo 300/=', 'price': 300, 'is_active': True},
+        {'id': 50, 'category': 'obambo', 'name': 'Obambo 350/=', 'price': 350, 'is_active': True},
+        {'id': 51, 'category': 'obambo', 'name': 'Obambo 400/=', 'price': 400, 'is_active': True},
+        {'id': 52, 'category': 'obambo', 'name': 'Obambo 450/=', 'price': 450, 'is_active': True},
+        {'id': 53, 'category': 'obambo', 'name': 'Obambo 500/=', 'price': 500, 'is_active': True},
+        {'id': 54, 'category': 'obambo', 'name': 'Obambo 550/=', 'price': 550, 'is_active': True},
+        {'id': 55, 'category': 'obambo', 'name': 'Obambo 600/=', 'price': 600, 'is_active': True},
+        {'id': 56, 'category': 'obambo', 'name': 'Obambo 650/=', 'price': 650, 'is_active': True},
+        {'id': 57, 'category': 'obambo', 'name': 'Obambo 700/=', 'price': 700, 'is_active': True},
         {'id': 12, 'category': 'ugali', 'name': 'Brown Ugali', 'price': 100, 'is_active': True},
         {'id': 13, 'category': 'ugali', 'name': 'White Ugali', 'price': 50, 'is_active': True},
         {'id': 14, 'category': 'wetfry', 'name': 'Wet Fry', 'price': 100, 'is_active': True},

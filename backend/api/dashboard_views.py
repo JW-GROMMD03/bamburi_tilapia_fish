@@ -29,9 +29,10 @@ def admin_dashboard(request):
     # Cash at Hand = Cash Sales - Expenses
     cash_at_hand = cash_sales - total_expenses
     
-    # Fish/Mbuta cash vs M-Pesa
+    # Fish/Mbuta/Obambo cash vs M-Pesa
     fish_cash, fish_mpesa = 0, 0
     mbuta_cash, mbuta_mpesa = 0, 0
+    obambo_cash, obambo_mpesa = 0, 0
     
     for t in transactions:
         items = t.get('items', [])
@@ -47,7 +48,10 @@ def admin_dashboard(request):
             elif 'mbuta' in name:
                 if method == 'cash': mbuta_cash += amt
                 else: mbuta_mpesa += amt
-    
+            elif 'obambo' in name:
+                if method == 'cash': obambo_cash += amt
+                else: obambo_mpesa += amt
+
     return Response({
         'today': {
             'date': today,
@@ -63,6 +67,7 @@ def admin_dashboard(request):
         'fish_breakdown': {
             'tilapia': {'cash': fish_cash, 'mpesa': fish_mpesa, 'total': fish_cash + fish_mpesa},
             'mbuta': {'cash': mbuta_cash, 'mpesa': mbuta_mpesa, 'total': mbuta_cash + mbuta_mpesa},
+            'obambo': {'cash': obambo_cash, 'mpesa': obambo_mpesa, 'total': obambo_cash + obambo_mpesa},
         },
         'shifts': {
             'day_shift_sales': sum(t.get('total', 0) for t in transactions if t.get('shift') == 'day'),
@@ -182,6 +187,7 @@ def calculate_category_stats(transactions):
     categories = {
         'tilapia': {'pieces': 0, 'amount': 0},
         'mbuta': {'pieces': 0, 'amount': 0},
+        'obambo': {'pieces': 0, 'amount': 0},
         'ugali': {'pieces': 0, 'amount': 0},
         'wetfry': {'pieces': 0, 'amount': 0},
         'soda': {'pieces': 0, 'amount': 0},
@@ -207,6 +213,8 @@ def calculate_category_stats(transactions):
                 cat = 'tilapia'
             elif 'mbuta' in name or 'fish' in name:
                 cat = 'mbuta'
+            elif 'obambo' in name:
+                cat = 'obambo'
             elif 'ugali' in name:
                 cat = 'ugali'
             elif 'wet fry' in name or 'kachumbari' in name:

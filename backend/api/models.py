@@ -5,6 +5,7 @@ class MenuItem(models.Model):
     CATEGORY_CHOICES = [
         ('tilapia', 'Tilapia'),
         ('mbuta', 'Mbuta'),
+        ('obambo', 'Obambo'),
         ('ugali', 'Ugali'),
         ('wetfry', 'Wet Fry'),
         ('soda', 'Soda'),
