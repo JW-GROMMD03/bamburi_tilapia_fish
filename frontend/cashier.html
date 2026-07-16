@@ -1207,17 +1207,46 @@ function switchExpenseTab(tab) {
 // ============ EXPENSES ============
 async function renderExpenses() {
   try {
-    var e = await apiCall('expenses/') || [];
+    var e = await apiCall('expenses/', 'GET', null, 'exp') || [];
     var shiftStart = getShiftStartTime();
     var businessDay = getToday();
     
-    // Filter by current shift AND business day - only show regular expenses
+    console.log('🔍 renderExpenses - All expenses count:', e.length);
+    console.log('🔍 renderExpenses - Shift start:', shiftStart.toISOString());
+    console.log('🔍 renderExpenses - Business day:', businessDay);
+    
+    // Filter by current shift AND business day - show ALL expenses (including advances/debts saved as expenses)
     var myExp = e.filter(function(ex) {
-      var exTime = ex.created_at ? new Date(ex.created_at) : new Date();
+      // Use date field first, fall back to created_at
       var exDate = ex.date || (ex.created_at ? new Date(ex.created_at).toISOString().split('T')[0] : '');
-      var isRegularExpense = !ex.category || ex.category === 'other' || ex.category === 'supplies' || ex.category === 'maintenance';
-      return isRegularExpense && exTime >= shiftStart && exDate === businessDay;
+      
+      // Get time from time field or created_at
+      var exTimeStr = ex.time || (ex.created_at ? new Date(ex.created_at).toISOString() : '');
+      var exTime;
+      if (exTimeStr) {
+        exTime = new Date(exTimeStr);
+      } else {
+        exTime = new Date();
+      }
+      
+      // Check if it's from current business day
+      var isCurrentDay = (exDate === businessDay);
+      
+      // For shift check, use the date field + shift info, or just check the date
+      // If the expense has a 'shift' field, use it. Otherwise, accept all today's expenses
+      var isCurrentShift = true;
+      if (ex.shift) {
+        isCurrentShift = (ex.shift === user.shift);
+      } else {
+        // No shift info - accept if it's from today's business day
+        isCurrentShift = isCurrentDay;
+      }
+      
+      // Show ALL expense types including advance and debt
+      return isCurrentDay && isCurrentShift;
     });
+    
+    console.log('🔍 renderExpenses - Filtered expenses:', myExp.length);
     
     var container = document.getElementById('expenseListToday');
     if (!container) return;
@@ -1226,9 +1255,15 @@ async function renderExpenses() {
       container.innerHTML = '<p style="color:#888;text-align:center;padding:12px;">No expenses this shift</p>';
     } else {
       container.innerHTML = myExp.map(function(x) {
-        return '<div class="list-item" style="background:#f8fafd;padding:10px;border-radius:10px;margin-bottom:5px;border:1px solid #eef2f6;">' +
+        var isAdvance = (x.category === 'advance' || (x.name && x.name.toLowerCase().includes('advance')));
+        var isDebt = (x.category === 'debt' || (x.name && x.name.toLowerCase().includes('debt')));
+        var icon = isAdvance ? '⏰' : isDebt ? '🤝' : '💸';
+        var bgColor = isAdvance ? '#fef3c7' : isDebt ? '#fee2e2' : '#f8fafd';
+        var borderColor = isAdvance ? '#f59e0b' : isDebt ? '#ef4444' : '#eef2f6';
+        
+        return '<div class="list-item" style="background:' + bgColor + ';padding:10px;border-radius:10px;margin-bottom:5px;border:1px solid ' + borderColor + ';">' +
           '<div style="flex:1;">' +
-          '<span style="font-weight:600;">💸 ' + (x.name || x.description || 'Expense') + '</span>' +
+          '<span style="font-weight:600;">' + icon + ' ' + (x.name || x.description || 'Expense') + '</span>' +
           '<span style="font-size:0.6rem;color:#888;display:block;">' + (x.time || '') + '</span>' +
           '</div>' +
           '<div style="display:flex;align-items:center;gap:10px;">' +
