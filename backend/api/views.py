@@ -1623,20 +1623,33 @@ def surplus_adjust(request):
         payment_method = data.get('payment_method', 'cash')  # cash or mpesa
         real_amount = int(data.get('real_amount', 0))
         
-        # Get current system amount
+       
+               # Get current system amount (Cash at Hand = Cash Sales - ALL cash deductions)
         transactions = SupabaseDB.get_tx(business_date) or []
         
+        # Get ALL deductions (financial entries + cashier expenses)
+        fin_entries = get_fin_entries_for_date(business_date)
+        cashier_expenses = SupabaseDB.get_exp(business_date) or []
+        
         if payment_method == 'cash':
-            system_amount = sum(t.get('total', 0) for t in transactions if t.get('method') == 'cash')
-            # Subtract cash deductions
-            fin_entries = get_fin_entries_for_date(business_date)
-            cash_deductions = sum(e.get('amount', 0) for e in fin_entries if e.get('payment_method') == 'cash')
-            system_amount -= cash_deductions
+            # Total cash sales
+            cash_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'cash')
+            
+            # All cash deductions: financial entries + cashier expenses
+            fin_cash_deductions = sum(e.get('amount', 0) for e in fin_entries if e.get('payment_method') == 'cash')
+            cashier_exp_deductions = sum(e.get('amount', 0) for e in cashier_expenses)
+            
+            # System cash at hand
+            system_amount = cash_sales - fin_cash_deductions - cashier_exp_deductions
         else:
-            system_amount = sum(t.get('total', 0) for t in transactions if t.get('method') == 'mpesa')
-            fin_entries = get_fin_entries_for_date(business_date)
-            mpesa_deductions = sum(e.get('amount', 0) for e in fin_entries if e.get('payment_method') == 'mpesa')
-            system_amount -= mpesa_deductions
+            # Total mpesa sales
+            mpesa_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'mpesa')
+            
+            # All mpesa deductions
+            fin_mpesa_deductions = sum(e.get('amount', 0) for e in fin_entries if e.get('payment_method') == 'mpesa')
+            
+            # System mpesa balance
+            system_amount = mpesa_sales - fin_mpesa_deductions
         
         difference = real_amount - system_amount
         
