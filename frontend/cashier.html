@@ -1249,15 +1249,26 @@ async function addExpense() {
   var a = parseInt(document.getElementById('expAmt').value);
   if (!n || !a || a < 1) { showToast('Enter expense name and valid amount'); return; }
   
-  var result = await apiCall('expenses/', 'POST', {
+  // Disable button to prevent double-clicks
+  document.getElementById('expName').disabled = true;
+  document.getElementById('expAmt').disabled = true;
+  
+  // Send ONLY the fields the backend expects: name, amount, created_by, date, time
+  var payload = {
     name: n,
     amount: a,
-    category: 'supplies',
     created_by: user.id,
     date: getToday(),
-    time: new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: true }),
-    shift: user.shift
-  });
+    time: new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: true })
+  };
+  
+  console.log('📤 Sending expense:', JSON.stringify(payload));
+  var result = await apiCall('expenses/', 'POST', payload);
+  console.log('📥 Expense response:', result);
+  
+  // Re-enable inputs
+  document.getElementById('expName').disabled = false;
+  document.getElementById('expAmt').disabled = false;
   
   if (result && !result.error) {
     showToast('💸 Expense recorded: -' + a.toLocaleString() + '/=');
@@ -1267,7 +1278,7 @@ async function addExpense() {
     renderExpenses();
     updateDashboard();
   } else {
-    showToast('❌ Failed to save expense');
+    showToast('❌ Failed: ' + (result?.error || 'Server rejected the expense'));
   }
 }
 
@@ -1371,20 +1382,16 @@ async function addAdvance() {
       shift: user.shift,
       created_by: user.id
     });
-  } catch(e) {
-    // Financial API not available
-  }
+  } catch(e) { /* Financial API not available */ }
   
-  // Fallback to expenses API
+  // Fallback to expenses API - send MINIMAL fields
   if (!result || result.error) {
     result = await apiCall('expenses/', 'POST', {
       name: 'Advance: ' + name,
       amount: amt,
-      category: 'advance',
       created_by: user.id,
       date: getToday(),
-      time: new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: true }),
-      shift: user.shift
+      time: new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: true })
     });
   }
   
@@ -1392,6 +1399,7 @@ async function addAdvance() {
     showToast('⏰ Advance recorded: -' + amt.toLocaleString() + '/=');
     document.getElementById('advName').value = '';
     document.getElementById('advAmt').value = '';
+    _cache = {};
     renderAdvances();
     updateDashboard();
   } else {
@@ -1476,20 +1484,16 @@ async function addDebt() {
       shift: user.shift,
       created_by: user.id
     });
-  } catch(e) {
-    // Financial API not available
-  }
+  } catch(e) { /* Financial API not available */ }
   
-  // Fallback to expenses API
+  // Fallback to expenses API - send MINIMAL fields
   if (!result || result.error) {
     result = await apiCall('expenses/', 'POST', {
       name: 'Debt: ' + name,
       amount: amt,
-      category: 'debt',
       created_by: user.id,
       date: getToday(),
-      time: new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: true }),
-      shift: user.shift
+      time: new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: true })
     });
   }
   
@@ -1497,6 +1501,7 @@ async function addDebt() {
     showToast('🤝 Debt recorded: -' + amt.toLocaleString() + '/=');
     document.getElementById('debtName').value = '';
     document.getElementById('debtAmt').value = '';
+    _cache = {};
     renderDebts();
     updateDashboard();
   } else {

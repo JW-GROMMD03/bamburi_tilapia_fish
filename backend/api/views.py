@@ -138,11 +138,16 @@ def expenses(request):
             'time': data.get('time', now.strftime('%H:%M')),
             'name': data.get('name', ''),
             'amount': data.get('amount', 0),
-            'category': data.get('category', 'other'),
-            'shift': data.get('shift', current_shift),  # <-- ADD shift tracking
-            'created_by': data.get('created_by', ''),
             'created_at': now.isoformat()
         }
+        # Add optional fields only if they exist in the data
+        if data.get('category'):
+            ex['category'] = data.get('category')
+        if data.get('shift'):
+            ex['shift'] = data.get('shift')
+        if data.get('created_by'):
+            ex['created_by'] = data.get('created_by')
+            
         r = SupabaseDB.save_exp(ex)
         if r: return Response(r, status=status.HTTP_201_CREATED)
         return Response({'error':'Save failed'}, status=400)
