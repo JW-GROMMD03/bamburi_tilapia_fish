@@ -16,7 +16,7 @@
             --bg: #0a1628;
             --white: #ffffff;
             --gray: #64748b;
-            --light-gray: #f1f5f9;
+            --light-gray: #f8fafc;
         }
         
         * {
@@ -33,7 +33,8 @@
             align-items: center;
             justify-content: center;
             position: relative;
-            overflow: hidden;
+            overflow-x: hidden;
+            padding: 20px;
         }
         
         /* Animated background particles */
@@ -108,74 +109,162 @@
             z-index: 0;
         }
         
-        .login-wrapper {
+        /* Main Layout Wrapper - Split Screen */
+        .login-container-wrapper {
             position: relative;
             z-index: 1;
             width: 100%;
-            max-width: 480px;
-            padding: 20px;
-        }
-        
-        .login-card {
+            max-width: 1100px;
+            min-height: 680px;
             background: rgba(255, 255, 255, 0.98);
             backdrop-filter: blur(30px);
-            border-radius: 28px;
-            padding: 45px 40px;
-            box-shadow: 
-                0 30px 100px rgba(0, 0, 0, 0.5),
-                0 0 0 1px rgba(255, 255, 255, 0.1),
-                inset 0 0 0 1px rgba(255, 255, 255, 0.5);
-            position: relative;
+            border-radius: 32px;
+            box-shadow: 0 30px 100px rgba(0, 0, 0, 0.5);
+            display: flex;
             overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        
-        /* Gold accent line at top */
-        .login-card::before {
+
+        /* Gold Accent bar spanning the container */
+        .login-container-wrapper::before {
             content: '';
             position: absolute;
             top: 0;
-            left: 20%;
-            right: 20%;
-            height: 3px;
-            background: linear-gradient(90deg, transparent, var(--gold), var(--gold-light), var(--gold), transparent);
-            border-radius: 0 0 3px 3px;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--gold), var(--gold-light), var(--gold), var(--primary));
+            z-index: 10;
+        }
+
+        /* Left Hand Form Section */
+        .login-form-side {
+            flex: 1.1;
+            padding: 50px 45px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
         
+        /* Right Hand Visual Slideshow Section */
+        .login-slideshow-side {
+            flex: 0.9;
+            position: relative;
+            background: var(--primary-dark);
+            overflow: hidden;
+            display: flex;
+            align-items: flex-end;
+        }
+
+        .slideshow-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            opacity: 0;
+            transition: opacity 1.2s ease-in-out, transform 1.5s ease;
+            transform: scale(1.05);
+            filter: brightness(0.7) contrast(1.1);
+        }
+
+        .slide.active {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Ambient gradient on top of slide images to blend text safely */
+        .slide-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 60%;
+            background: linear-gradient(to top, rgba(6, 30, 45, 0.95) 10%, rgba(6, 30, 45, 0.6) 50%, transparent 100%);
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .slide-caption {
+            position: relative;
+            z-index: 3;
+            padding: 40px;
+            color: white;
+            width: 100%;
+        }
+
+        .slide-tag {
+            background: var(--gold);
+            color: var(--primary-dark);
+            padding: 5px 12px;
+            border-radius: 30px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: inline-block;
+            margin-bottom: 12px;
+        }
+
+        .slide-title {
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+            color: var(--white);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+        }
+
+        .slide-desc {
+            font-size: 0.95rem;
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.4;
+        }
+
         /* Logo section */
         .logo-section {
             text-align: center;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
         }
         
         .logo-container {
             display: inline-block;
             position: relative;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
         
         .logo-circle {
-            width: 90px;
-            height: 90px;
+            width: 80px;
+            height: 80px;
             border-radius: 50%;
             background: linear-gradient(135deg, var(--primary), #0d4f75);
             display: flex;
             align-items: center;
             justify-content: center;
             box-shadow: 
-                0 10px 30px rgba(11, 57, 84, 0.3),
-                0 0 0 6px rgba(212, 168, 83, 0.2),
-                0 0 0 12px rgba(212, 168, 83, 0.1);
+                0 8px 25px rgba(11, 57, 84, 0.2),
+                0 0 0 4px rgba(212, 168, 83, 0.15),
+                0 0 0 8px rgba(212, 168, 83, 0.08);
             animation: logoPulse 3s ease-in-out infinite;
             position: relative;
         }
         
         @keyframes logoPulse {
-            0%, 100% { box-shadow: 0 10px 30px rgba(11, 57, 84, 0.3), 0 0 0 6px rgba(212, 168, 83, 0.2), 0 0 0 12px rgba(212, 168, 83, 0.1); }
-            50% { box-shadow: 0 15px 40px rgba(11, 57, 84, 0.4), 0 0 0 10px rgba(212, 168, 83, 0.3), 0 0 0 18px rgba(212, 168, 83, 0.15); }
+            0%, 100% { box-shadow: 0 8px 25px rgba(11, 57, 84, 0.2), 0 0 0 4px rgba(212, 168, 83, 0.15), 0 0 0 8px rgba(212, 168, 83, 0.08); }
+            50% { box-shadow: 0 12px 35px rgba(11, 57, 84, 0.35), 0 0 0 6px rgba(212, 168, 83, 0.25), 0 0 0 12px rgba(212, 168, 83, 0.12); }
         }
         
         .logo-icon {
-            font-size: 2.8rem;
+            font-size: 2.5rem;
             animation: fishSwim 2s ease-in-out infinite;
         }
         
@@ -186,27 +275,27 @@
         
         .logo-badge {
             position: absolute;
-            bottom: -5px;
-            right: -5px;
+            bottom: -3px;
+            right: -3px;
             background: var(--gold);
             color: var(--primary-dark);
-            width: 28px;
-            height: 28px;
+            width: 26px;
+            height: 26px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             font-weight: 700;
-            box-shadow: 0 3px 10px rgba(212, 168, 83, 0.5);
+            box-shadow: 0 3px 10px rgba(212, 168, 83, 0.4);
         }
         
         .hotel-name {
-            font-size: 1.5rem;
+            font-size: 1.6rem;
             font-weight: 800;
             color: var(--primary);
             margin-top: 5px;
-            letter-spacing: -0.3px;
+            letter-spacing: -0.5px;
         }
         
         .hotel-name .gold {
@@ -214,18 +303,18 @@
         }
         
         .system-name {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: var(--gray);
-            font-weight: 500;
-            letter-spacing: 1.5px;
+            font-weight: 600;
+            letter-spacing: 2px;
             text-transform: uppercase;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
         }
         
         .tagline {
-            font-size: 0.82rem;
-            color: #888;
-            margin-bottom: 28px;
+            font-size: 0.85rem;
+            color: #64748b;
+            margin-bottom: 24px;
             font-style: italic;
         }
         
@@ -233,26 +322,30 @@
         .role-selector {
             display: flex;
             gap: 10px;
-            margin-bottom: 25px;
-            background: var(--light-gray);
-            border-radius: 16px;
-            padding: 6px;
+            margin-bottom: 22px;
+            background: rgba(15, 23, 42, 0.04);
+            border-radius: 14px;
+            padding: 5px;
         }
         
         .role-option {
             flex: 1;
-            padding: 14px 12px;
+            padding: 12px;
             text-align: center;
-            border-radius: 12px;
+            border-radius: 10px;
             cursor: pointer;
             font-size: 0.85rem;
             font-weight: 600;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             border: none;
             background: transparent;
-            color: #888;
+            color: #64748b;
             position: relative;
             overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
         
         .role-option::before {
@@ -276,27 +369,25 @@
         .role-option.active {
             background: white;
             color: var(--primary);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            transform: scale(1.01);
         }
         
         .role-option:hover:not(.active) {
             color: var(--primary);
-            background: rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.6);
         }
         
         .role-icon {
-            font-size: 1.5rem;
-            display: block;
-            margin-bottom: 5px;
+            font-size: 1.1rem;
         }
         
         .role-label {
-            font-size: 0.75rem;
+            font-size: 0.85rem;
             color: inherit;
         }
         
-        /* Form */
+        /* Form elements */
         .form-group {
             margin-bottom: 18px;
             position: relative;
@@ -306,8 +397,8 @@
             display: block;
             font-size: 0.8rem;
             font-weight: 600;
-            color: #444;
-            margin-bottom: 7px;
+            color: #334155;
+            margin-bottom: 6px;
             letter-spacing: 0.3px;
         }
         
@@ -320,8 +411,8 @@
             left: 14px;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 1.1rem;
-            color: #aaa;
+            font-size: 1rem;
+            color: #94a3b8;
             transition: color 0.3s;
             z-index: 2;
             pointer-events: none;
@@ -331,11 +422,11 @@
             width: 100%;
             padding: 14px 15px 14px 42px;
             border: 2px solid #e2e8f0;
-            border-radius: 14px;
+            border-radius: 12px;
             font-size: 0.95rem;
             transition: all 0.3s;
-            background: #f8fafd;
-            color: #333;
+            background: #f8fafc;
+            color: #0f172a;
         }
         
         .form-group input:focus {
@@ -360,7 +451,7 @@
             border: none;
             cursor: pointer;
             font-size: 1rem;
-            color: #aaa;
+            color: #94a3b8;
             padding: 5px;
             z-index: 2;
         }
@@ -372,19 +463,22 @@
         /* Login button */
         .btn-login {
             width: 100%;
-            padding: 15px;
+            padding: 14px;
             background: linear-gradient(135deg, var(--primary) 0%, #0d4f75 50%, var(--primary-dark) 100%);
             color: white;
             border: none;
-            border-radius: 14px;
-            font-size: 1rem;
+            border-radius: 12px;
+            font-size: 0.95rem;
             font-weight: 700;
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            margin-top: 10px;
+            margin-top: 5px;
             letter-spacing: 0.5px;
             position: relative;
             overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         .btn-login::before {
@@ -404,7 +498,7 @@
         
         .btn-login:hover {
             transform: translateY(-2px);
-            box-shadow: 0 15px 40px rgba(11, 57, 84, 0.4);
+            box-shadow: 0 10px 25px rgba(11, 57, 84, 0.3);
         }
         
         .btn-login:active {
@@ -419,8 +513,8 @@
         
         .btn-login .spinner {
             display: none;
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             border: 2px solid rgba(255,255,255,0.3);
             border-top-color: white;
             border-radius: 50%;
@@ -436,15 +530,11 @@
             display: inline-block;
         }
         
-        .btn-login.loading .btn-text {
-            display: inline;
-        }
-        
         /* Messages */
         .message-box {
             text-align: center;
-            padding: 14px;
-            border-radius: 12px;
+            padding: 12px;
+            border-radius: 10px;
             margin-top: 15px;
             font-size: 0.85rem;
             font-weight: 500;
@@ -472,14 +562,14 @@
         /* Footer */
         .footer-section {
             text-align: center;
-            margin-top: 22px;
-            padding-top: 18px;
-            border-top: 1px solid #eee;
+            margin-top: 25px;
+            padding-top: 15px;
+            border-top: 1px solid #f1f5f9;
         }
         
         .footer-links {
             font-size: 0.85rem;
-            color: #666;
+            color: #64748b;
         }
         
         .footer-links a {
@@ -497,11 +587,11 @@
         .footer-info {
             margin-top: 10px;
             font-size: 0.7rem;
-            color: #aaa;
+            color: #94a3b8;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 15px;
+            gap: 12px;
         }
         
         .footer-info span {
@@ -510,26 +600,55 @@
             gap: 4px;
         }
         
-        /* Responsive */
-        @media (max-width: 500px) {
-            .login-card {
-                padding: 30px 22px;
-                border-radius: 22px;
+        /* Responsive Breakpoints */
+        @media (max-width: 900px) {
+            .login-container-wrapper {
+                flex-direction: column;
+                max-width: 480px;
+                min-height: auto;
+                border-radius: 24px;
             }
+
+            .login-slideshow-side {
+                display: none; /* Side slides hidden on middle layouts */
+            }
+            
+            .login-form-side {
+                padding: 40px 30px;
+            }
+        }
+
+        @media (max-width: 500px) {
+            body {
+                padding: 10px;
+            }
+            
+            .login-container-wrapper {
+                border-radius: 18px;
+            }
+
+            .login-form-side {
+                padding: 30px 20px;
+            }
+            
             .logo-circle {
                 width: 70px;
                 height: 70px;
             }
+            
             .logo-icon {
                 font-size: 2.2rem;
             }
+            
             .hotel-name {
-                font-size: 1.2rem;
+                font-size: 1.3rem;
             }
+            
             .role-option {
-                padding: 10px 8px;
-                font-size: 0.78rem;
+                padding: 10px;
+                font-size: 0.8rem;
             }
+            
             .form-group input {
                 padding: 12px 12px 12px 38px;
                 font-size: 0.9rem;
@@ -538,12 +657,10 @@
     </style>
 </head>
 <body>
-    <!-- Animated particles -->
     <div class="particles" id="particles"></div>
     
-    <div class="login-wrapper">
-        <div class="login-card">
-            <!-- Logo Section -->
+    <div class="login-container-wrapper">
+        <div class="login-form-side">
             <div class="logo-section">
                 <div class="logo-container">
                     <div class="logo-circle">
@@ -558,45 +675,44 @@
                 <p class="tagline">🍽️ Fresh from the waters, served with excellence</p>
             </div>
             
-            <!-- Role Selector (Admin & Cashier only) -->
-            <div class="role-selector" id="roleSelector">
-                <button class="role-option active" data-role="cashier" onclick="selectRole('cashier', this)">
-                    <span class="role-icon">💰</span>
-                    <span class="role-label">Cashier</span>
-                </button>
-                <button class="role-option" data-role="admin" onclick="selectRole('admin', this)">
-                    <span class="role-icon">👑</span>
-                    <span class="role-label">Admin</span>
-                </button>
-            </div>
-            
-            <!-- Login Form -->
-            <div class="form-group">
-                <label>📧 Email Address</label>
-                <div class="input-wrapper">
-                    <span class="input-icon">✉️</span>
-                    <input type="email" id="email" placeholder="Enter your email address" autocomplete="email">
+            <div class="login-form-body">
+                <div class="role-selector" id="roleSelector">
+                    <button class="role-option active" data-role="cashier" onclick="selectRole('cashier', this)">
+                        <span class="role-icon">💰</span>
+                        <span class="role-label">Cashier</span>
+                    </button>
+                    <button class="role-option" data-role="admin" onclick="selectRole('admin', this)">
+                        <span class="role-icon">👑</span>
+                        <span class="role-label">Admin</span>
+                    </button>
                 </div>
-            </div>
-            
-            <div class="form-group">
-                <label>🔒 Password</label>
-                <div class="input-wrapper">
-                    <span class="input-icon">🔑</span>
-                    <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password">
-                    <button class="toggle-password" onclick="togglePassword()" title="Show/Hide Password">👁️</button>
+                
+                <div class="form-group">
+                    <label>📧 Email Address</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">✉️</span>
+                        <input type="email" id="email" placeholder="Enter your email address" autocomplete="email">
+                    </div>
                 </div>
+                
+                <div class="form-group">
+                    <label>🔒 Password</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">🔑</span>
+                        <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password">
+                        <button class="toggle-password" onclick="togglePassword()" title="Show/Hide Password">👁️</button>
+                    </div>
+                </div>
+                
+                <button class="btn-login" id="loginBtn" onclick="handleLogin()">
+                    <span class="spinner"></span>
+                    <span class="btn-text">🔐 Sign In to Dashboard</span>
+                </button>
+                
+                <div class="message-box error-msg" id="errorMsg"></div>
+                <div class="message-box success-msg" id="successMsg"></div>
             </div>
             
-            <button class="btn-login" id="loginBtn" onclick="handleLogin()">
-                <span class="spinner"></span>
-                <span class="btn-text">🔐 Sign In to Dashboard</span>
-            </button>
-            
-            <div class="message-box error-msg" id="errorMsg"></div>
-            <div class="message-box success-msg" id="successMsg"></div>
-            
-            <!-- Footer -->
             <div class="footer-section">
                 <div class="footer-links">
                     <p>Need access? <a href="#">Contact Administrator</a></p>
@@ -610,6 +726,17 @@
                 </div>
             </div>
         </div>
+
+        <div class="login-slideshow-side">
+            <div class="slideshow-container" id="slideshow">
+                </div>
+            <div class="slide-overlay"></div>
+            <div class="slide-caption" id="slideCaption">
+                <span class="slide-tag" id="slideTag">Popular</span>
+                <h2 class="slide-title" id="slideTitle">Sizzling Wet Fry</h2>
+                <p class="slide-desc" id="slideDesc">Fresh Lake Tilapia sautéed with sweet onions and red-ripe Kenyan tomatoes.</p>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -617,10 +744,104 @@
         const API = 'https://bamburi-tilapia-fish.onrender.com/api';
         let selectedRole = 'cashier';
         
+        // ============ SLIDESHOW CONFIGURATION ============
+        // Transitioning pictures based on requested Kenyan delicacies & Chef profile
+        const slidesData = [
+            {
+                image: "https://images.unsplash.com/photo-1576107232684-1279f390859f?q=80&w=1200&auto=format&fit=crop",
+                tag: "Crispy Delight",
+                title: "Golden French Fries",
+                desc: "Finely sliced, double-fried hand-cut chips crispy on the outside, fluffy inside."
+            },
+            {
+                image: "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?q=80&w=1200&auto=format&fit=crop",
+                tag: "Signature Dish",
+                title: "Wet Fry Tilapia",
+                desc: "Sautéed in a rich tomato, coriander, onion and native capsicum gravy."
+            },
+            {
+                image: "https://images.unsplash.com/photo-1541832676-9b763b0239ab?q=80&w=1200&auto=format&fit=crop",
+                tag: "The Foundation",
+                title: "Simmering Hot Ugali",
+                desc: "Fresh, steaming stone-ground premium white maize meal cooked to absolute perfection."
+            },
+            {
+                image: "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?q=80&w=1200&auto=format&fit=crop",
+                tag: "Lakeside Classic",
+                title: "Deep Fried Tilapia & Kachumbari",
+                desc: "Crispy dry-fried skin served alongside raw onions, tomatoes, and spicy green chillies."
+            },
+            {
+                image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?q=80&w=1200&auto=format&fit=crop",
+                tag: "Cold Refreshment",
+                title: "Chilled Soda",
+                desc: "Ice-cold sparkling soda to balance the beautiful, robust spices."
+            },
+            {
+                image: "https://images.unsplash.com/photo-1521305916504-4a1121188589?q=80&w=1200&auto=format&fit=crop",
+                tag: "Lake Giant",
+                title: "Mbuta (Nile Perch)",
+                desc: "Delectable chunky portions of premium deep-fried or wet-fried Nile Perch filet."
+            },
+            {
+                image: "https://images.unsplash.com/photo-1514516345957-556ca7d90a29?q=80&w=1200&auto=format&fit=crop",
+                tag: "Lake Victoria Savory",
+                title: "Wet Fried Omena",
+                desc: "Slow simmered tiny silver cyprinids glazed in onions, tomatoes, and sour cream."
+            },
+            {
+                image: "https://images.unsplash.com/photo-1551248429-40975aa4de74?q=80&w=1200&auto=format&fit=crop",
+                tag: "Traditional delicacy",
+                title: "Wet Fried Fulu",
+                desc: "Rich, delicious, native wild tilapia varieties wet fried in heavy-cream local style."
+            },
+            {
+                image: "https://images.unsplash.com/photo-1604152135912-04a022e23696?q=80&w=1200&auto=format&fit=crop",
+                tag: "Traditional Greens",
+                title: "Sweet Sukuma Wiki & Kales",
+                desc: "Lightly blanched farm-fresh kales cooked with onions and a hint of butter."
+            },
+            {
+                image: "https://images.unsplash.com/photo-1600565193348-f74bd3c7ccdf?q=80&w=1200&auto=format&fit=crop",
+                tag: "Crafted with Love",
+                title: "Master Chef Collection",
+                desc: "Our top kitchen chefs serving you excellence with local coastal hospitality."
+            }
+        ];
+
+        let currentSlide = 0;
+
+        function initializeSlideshow() {
+            const container = document.getElementById('slideshow');
+            slidesData.forEach((slide, index) => {
+                const div = document.createElement('div');
+                div.className = `slide ${index === 0 ? 'active' : ''}`;
+                div.style.backgroundImage = `url('${slide.image}')`;
+                container.appendChild(div);
+            });
+            updateCaption();
+            setInterval(nextSlide, 5000); // Transitions every 5 seconds
+        }
+
+        function nextSlide() {
+            const slides = document.querySelectorAll('.slide');
+            slides[currentSlide].classList.remove('active');
+            currentSlide = (currentSlide + 1) % slides.length;
+            slides[currentSlide].classList.add('active');
+            updateCaption();
+        }
+
+        function updateCaption() {
+            const data = slidesData[currentSlide];
+            document.getElementById('slideTag').textContent = data.tag;
+            document.getElementById('slideTitle').textContent = data.title;
+            document.getElementById('slideDesc').textContent = data.desc;
+        }
+
         // ============ CREATE PARTICLES ============
         function createParticles() {
             const container = document.getElementById('particles');
-            const particleCount = 30;
+            const particleCount = 20;
             
             for (let i = 0; i < particleCount; i++) {
                 const particle = document.createElement('div');
@@ -650,8 +871,8 @@
             element.classList.add('active');
             
             // Subtle animation on selection
-            element.style.transform = 'scale(0.95)';
-            setTimeout(() => { element.style.transform = 'scale(1.02)'; }, 150);
+            element.style.transform = 'scale(0.97)';
+            setTimeout(() => { element.style.transform = 'scale(1.01)'; }, 150);
         }
         
         // ============ TOGGLE PASSWORD ============
@@ -741,25 +962,24 @@
                     localStorage.setItem('fishflow_user', JSON.stringify(profile));
                     
                     // Verify role
+                    const userRole = (profile.role || data.user?.role || 'cashier').toLowerCase();
 
-const userRole = (profile.role || data.user?.role || 'cashier').toLowerCase();
+                    // If the user selected a different role, warn them but still let them in with correct role
+                    if (userRole !== selectedRole && selectedRole !== userRole) {
+                        console.log(`⚠️ User selected "${selectedRole}" but actual role is "${userRole}". Redirecting correctly.`);
+                    }
 
-// If the user selected a different role, warn them but still let them in with correct role
-if (userRole !== selectedRole && selectedRole !== userRole) {
-    console.log(`⚠️ User selected "${selectedRole}" but actual role is "${userRole}". Redirecting correctly.`);
-}
+                    // Success! Always redirect based on the ACTUAL role from server
+                    showSuccess(`Welcome back! Redirecting to ${userRole} dashboard...`);
 
-// Success! Always redirect based on the ACTUAL role from server
-showSuccess(`Welcome back! Redirecting to ${userRole} dashboard...`);
-
-// Redirect based on ACTUAL role from database
-setTimeout(() => {
-    if (userRole === 'admin' || userRole === 'manager') {
-        window.location.href = 'admin.html';
-    } else {
-        window.location.href = 'cashier.html';
-    }
-}, 1000);
+                    // Redirect based on ACTUAL role from database
+                    setTimeout(() => {
+                        if (userRole === 'admin' || userRole === 'manager') {
+                            window.location.href = 'admin.html';
+                        } else {
+                            window.location.href = 'cashier.html';
+                        }
+                    }, 1000);
                     
                 } else {
                     const errorMsg = data.error || data.message || 'Invalid email or password';
@@ -813,7 +1033,7 @@ setTimeout(() => {
         window.addEventListener('load', function() {
             document.getElementById('email').focus();
             createParticles();
-            
+            initializeSlideshow();
         });
         
         // Check if already logged in
