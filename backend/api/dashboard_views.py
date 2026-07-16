@@ -8,13 +8,38 @@ import json
 
 @api_view(['GET'])
 def admin_dashboard(request):
-    
-    """Admin dashboard - complete overview"""
+    """Admin dashboard - complete overview with business day reset at 09:30"""
     today = get_business_day()
     
-    transactions = SupabaseDB.get_tx(today)
-    expenses = SupabaseDB.get_exp(today)
-    cashiers = SupabaseDB.get_all_cashiers()
+    # Get current shift info
+    now = datetime.now()
+    current_hour = now.hour
+    current_shift = 'night' if (current_hour >= 22 or current_hour < 9) else 'day'
+    
+    transactions = SupabaseDB.get_tx(today) or []
+    expenses = SupabaseDB.get_exp(today) or []
+    
+    # Filter transactions to only those after 09:30 (business day start)
+    business_start = datetime.now().replace(hour=9, minute=30, second=0, microsecond=0)
+    if now.hour < 9 or (now.hour == 9 and now.minute < 30):
+        business_start = business_start - timedelta(days=1)
+    
+    # Filter by business day start time
+    valid_transactions = []
+    for t in transactions:
+        tx_time = t.get('created_at', '')
+        if tx_time:
+            try:
+                tx_dt = datetime.fromisoformat(tx_time.replace('Z', '+00:00'))
+                if tx_dt >= business_start:
+                    valid_transactions.append(t)
+            except:
+                valid_transactions.append(t)
+        else:
+            valid_transactions.append(t)
+    
+    transactions = valid_transactions
+    cashiers = SupabaseDB.get_all_cashiers() or []
     
     category_stats = calculate_category_stats(transactions)
     cashier_performance = get_cashier_performance(transactions)
@@ -37,9 +62,14 @@ def admin_dashboard(request):
     for t in transactions:
         items = t.get('items', [])
         if isinstance(items, str):
-            items = json.loads(items)
+            try:
+                items = json.loads(items)
+            except:
+                items = []
         method = t.get('method', 'cash')
         for item in items:
+            if not isinstance(item, dict):
+                continue
             name = item.get('name', '').lower()
             amt = item.get('price', 0) * item.get('qty', 1)
             if 'tilapia' in name:
@@ -52,9 +82,14 @@ def admin_dashboard(request):
                 if method == 'cash': obambo_cash += amt
                 else: obambo_mpesa += amt
 
+    # Shift breakdown
+    day_shift_tx = [t for t in transactions if t.get('shift') == 'day']
+    night_shift_tx = [t for t in transactions if t.get('shift') == 'night']
+    
     return Response({
         'today': {
             'date': today,
+            'current_shift': current_shift,
             'total_sales': total_sales,
             'cash_sales': cash_sales,
             'mpesa_sales': mpesa_sales,
@@ -70,8 +105,11 @@ def admin_dashboard(request):
             'obambo': {'cash': obambo_cash, 'mpesa': obambo_mpesa, 'total': obambo_cash + obambo_mpesa},
         },
         'shifts': {
-            'day_shift_sales': sum(t.get('total', 0) for t in transactions if t.get('shift') == 'day'),
-            'night_shift_sales': sum(t.get('total', 0) for t in transactions if t.get('shift') == 'night'),
+            'current_shift': current_shift,
+            'day_shift_sales': sum(t.get('total', 0) for t in day_shift_tx),
+            'night_shift_sales': sum(t.get('total', 0) for t in night_shift_tx),
+            'day_count': len(day_shift_tx),
+            'night_count': len(night_shift_tx),
         },
         'cashiers': {
             'total': len(cashiers),

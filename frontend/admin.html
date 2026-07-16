@@ -1159,17 +1159,21 @@ flex-wrap:wrap;
       </div>
     </div>
 
-    <!-- EXPENSES PANEL -->
-    <div class="panel" id="expenses">
-      <button class="btn" onclick="openExpenseModal()">🧾 Add Expense</button>
-      <div class="table-wrapper">
-        <table>
-          <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th></tr></thead>
-          <tbody id="expenseBody"><tr><td colspan="4" class="loading">Loading expenses...</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-
+<!-- EXPENSES PANEL -->
+<div class="panel" id="expenses">
+  <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-bottom: 20px;">
+    <button class="btn" onclick="openExpenseModal()">🧾 Add Expense</button>
+    <div><label>Date:</label><input type="date" id="expenseFilterDate" style="padding: 8px; border-radius: 8px; border: 1px solid var(--border);"></div>
+    <button class="btn" onclick="filterExpensesByDate()" style="background: #3b82f6;">🔍 Filter</button>
+    <button class="btn" onclick="resetExpenseFilter()" style="background: #64748b;">↩️ Reset</button>
+  </div>
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>Date</th><th>Time</th><th>Description</th><th>Category</th><th>Shift</th><th>Amount</th></tr></thead>
+      <tbody id="expenseBody"><tr><td colspan="6" class="loading">Loading expenses...</td></tr></tbody>
+    </table>
+  </div>
+</div>
     <!-- ANALYTICS PANEL -->
     <div class="panel" id="analytics">
       <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
@@ -3070,58 +3074,115 @@ async function addCreditSale() {
   }
 }
 
-// ============ EXPENSES ============
+// ============ EXPENSES WITH DATE FILTER & SHIFT INDICATOR ============
+let allExpensesData = [];
+
 async function loadExpenses() {
   try {
-    const expenses = await apiRequest('expenses/');
-    const container = document.getElementById('expenseBody');
-    
-    if (!expenses || expenses.length === 0) {
-      container.innerHTML = '<tr><td colspan="4" class="loading">No expenses recorded</td></tr>';
-      return;
+    // Set default date
+    if (!document.getElementById('expenseFilterDate').value) {
+      const businessDay = getBusinessDayStart();
+      document.getElementById('expenseFilterDate').value = businessDay.toISOString().split('T')[0];
     }
     
-    let html = '';
-    let total = 0;
-    expenses.forEach(e => {
-      total += e.amount || 0;
-      html += `<tr>
-        <td>${new Date(e.created_at).toLocaleDateString()}</td>
-        <td>${e.name || e.description}</td>
-        <td><span class="badge info">${e.category || 'other'}</span></td>
-        <td><strong>KES ${(e.amount || 0).toLocaleString()}</strong></td>
-      </tr>`;
-    });
-    html += `<tr style="background:#f0f0f0;"><td colspan="3"><strong>Total Expenses</strong></td><td><strong>KES ${total.toLocaleString()}</strong></td></tr>`;
-    container.innerHTML = html;
+    const expenses = await apiRequest('expenses/');
+    allExpensesData = expenses || [];
+    
+    // Apply date filter
+    const filterDate = document.getElementById('expenseFilterDate').value;
+    let filteredData = allExpensesData;
+    
+    if (filterDate) {
+      filteredData = allExpensesData.filter(e => {
+        const expDate = e.date || (e.created_at ? new Date(e.created_at).toISOString().split('T')[0] : '');
+        return expDate === filterDate;
+      });
+    }
+    
+    renderExpensesTable(filteredData);
   } catch (error) {
-    document.getElementById('expenseBody').innerHTML = '<tr><td colspan="4" class="loading">Failed to load expenses</td></tr>';
+    document.getElementById('expenseBody').innerHTML = '<tr><td colspan="6" class="loading">Failed to load expenses</td></tr>';
   }
 }
 
-async function addExpense() {
-  const expenseData = {
-    name: document.getElementById('expenseDesc').value,
-    amount: parseFloat(document.getElementById('expenseAmount').value) || 0,
-    category: document.getElementById('expenseCategory').value
-  };
+function renderExpensesTable(expenses) {
+  const container = document.getElementById('expenseBody');
   
-  if (!expenseData.name || !expenseData.amount) {
-    toast('Please fill all fields', 'error');
+  if (!expenses || expenses.length === 0) {
+    container.innerHTML = '<tr><td colspan="6" class="loading">No expenses recorded for this date</td></tr>';
     return;
   }
   
-  try {
-    await apiRequest('expenses/', 'POST', expenseData);
-    toast('Expense added successfully');
-    closeModal('expenseModal');
-    loadExpenses();
-    loadDashboard();
-    document.getElementById('expenseDesc').value = '';
-    document.getElementById('expenseAmount').value = '';
-  } catch (error) {
-    toast('Failed to add expense: ' + error.message, 'error');
+  let total = 0;
+  let html = '';
+  
+  expenses.forEach(e => {
+    total += e.amount || 0;
+    
+    // Determine shift from time
+    let shift = e.shift || 'day';
+    if (!e.shift) {
+      const expTime = e.time || (e.created_at ? new Date(e.created_at).toLocaleTimeString('en-KE', {hour: '2-digit', minute: '2-digit', hour12: false}) : '');
+      if (expTime) {
+        const hour = parseInt(expTime.split(':')[0]);
+        shift = (hour >= 22 || hour < 9) ? 'night' : 'day';
+      }
+    }
+    
+    const shiftClass = shift === 'night' ? 'info' : 'warning';
+    const shiftDisplay = shift === 'night' ? '🌙 Night' : '☀️ Day';
+    const expDate = e.date || (e.created_at ? new Date(e.created_at).toISOString().split('T')[0] : '');
+    const expTime = e.time || (e.created_at ? new Date(e.created_at).toLocaleTimeString('en-KE', {hour: '2-digit', minute: '2-digit'}) : '');
+    
+    html += `<tr>
+      <td>${expDate}</td>
+      <td>${expTime}</td>
+      <td>${escapeHtml(e.name || e.description || '')}</td>
+      <td><span class="badge" style="background: #e2e8f0; color: #475569;">${escapeHtml(e.category || 'other')}</span></td>
+      <td><span class="badge ${shiftClass}">${shiftDisplay}</span></td>
+      <td><strong>KES ${(e.amount || 0).toLocaleString()}</strong></td>
+    </tr>`;
+  });
+  
+  html += `<tr style="background:#f0f0f0; font-weight: bold;">
+    <td colspan="5" style="text-align: right;">Total Expenses:</td>
+    <td><strong>KES ${total.toLocaleString()}</strong></td>
+  </tr>`;
+  
+  container.innerHTML = html;
+}
+
+function filterExpensesByDate() {
+  const filterDate = document.getElementById('expenseFilterDate').value;
+  if (!filterDate) {
+    toast('Please select a date', 'error');
+    return;
   }
+  
+  let filteredData = allExpensesData.filter(e => {
+    const expDate = e.date || (e.created_at ? new Date(e.created_at).toISOString().split('T')[0] : '');
+    return expDate === filterDate;
+  });
+  
+  renderExpensesTable(filteredData);
+  toast(`Showing ${filteredData.length} expenses for ${filterDate}`, 'info');
+}
+
+function resetExpenseFilter() {
+  const businessDay = getBusinessDayStart();
+  document.getElementById('expenseFilterDate').value = businessDay.toISOString().split('T')[0];
+  renderExpensesTable(allExpensesData);
+  toast('Filter reset - showing all expenses', 'info');
+}
+
+// Helper for business day start
+function getBusinessDayStart() {
+  const now = new Date();
+  if (now.getHours() < 9 || (now.getHours() === 9 && now.getMinutes() < 30)) {
+    now.setDate(now.getDate() - 1);
+  }
+  now.setHours(9, 30, 0, 0);
+  return now;
 }
 
 // ============ ENHANCED ANALYTICS WITH SHIFT BREAKDOWN ============

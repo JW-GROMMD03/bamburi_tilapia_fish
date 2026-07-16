@@ -29,13 +29,31 @@ from .utils import get_business_day, get_current_shift
 @api_view(['GET','POST'])
 def transactions(request):
     if request.method == 'GET':
-        d = request.query_params.get('date', str(date.today()))
-        return Response(SupabaseDB.get_all_tx())
+        # Support filtering by date, shift, cashier_id
+        d = request.query_params.get('date', get_business_day())
+        shift = request.query_params.get('shift', None)
+        cashier_id = request.query_params.get('cashier_id', None)
+        
+        all_tx = SupabaseDB.get_all_tx() if hasattr(SupabaseDB, 'get_all_tx') else SupabaseDB.get_tx(d)
+        if not all_tx:
+            all_tx = []
+        
+        # Filter by shift if provided
+        if shift:
+            all_tx = [t for t in all_tx if t.get('shift') == shift]
+        if cashier_id:
+            all_tx = [t for t in all_tx if str(t.get('cashier_id', '')) == str(cashier_id)]
+        
+        return Response(all_tx)
+    
     try:
         data = request.data
+        # Use the time sent by cashier for accurate time display
+        tx_time = data.get('time', datetime.now().strftime('%H:%M'))
+        
         tx = {
             'date': get_business_day(),
-            'time': data.get('time', ''),
+            'time': tx_time,  # <-- Accurate time from cashier
             'total': data.get('total', 0),
             'method': data.get('method', 'cash'),
             'cash_amount': data.get('cashAmt', 0),
@@ -44,9 +62,9 @@ def transactions(request):
             'cashier_id': str(data.get('cashier_id', '')),
             'cashier_name': str(data.get('cashier_name', '')),
             'shift': str(data.get('shift', 'day')), 
-            'created_at': datetime.now().isoformat()
+            'created_at': datetime.now().isoformat()  # Server timestamp for filtering
         }
-        print(f"📝 Saving TX - Cashier: {tx['cashier_name']}, Shift: {tx['shift']}")
+        print(f"📝 Saving TX - Cashier: {tx['cashier_name']}, Shift: {tx['shift']}, Time: {tx['time']}")
         r = SupabaseDB.save_tx(tx)
         if r: return Response(r, status=status.HTTP_201_CREATED)
         return Response({'error':'Save failed'}, status=400)
@@ -62,16 +80,68 @@ def delete_transaction(request, transaction_id):
 @api_view(['GET','POST'])
 def expenses(request):
     if request.method == 'GET':
-        d = request.query_params.get('date', str(date.today()))
-        return Response(SupabaseDB.get_exp(d))
+        d = request.query_params.get('date', None)
+        shift = request.query_params.get('shift', None)
+        
+        # Get all expenses or by date
+        if d:
+            all_exp = SupabaseDB.get_exp(d)
+        else:
+            # Fetch all expenses for admin date filtering
+            all_exp = []
+            if hasattr(SupabaseDB, 'get_all_exp'):
+                all_exp = SupabaseDB.get_all_exp()
+            else:
+                # Fallback: get last 30 days
+                for i in range(30):
+                    day = (date.today() - timedelta(days=i)).isoformat()
+                    day_exp = SupabaseDB.get_exp(day)
+                    if day_exp:
+                        all_exp.extend(day_exp)
+        
+        if not all_exp:
+            all_exp = []
+        
+        # Add shift indicator based on time
+        for exp in all_exp:
+            exp_time = exp.get('time', '') or exp.get('created_at', '')
+            if exp_time:
+                try:
+                    if isinstance(exp_time, str) and 'T' in exp_time:
+                        hour = datetime.fromisoformat(exp_time.replace('Z', '+00:00')).hour
+                    elif ':' in str(exp_time):
+                        hour = int(str(exp_time).split(':')[0])
+                    else:
+                        hour = 12
+                    exp['shift'] = 'night' if (hour >= 22 or hour < 9) else 'day'
+                except:
+                    exp['shift'] = 'day'
+            else:
+                exp['shift'] = 'day'
+        
+        # Filter by shift if requested
+        if shift:
+            all_exp = [e for e in all_exp if e.get('shift') == shift]
+        
+        return Response(all_exp)
+    
     try:
         data = request.data
+        now = datetime.now()
+        current_hour = now.hour
+        
+        # Determine shift based on current time
+        current_shift = 'night' if (current_hour >= 22 or current_hour < 9) else 'day'
+        
         ex = {
             'date': get_business_day(),
-            'time': data.get('time', ''),
+            'time': data.get('time', now.strftime('%H:%M')),
             'name': data.get('name', ''),
             'amount': data.get('amount', 0),
-            'created_at': datetime.now().isoformat()
+            'category': data.get('category', 'other'),
+            'shift': data.get('shift', current_shift),  # <-- ADD shift tracking
+            'created_by': data.get('created_by', ''),
+            'created_at': now.isoformat()
         }
         r = SupabaseDB.save_exp(ex)
         if r: return Response(r, status=status.HTTP_201_CREATED)
