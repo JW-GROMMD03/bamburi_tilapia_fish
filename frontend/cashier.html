@@ -184,9 +184,54 @@
   </div>
 
   <div id="panel-expense" class="panel">
-    <h3 style="margin-bottom:8px;font-size:0.85rem;">📝 Add Expense</h3>
-    <div class="flex-row"><input type="text" id="expName" placeholder="Expense name" style="flex:2;"><input type="number" id="expAmt" placeholder="Amount" style="flex:1;"><button class="btn btn-primary" onclick="addExpense()">➕</button></div>
-    <div id="expenseListToday" style="margin-top:12px;"><div class="loading">Loading expenses...</div></div>
+    <!-- Tab Switcher -->
+    <div class="flex-row" style="margin-bottom:12px; background:#f0f5fb; border-radius:12px; padding:4px;">
+      <button class="btn btn-sm" id="tabExpenseBtn" onclick="switchExpenseTab('expense')" style="flex:1; background:#0b3954; color:white;">💸 Expense</button>
+      <button class="btn btn-sm" id="tabAdvanceBtn" onclick="switchExpenseTab('advance')" style="flex:1; background:transparent; color:#0b3954;">⏰ Advance</button>
+      <button class="btn btn-sm" id="tabDebtBtn" onclick="switchExpenseTab('debt')" style="flex:1; background:transparent; color:#0b3954;">🤝 Debt</button>
+    </div>
+
+    <!-- Expense Tab -->
+    <div id="expenseTabContent">
+      <h3 style="margin-bottom:8px;font-size:0.85rem;">📝 Record Expense</h3>
+      <div class="card">
+        <input type="text" id="expName" placeholder="What was the expense for?" style="margin-bottom:6px;">
+        <div class="flex-row">
+          <input type="number" id="expAmt" placeholder="Amount (KES)" style="flex:2;">
+          <button class="btn btn-primary" onclick="addExpense()" style="flex:1;">➕ Add</button>
+        </div>
+        <small style="color:#888;display:block;margin-top:4px;">💡 Expenses are deducted from CASH automatically</small>
+      </div>
+      <div id="expenseListToday" style="margin-top:12px;"><div class="loading">Loading expenses...</div></div>
+    </div>
+
+    <!-- Advance Tab -->
+    <div id="advanceTabContent" style="display:none;">
+      <h3 style="margin-bottom:8px;font-size:0.85rem;">⏰ Record Salary Advance</h3>
+      <div class="card">
+        <input type="text" id="advName" placeholder="Staff name receiving advance" style="margin-bottom:6px;">
+        <div class="flex-row">
+          <input type="number" id="advAmt" placeholder="Amount (KES)" style="flex:2;">
+          <button class="btn btn-warning" onclick="addAdvance()" style="flex:1;">➕ Add</button>
+        </div>
+        <small style="color:#888;display:block;margin-top:4px;">💡 Advances are deducted from CASH, visible to admin</small>
+      </div>
+      <div id="advanceListToday" style="margin-top:12px;"><div class="loading">Loading advances...</div></div>
+    </div>
+
+    <!-- Debt Tab -->
+    <div id="debtTabContent" style="display:none;">
+      <h3 style="margin-bottom:8px;font-size:0.85rem;">🤝 Record Debt (Money Lent Out)</h3>
+      <div class="card">
+        <input type="text" id="debtName" placeholder="Name of person who borrowed" style="margin-bottom:6px;">
+        <div class="flex-row">
+          <input type="number" id="debtAmt" placeholder="Amount (KES)" style="flex:2;">
+          <button class="btn btn-danger" onclick="addDebt()" style="flex:1;">➕ Add</button>
+        </div>
+        <small style="color:#888;display:block;margin-top:4px;">💡 Debts are deducted from CASH, admin can track them</small>
+      </div>
+      <div id="debtListToday" style="margin-top:12px;"><div class="loading">Loading debts...</div></div>
+    </div>
   </div>
 
   <div id="panel-analysis" class="panel">
@@ -1129,59 +1174,359 @@ async function deleteReceipt(id) {
   }
 }
 
+// ============ EXPENSES, ADVANCES & DEBTS ============
+var currentExpenseTab = 'expense';
+
+function switchExpenseTab(tab) {
+  currentExpenseTab = tab;
+  
+  // Update tab buttons
+  var tabExpenseBtn = document.getElementById('tabExpenseBtn');
+  var tabAdvanceBtn = document.getElementById('tabAdvanceBtn');
+  var tabDebtBtn = document.getElementById('tabDebtBtn');
+  
+  if (tabExpenseBtn) {
+    tabExpenseBtn.style.background = tab === 'expense' ? '#0b3954' : 'transparent';
+    tabExpenseBtn.style.color = tab === 'expense' ? 'white' : '#0b3954';
+  }
+  if (tabAdvanceBtn) {
+    tabAdvanceBtn.style.background = tab === 'advance' ? '#0b3954' : 'transparent';
+    tabAdvanceBtn.style.color = tab === 'advance' ? 'white' : '#0b3954';
+  }
+  if (tabDebtBtn) {
+    tabDebtBtn.style.background = tab === 'debt' ? '#0b3954' : 'transparent';
+    tabDebtBtn.style.color = tab === 'debt' ? 'white' : '#0b3954';
+  }
+  
+  // Show/hide content
+  var expenseTab = document.getElementById('expenseTabContent');
+  var advanceTab = document.getElementById('advanceTabContent');
+  var debtTab = document.getElementById('debtTabContent');
+  
+  if (expenseTab) expenseTab.style.display = tab === 'expense' ? 'block' : 'none';
+  if (advanceTab) advanceTab.style.display = tab === 'advance' ? 'block' : 'none';
+  if (debtTab) debtTab.style.display = tab === 'debt' ? 'block' : 'none';
+  
+  // Load data
+  if (tab === 'expense') renderExpenses();
+  if (tab === 'advance') renderAdvances();
+  if (tab === 'debt') renderDebts();
+}
+
 // ============ EXPENSES ============
 async function renderExpenses() {
-  var e = await apiCall('expenses/') || [];
-  var shiftStart = getShiftStartTime();
-  var businessDay = getToday();
-  
-  // Filter by current shift AND business day
-  var myExp = e.filter(function(ex) {
-    var exTime = ex.created_at ? new Date(ex.created_at) : new Date();
-    var exDate = ex.date || (ex.created_at ? new Date(ex.created_at).toISOString().split('T')[0] : '');
-    return exTime >= shiftStart && exDate === businessDay;
-  });
-  
-  document.getElementById('expenseListToday').innerHTML = myExp.length === 0 ?
-    '<p style="color:#888;">No expenses this shift</p>' :
-    myExp.map(function(x) {
-      return '<div class="list-item">' + (x.name || x.description) + ' <strong>' + (x.amount || 0).toLocaleString() + '/=</strong>' +
-        '<button onclick="deleteExpense(' + x.id + ')" style="background:none;border:none;color:red;cursor:pointer;">✕</button></div>';
-    }).join('');
+  try {
+    var e = await apiCall('expenses/') || [];
+    var shiftStart = getShiftStartTime();
+    var businessDay = getToday();
+    
+    // Filter by current shift AND business day - only show regular expenses
+    var myExp = e.filter(function(ex) {
+      var exTime = ex.created_at ? new Date(ex.created_at) : new Date();
+      var exDate = ex.date || (ex.created_at ? new Date(ex.created_at).toISOString().split('T')[0] : '');
+      var isRegularExpense = !ex.category || ex.category === 'other' || ex.category === 'supplies' || ex.category === 'maintenance';
+      return isRegularExpense && exTime >= shiftStart && exDate === businessDay;
+    });
+    
+    var container = document.getElementById('expenseListToday');
+    if (!container) return;
+    
+    if (myExp.length === 0) {
+      container.innerHTML = '<p style="color:#888;text-align:center;padding:12px;">No expenses this shift</p>';
+    } else {
+      container.innerHTML = myExp.map(function(x) {
+        return '<div class="list-item" style="background:#f8fafd;padding:10px;border-radius:10px;margin-bottom:5px;border:1px solid #eef2f6;">' +
+          '<div style="flex:1;">' +
+          '<span style="font-weight:600;">💸 ' + (x.name || x.description || 'Expense') + '</span>' +
+          '<span style="font-size:0.6rem;color:#888;display:block;">' + (x.time || '') + '</span>' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:10px;">' +
+          '<strong style="color:#dc2626;font-size:0.85rem;">-' + (x.amount || 0).toLocaleString() + '/=</strong>' +
+          '<button onclick="deleteExpense(' + x.id + ')" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:1.1rem;padding:4px 8px;">✕</button>' +
+          '</div></div>';
+      }).join('');
+    }
+  } catch(e) {
+    console.error('Render expenses error:', e);
+    var container = document.getElementById('expenseListToday');
+    if (container) container.innerHTML = '<p style="color:#888;">Failed to load expenses</p>';
+  }
 }
 
 async function addExpense() {
   var n = document.getElementById('expName').value.trim();
   var a = parseInt(document.getElementById('expAmt').value);
-  if (!n || !a || a < 1) { alert('Enter valid name and amount'); return; }
-  await apiCall('expenses/', 'POST', {
+  if (!n || !a || a < 1) { showToast('Enter expense name and valid amount'); return; }
+  
+  var result = await apiCall('expenses/', 'POST', {
     name: n,
     amount: a,
+    category: 'supplies',
     created_by: user.id,
     date: getToday(),
-    time: new Date().toLocaleTimeString()
+    time: new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: true }),
+    shift: user.shift
   });
-  showToast('💸 Expense added');
-  renderExpenses();
-  updateDashboard();
-  document.getElementById('expName').value = '';
-  document.getElementById('expAmt').value = '';
+  
+  if (result && !result.error) {
+    showToast('💸 Expense recorded: -' + a.toLocaleString() + '/=');
+    document.getElementById('expName').value = '';
+    document.getElementById('expAmt').value = '';
+    renderExpenses();
+    updateDashboard();
+  } else {
+    showToast('❌ Failed to save expense');
+  }
 }
 
 async function deleteExpense(id) {
-  var e = await apiCall('expenses/') || [];
-  var ex = e.find(function(x) { return x.id === id; });
-  if (ex) {
-    await apiCall('trash/', 'POST', {
-      item_type: 'expense',
-      description: (ex.name || '') + ' ' + (ex.amount || 0) + '/=',
-      data: ex,
-      deleted_by: user.id
-    });
+  if (!confirm('Delete this expense?')) return;
+  try {
+    var e = await apiCall('expenses/') || [];
+    var ex = e.find(function(x) { return x.id == id; });
+    if (ex) {
+      await apiCall('trash/', 'POST', {
+        item_type: 'expense',
+        description: (ex.name || '') + ' ' + (ex.amount || 0) + '/=',
+        data: ex,
+        deleted_by: user.id
+      });
+    }
     await apiCall('expenses/' + id + '/', 'DELETE');
+    showToast('🗑️ Expense removed');
     renderExpenses();
     updateDashboard();
+  } catch(e) {
+    showToast('❌ Failed to delete');
   }
+}
+
+// ============ ADVANCES ============
+async function renderAdvances() {
+  try {
+    var allAdvances = [];
+    
+    // Try financial entries API first
+    try {
+      var entries = await apiCall('financial/entries/?type=advance');
+      if (entries && entries.entries) {
+        allAdvances = entries.entries;
+      } else if (Array.isArray(entries)) {
+        allAdvances = entries;
+      }
+    } catch(e) {
+      // Fallback to expenses with advance category
+      var e = await apiCall('expenses/') || [];
+      allAdvances = e.filter(function(ex) {
+        return ex.category === 'advance';
+      });
+    }
+    
+    var shiftStart = getShiftStartTime();
+    var businessDay = getToday();
+    
+    var myAdvances = allAdvances.filter(function(a) {
+      var aTime = a.created_at ? new Date(a.created_at) : new Date();
+      var aDate = a.business_date || a.date || (a.created_at ? new Date(a.created_at).toISOString().split('T')[0] : '');
+      return aTime >= shiftStart && aDate === businessDay;
+    });
+    
+    var container = document.getElementById('advanceListToday');
+    if (!container) return;
+    
+    if (myAdvances.length === 0) {
+      container.innerHTML = '<p style="color:#888;text-align:center;padding:12px;">No advances this shift</p>';
+    } else {
+      container.innerHTML = myAdvances.map(function(x) {
+        var name = x.person_name || x.name || 'Staff';
+        var amt = x.amount || 0;
+        var time = x.time || (x.created_at ? new Date(x.created_at).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' }) : '');
+        return '<div class="list-item" style="background:#fef3c7;padding:10px;border-radius:10px;margin-bottom:5px;border-left:4px solid #f59e0b;">' +
+          '<div style="flex:1;">' +
+          '<span style="font-weight:600;">⏰ ' + escapeHtml(name) + '</span>' +
+          '<span style="font-size:0.6rem;color:#888;display:block;">Salary Advance | ' + time + '</span>' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:10px;">' +
+          '<strong style="color:#92400e;font-size:0.85rem;">-' + amt.toLocaleString() + '/=</strong>' +
+          '<button onclick="deleteFinancialEntry(\'' + (x.id || '') + '\', \'advance\')" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:1.1rem;padding:4px 8px;">✕</button>' +
+          '</div></div>';
+      }).join('');
+    }
+  } catch(e) {
+    console.error('Render advances error:', e);
+    var container = document.getElementById('advanceListToday');
+    if (container) container.innerHTML = '<p style="color:#888;">Failed to load advances</p>';
+  }
+}
+
+async function addAdvance() {
+  var name = document.getElementById('advName').value.trim();
+  var amt = parseInt(document.getElementById('advAmt').value);
+  if (!name || !amt || amt < 1) { showToast('Enter name and valid amount'); return; }
+  
+  var result = null;
+  
+  // Try financial entries API first
+  try {
+    result = await apiCall('financial/entries/', 'POST', {
+      entry_type: 'advance',
+      person_name: name,
+      amount: amt,
+      payment_method: 'cash',
+      description: 'Salary advance - ' + name,
+      business_date: getToday(),
+      shift: user.shift,
+      created_by: user.id
+    });
+  } catch(e) {
+    // Financial API not available
+  }
+  
+  // Fallback to expenses API
+  if (!result || result.error) {
+    result = await apiCall('expenses/', 'POST', {
+      name: 'Advance: ' + name,
+      amount: amt,
+      category: 'advance',
+      created_by: user.id,
+      date: getToday(),
+      time: new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: true }),
+      shift: user.shift
+    });
+  }
+  
+  if (result && !result.error) {
+    showToast('⏰ Advance recorded: -' + amt.toLocaleString() + '/=');
+    document.getElementById('advName').value = '';
+    document.getElementById('advAmt').value = '';
+    renderAdvances();
+    updateDashboard();
+  } else {
+    showToast('❌ Failed to save advance');
+  }
+}
+
+// ============ DEBTS ============
+async function renderDebts() {
+  try {
+    var allDebts = [];
+    
+    // Try financial entries API first
+    try {
+      var entries = await apiCall('financial/entries/?type=debt');
+      if (entries && entries.entries) {
+        allDebts = entries.entries;
+      } else if (Array.isArray(entries)) {
+        allDebts = entries;
+      }
+    } catch(e) {
+      // Fallback to expenses with debt category
+      var e = await apiCall('expenses/') || [];
+      allDebts = e.filter(function(ex) {
+        return ex.category === 'debt';
+      });
+    }
+    
+    var shiftStart = getShiftStartTime();
+    var businessDay = getToday();
+    
+    var myDebts = allDebts.filter(function(d) {
+      var dTime = d.created_at ? new Date(d.created_at) : new Date();
+      var dDate = d.business_date || d.date || (d.created_at ? new Date(d.created_at).toISOString().split('T')[0] : '');
+      return dTime >= shiftStart && dDate === businessDay;
+    });
+    
+    var container = document.getElementById('debtListToday');
+    if (!container) return;
+    
+    if (myDebts.length === 0) {
+      container.innerHTML = '<p style="color:#888;text-align:center;padding:12px;">No debts this shift</p>';
+    } else {
+      container.innerHTML = myDebts.map(function(x) {
+        var name = x.person_name || x.name || 'Borrower';
+        var amt = x.amount || 0;
+        var time = x.time || (x.created_at ? new Date(x.created_at).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' }) : '');
+        return '<div class="list-item" style="background:#fee2e2;padding:10px;border-radius:10px;margin-bottom:5px;border-left:4px solid #ef4444;">' +
+          '<div style="flex:1;">' +
+          '<span style="font-weight:600;">🤝 ' + escapeHtml(name) + '</span>' +
+          '<span style="font-size:0.6rem;color:#888;display:block;">Money Lent | ' + time + '</span>' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:10px;">' +
+          '<strong style="color:#dc2626;font-size:0.85rem;">-' + amt.toLocaleString() + '/=</strong>' +
+          '<button onclick="deleteFinancialEntry(\'' + (x.id || '') + '\', \'debt\')" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:1.1rem;padding:4px 8px;">✕</button>' +
+          '</div></div>';
+      }).join('');
+    }
+  } catch(e) {
+    console.error('Render debts error:', e);
+    var container = document.getElementById('debtListToday');
+    if (container) container.innerHTML = '<p style="color:#888;">Failed to load debts</p>';
+  }
+}
+
+async function addDebt() {
+  var name = document.getElementById('debtName').value.trim();
+  var amt = parseInt(document.getElementById('debtAmt').value);
+  if (!name || !amt || amt < 1) { showToast('Enter name and valid amount'); return; }
+  
+  var result = null;
+  
+  // Try financial entries API first
+  try {
+    result = await apiCall('financial/entries/', 'POST', {
+      entry_type: 'debt',
+      person_name: name,
+      amount: amt,
+      payment_method: 'cash',
+      description: 'Money lent to ' + name,
+      business_date: getToday(),
+      shift: user.shift,
+      created_by: user.id
+    });
+  } catch(e) {
+    // Financial API not available
+  }
+  
+  // Fallback to expenses API
+  if (!result || result.error) {
+    result = await apiCall('expenses/', 'POST', {
+      name: 'Debt: ' + name,
+      amount: amt,
+      category: 'debt',
+      created_by: user.id,
+      date: getToday(),
+      time: new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: true }),
+      shift: user.shift
+    });
+  }
+  
+  if (result && !result.error) {
+    showToast('🤝 Debt recorded: -' + amt.toLocaleString() + '/=');
+    document.getElementById('debtName').value = '';
+    document.getElementById('debtAmt').value = '';
+    renderDebts();
+    updateDashboard();
+  } else {
+    showToast('❌ Failed to save debt');
+  }
+}
+
+async function deleteFinancialEntry(id, type) {
+  if (!id) { showToast('Cannot delete this entry'); return; }
+  if (!confirm('Delete this ' + type + '?')) return;
+  
+  try {
+    await apiCall('financial/entries/' + id + '/', 'DELETE');
+  } catch(e) {
+    // If financial API fails, try expenses API
+    await apiCall('expenses/' + id + '/', 'DELETE');
+  }
+  
+  showToast('🗑️ ' + type.charAt(0).toUpperCase() + type.slice(1) + ' removed');
+  if (type === 'advance') renderAdvances();
+  if (type === 'debt') renderDebts();
+  if (type === 'expense') renderExpenses();
+  updateDashboard();
 }
 
 // ============ TRASH ============
@@ -1219,7 +1564,11 @@ async function undoTrash(id) {
       await apiCall('expenses/', 'POST', {
         name: d.name || d.description,
         amount: d.amount,
-        created_by: user.id
+        category: d.category || 'supplies',
+        created_by: user.id,
+        date: d.date || getToday(),
+        time: d.time || new Date().toLocaleTimeString(),
+        shift: d.shift || user.shift
       });
     }
     await apiCall('trash/' + id + '/', 'DELETE');
@@ -1273,6 +1622,22 @@ async function updateDashboard() {
     var isCurrentDay = (exDate === businessDay);
     return isCurrentShift && isCurrentDay;
   });
+
+    // Also fetch advances and debts from financial entries API
+  var finEntries = { entries: [] };
+  try {
+    var finResp = await apiCall('financial/entries/?date=' + businessDay);
+    finEntries = finResp || { entries: [] };
+  } catch(e) { /* ignore if API not available */ }
+  
+  var finList = finEntries.entries || finEntries || [];
+  var myAdvances = finList.filter(function(a) {
+    return (a.entry_type === 'advance' || a.entry_type === 'debt') && a.payment_method === 'cash';
+  });
+  var advanceDebtTotal = myAdvances.reduce(function(s, a) { return s + (a.amount || 0); }, 0);
+  
+  // Add to total expenses
+  totalExp += advanceDebtTotal;
   
   console.log('My shift expenses:', myShiftExp.length);
   
@@ -1313,8 +1678,26 @@ async function updateDashboard() {
   var totalSales = myShiftTx.reduce(function(s, x) { return s + (x.total || 0); }, 0);
   var cashSales = myShiftTx.filter(function(x) { return (x.method || '').toLowerCase() === 'cash'; })
                            .reduce(function(s, x) { return s + (x.total || 0); }, 0);
-  var totalExp = myShiftExp.reduce(function(s, x) { return s + (x.amount || 0); }, 0);
-  var cashAtHand = cashSales - totalExp;
+var totalExp = myShiftExp.reduce(function(s, x) { 
+  // Count all expenses including advances and debts
+  return s + (x.amount || 0); 
+}, 0);
+
+// Also fetch financial entries (advances/debts) if API available
+try {
+  var finData = await apiCall('financial/entries/?date=' + businessDay);
+  var finEntries = finData?.entries || finData || [];
+  if (Array.isArray(finEntries)) {
+    var cashDeductions = finEntries.filter(function(f) {
+      return f.payment_method === 'cash';
+    });
+    totalExp += cashDeductions.reduce(function(s, f) { return s + (f.amount || 0); }, 0);
+  }
+} catch(e) {
+  // Financial entries API not available - advances/debts already counted if saved as expenses
+}
+
+var cashAtHand = cashSales - totalExp;
   
   // Update display
   document.getElementById('tilapiaPcs').textContent = cat.tilapia.pieces;
@@ -1789,6 +2172,10 @@ function switchPanel(p) {
   if (p === 'expense') renderExpenses();
   if (p === 'analysis') { renderAnalysis(); updateDashboard(); }
   if (p === 'credit') loadCredits();
+  if (p === 'expense') { 
+    renderExpenses(); 
+    switchExpenseTab('expense'); // Initialize tab
+  }
 }
 
 document.querySelectorAll('.nav-item').forEach(function(b) {
