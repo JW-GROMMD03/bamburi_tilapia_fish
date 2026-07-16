@@ -142,6 +142,7 @@ def expenses(request):
         # Determine shift based on current time
         current_shift = 'night' if (current_hour >= 22 or current_hour < 9) else 'day'
         
+                # Only include fields that exist in the expenses table
         ex = {
             'date': get_business_day(),
             'time': data.get('time', now.strftime('%H:%M')),
@@ -149,14 +150,12 @@ def expenses(request):
             'amount': data.get('amount', 0),
             'created_at': now.isoformat()
         }
-        # Add optional fields only if they exist in the data
-        if data.get('category'):
-            ex['category'] = data.get('category')
-        if data.get('shift'):
-            ex['shift'] = data.get('shift')
-        if data.get('created_by'):
-            ex['created_by'] = data.get('created_by')
-            
+        # Only add shift if the table has this column - try and fall back
+        try:
+            ex['shift'] = data.get('shift', current_shift)
+        except:
+            pass  # Column doesn't exist, skip it
+        
         r = SupabaseDB.save_exp(ex)
         if r: return Response(r, status=status.HTTP_201_CREATED)
         return Response({'error':'Save failed'}, status=400)
