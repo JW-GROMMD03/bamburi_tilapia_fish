@@ -357,33 +357,24 @@ function escapeHtml(str) {
 }
 
 // ============ API CALLS ============
-async function apiCall(endpoint, method, body) {
+var _cache = {};
+async function apiCall(endpoint, method, body, cacheKey) {
   method = method || 'GET';
   body = body || null;
+  if (method === 'GET' && cacheKey && _cache[cacheKey] && (Date.now() - _cache[cacheKey].ts < 8000)) return _cache[cacheKey].data;
   try {
     var options = {
       method: method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token
-      }
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }
     };
     if (body) options.body = JSON.stringify(body);
-    
-    var cleanEndpoint = endpoint.replace(/^\/+/, '');
-    var r = await fetch(API_BASE + '/' + cleanEndpoint, options);
-    
-    if (r.status === 401 || r.status === 403) {
-      logout();
-      return null;
-    }
+    var r = await fetch(API_BASE + '/' + endpoint.replace(/^\/+/, ''), options);
+    if (r.status === 401 || r.status === 403) { logout(); return null; }
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    
-    return await r.json();
-  } catch (er) {
-    console.log('API Error:', er);
-    return null;
-  }
+    var data = await r.json();
+    if (method === 'GET' && cacheKey) _cache[cacheKey] = { data: data, ts: Date.now() };
+    return data;
+  } catch (er) { console.log('API:', er); return null; }
 }
 
 // ============ MENU LOADING (FIXED) ============
@@ -1272,6 +1263,7 @@ async function addExpense() {
     showToast('💸 Expense recorded: -' + a.toLocaleString() + '/=');
     document.getElementById('expName').value = '';
     document.getElementById('expAmt').value = '';
+    _cache = {};
     renderExpenses();
     updateDashboard();
   } else {
@@ -1294,6 +1286,7 @@ async function deleteExpense(id) {
     }
     await apiCall('expenses/' + id + '/', 'DELETE');
     showToast('🗑️ Expense removed');
+    _cache = {};
     renderExpenses();
     updateDashboard();
   } catch(e) {
@@ -1589,73 +1582,25 @@ async function deleteForever(id) {
 
 // ============ DASHBOARD - CURRENT SHIFT ONLY ============
 async function updateDashboard() {
-  var t = await apiCall('transactions/') || [];
-  var e = await apiCall('expenses/') || [];
-  
-  // Get current shift start time
+  var t = await apiCall('transactions/', 'GET', null, 'tx');
+  var e = await apiCall('expenses/', 'GET', null, 'exp');
   var shiftStart = getShiftStartTime();
-  
-  console.log('Shift start:', shiftStart.toISOString());
-  console.log('User ID:', user.id, 'User name:', user.full_name);
-  console.log('Total transactions:', t.length);
-  
-  // FIX: Filter by BOTH cashier AND time (current shift only)
+  var businessDay = getToday();
   var myShiftTx = t.filter(function(tx) {
-    var matchesCashier = (tx.cashier_id === user.id) || (tx.cashier_name === user.full_name);
-    // Check if transaction is from current shift
-    var txTime = tx.created_at ? new Date(tx.created_at) : new Date();
-    var isCurrentShift = txTime >= shiftStart;
-    return matchesCashier && isCurrentShift;
+    var mc = (tx.cashier_id === user.id) || (tx.cashier_name === user.full_name);
+    var tt = tx.created_at ? new Date(tx.created_at) : new Date();
+    return mc && tt >= shiftStart;
   });
-  
-  console.log('My shift transactions:', myShiftTx.length);
-  
-  // Filter expenses by current shift
-   // Filter expenses by current shift time AND business day
   var myShiftExp = e.filter(function(ex) {
-    var exTime = ex.created_at ? new Date(ex.created_at) : new Date();
-    // Must be from current shift
-    var isCurrentShift = exTime >= shiftStart;
-    // Must be from current business day
-    var exDate = ex.date || (ex.created_at ? new Date(ex.created_at).toISOString().split('T')[0] : '');
-    var businessDay = getToday();
-    var isCurrentDay = (exDate === businessDay);
-    return isCurrentShift && isCurrentDay;
+    var et = ex.created_at ? new Date(ex.created_at) : new Date();
+    var ed = ex.date || (ex.created_at ? new Date(ex.created_at).toISOString().split('T')[0] : '');
+    return et >= shiftStart && ed === businessDay;
   });
-
-    // Also fetch advances and debts from financial entries API
-  var finEntries = { entries: [] };
-  try {
-    var finResp = await apiCall('financial/entries/?date=' + businessDay);
-    finEntries = finResp || { entries: [] };
-  } catch(e) { /* ignore if API not available */ }
-  
-  var finList = finEntries.entries || finEntries || [];
-  var myAdvances = finList.filter(function(a) {
-    return (a.entry_type === 'advance' || a.entry_type === 'debt') && a.payment_method === 'cash';
-  });
-  var advanceDebtTotal = myAdvances.reduce(function(s, a) { return s + (a.amount || 0); }, 0);
-  
-  // Add to total expenses
-  totalExp += advanceDebtTotal;
-  
-  console.log('My shift expenses:', myShiftExp.length);
-  
-  var cat = {
-    tilapia: { pieces: 0, amount: 0 }, mbuta: { pieces: 0, amount: 0 },obambo: { pieces: 0, amount: 0 },
-    ugali: { pieces: 0, amount: 0 }, wetfry: { pieces: 0, amount: 0 },
-    soda: { pieces: 0, amount: 0 }, greens: { pieces: 0, amount: 0 },
-    chips: { pieces: 0, amount: 0 }, bag: { pieces: 0, amount: 0 },
-    fuluOmena: { pieces: 0, amount: 0 }, water: { pieces: 0, amount: 0 },
-    container: { pieces: 0, amount: 0 }, other: { pieces: 0, amount: 0 },
-    pepsi: { pieces: 0, amount: 0 }, cocacola: { pieces: 0, amount: 0 }
-  };
-  
+  var cat = { tilapia: { pieces: 0, amount: 0 }, mbuta: { pieces: 0, amount: 0 }, obambo: { pieces: 0, amount: 0 }, ugali: { pieces: 0, amount: 0 }, wetfry: { pieces: 0, amount: 0 }, soda: { pieces: 0, amount: 0 }, greens: { pieces: 0, amount: 0 }, chips: { pieces: 0, amount: 0 }, bag: { pieces: 0, amount: 0 }, fuluOmena: { pieces: 0, amount: 0 }, water: { pieces: 0, amount: 0 }, container: { pieces: 0, amount: 0 }, other: { pieces: 0, amount: 0 }, pepsi: { pieces: 0, amount: 0 }, cocacola: { pieces: 0, amount: 0 } };
   myShiftTx.forEach(function(tx) {
     var items = typeof tx.items === 'string' ? JSON.parse(tx.items) : (tx.items || []);
     items.forEach(function(x) {
-      var n = (x.name || '').toLowerCase();
-      var c = 'other';
+      var n = (x.name || '').toLowerCase(), c = 'other';
       if (n.includes('pepsi')) c = 'pepsi';
       else if (n.includes('coca') || n.includes('coke')) c = 'cocacola';
       else if (n.includes('tilapia')) c = 'tilapia';
@@ -1674,32 +1619,18 @@ async function updateDashboard() {
       cat[c].amount += (x.price || 0) * (x.qty || 1);
     });
   });
-  
   var totalSales = myShiftTx.reduce(function(s, x) { return s + (x.total || 0); }, 0);
-  var cashSales = myShiftTx.filter(function(x) { return (x.method || '').toLowerCase() === 'cash'; })
-                           .reduce(function(s, x) { return s + (x.total || 0); }, 0);
-var totalExp = myShiftExp.reduce(function(s, x) { 
-  // Count all expenses including advances and debts
-  return s + (x.amount || 0); 
-}, 0);
-
-// Also fetch financial entries (advances/debts) if API available
-try {
-  var finData = await apiCall('financial/entries/?date=' + businessDay);
-  var finEntries = finData?.entries || finData || [];
-  if (Array.isArray(finEntries)) {
-    var cashDeductions = finEntries.filter(function(f) {
-      return f.payment_method === 'cash';
-    });
-    totalExp += cashDeductions.reduce(function(s, f) { return s + (f.amount || 0); }, 0);
-  }
-} catch(e) {
-  // Financial entries API not available - advances/debts already counted if saved as expenses
-}
-
-var cashAtHand = cashSales - totalExp;
-  
-  // Update display
+  var cashSales = myShiftTx.filter(function(x) { return (x.method || '').toLowerCase() === 'cash'; }).reduce(function(s, x) { return s + (x.total || 0); }, 0);
+  var totalExp = myShiftExp.reduce(function(s, x) { return s + (x.amount || 0); }, 0);
+  try {
+    var fd = await apiCall('financial/entries/?date=' + businessDay, 'GET', null, 'fin' + businessDay);
+    var fe = (fd && fd.entries) ? fd.entries : (Array.isArray(fd) ? fd : []);
+    if (Array.isArray(fe)) {
+      var cd = fe.filter(function(f) { return f.payment_method === 'cash'; });
+      totalExp += cd.reduce(function(s, f) { return s + (f.amount || 0); }, 0);
+    }
+  } catch(e) {}
+  var cashAtHand = cashSales - totalExp;
   document.getElementById('tilapiaPcs').textContent = cat.tilapia.pieces;
   document.getElementById('tilapiaAmt').textContent = cat.tilapia.amount.toLocaleString() + '/=';
   document.getElementById('mbutaPcs').textContent = cat.mbuta.pieces;
@@ -2162,20 +2093,14 @@ function switchPanel(p) {
   document.querySelectorAll('.nav-item').forEach(function(b) { b.classList.remove('active'); });
   var navBtn = document.querySelector('[data-panel="' + p + '"]');
   if (navBtn) navBtn.classList.add('active');
-  
   document.querySelectorAll('.panel').forEach(function(pa) { pa.classList.remove('active'); });
   var panel = document.getElementById('panel-' + p);
   if (panel) panel.classList.add('active');
-  
   if (p === 'bills') renderBills();
   if (p === 'trash') renderTrash();
-  if (p === 'expense') renderExpenses();
+  if (p === 'expense') { switchExpenseTab('expense'); }
   if (p === 'analysis') { renderAnalysis(); updateDashboard(); }
   if (p === 'credit') loadCredits();
-  if (p === 'expense') { 
-    renderExpenses(); 
-    switchExpenseTab('expense'); // Initialize tab
-  }
 }
 
 document.querySelectorAll('.nav-item').forEach(function(b) {
