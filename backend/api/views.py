@@ -102,22 +102,31 @@ def expenses(request):
         if not all_exp:
             all_exp = []
         
-        # Add shift indicator based on time
+        
+        # Add shift indicator - prefer stored shift field, fall back to time-based detection
         for exp in all_exp:
-            exp_time = exp.get('time', '') or exp.get('created_at', '')
-            if exp_time:
-                try:
-                    if isinstance(exp_time, str) and 'T' in exp_time:
-                        hour = datetime.fromisoformat(exp_time.replace('Z', '+00:00')).hour
-                    elif ':' in str(exp_time):
-                        hour = int(str(exp_time).split(':')[0])
-                    else:
-                        hour = 12
-                    exp['shift'] = 'night' if (hour >= 22 or hour < 9) else 'day'
-                except:
+            # If shift is already stored, keep it
+            if not exp.get('shift'):
+                exp_time = exp.get('time', '') or exp.get('created_at', '')
+                if exp_time:
+                    try:
+                        if isinstance(exp_time, str) and 'T' in exp_time:
+                            hour = datetime.fromisoformat(exp_time.replace('Z', '+00:00')).hour
+                        elif ':' in str(exp_time):
+                            # Handle 12-hour format like "6:02 PM" or "6:02 AM"
+                            time_str = str(exp_time).strip().upper()
+                            hour = int(time_str.split(':')[0])
+                            if 'PM' in time_str and hour != 12:
+                                hour += 12
+                            elif 'AM' in time_str and hour == 12:
+                                hour = 0
+                        else:
+                            hour = 12
+                        exp['shift'] = 'night' if (hour >= 22 or hour < 9) else 'day'
+                    except:
+                        exp['shift'] = 'day'
+                else:
                     exp['shift'] = 'day'
-            else:
-                exp['shift'] = 'day'
         
         # Filter by shift if requested
         if shift:

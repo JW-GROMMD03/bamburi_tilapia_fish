@@ -1208,45 +1208,20 @@ function switchExpenseTab(tab) {
 async function renderExpenses() {
   try {
     var e = await apiCall('expenses/', 'GET', null, 'exp') || [];
-    var shiftStart = getShiftStartTime();
     var businessDay = getToday();
     
-    console.log('🔍 renderExpenses - All expenses count:', e.length);
-    console.log('🔍 renderExpenses - Shift start:', shiftStart.toISOString());
-    console.log('🔍 renderExpenses - Business day:', businessDay);
+    console.log('🔍 renderExpenses - All expenses:', e.length, 'Business day:', businessDay);
     
-    // Filter by current shift AND business day - show ALL expenses (including advances/debts saved as expenses)
+    // Filter by business day ONLY - show all today's expenses for this cashier
     var myExp = e.filter(function(ex) {
-      // Use date field first, fall back to created_at
       var exDate = ex.date || (ex.created_at ? new Date(ex.created_at).toISOString().split('T')[0] : '');
-      
-      // Get time from time field or created_at
-      var exTimeStr = ex.time || (ex.created_at ? new Date(ex.created_at).toISOString() : '');
-      var exTime;
-      if (exTimeStr) {
-        exTime = new Date(exTimeStr);
-      } else {
-        exTime = new Date();
-      }
-      
-      // Check if it's from current business day
-      var isCurrentDay = (exDate === businessDay);
-      
-      // For shift check, use the date field + shift info, or just check the date
-      // If the expense has a 'shift' field, use it. Otherwise, accept all today's expenses
-      var isCurrentShift = true;
-      if (ex.shift) {
-        isCurrentShift = (ex.shift === user.shift);
-      } else {
-        // No shift info - accept if it's from today's business day
-        isCurrentShift = isCurrentDay;
-      }
-      
-      // Show ALL expense types including advance and debt
-      return isCurrentDay && isCurrentShift;
+      // Also check if this expense was created by this cashier or has this cashier's shift
+      var isMyExpense = (ex.created_by === user.id) || (ex.shift === user.shift) || (!ex.shift && !ex.created_by);
+      return exDate === businessDay && isMyExpense;
     });
     
-    console.log('🔍 renderExpenses - Filtered expenses:', myExp.length);
+    console.log('🔍 renderExpenses - Filtered:', myExp.length);
+    if (myExp.length > 0) console.log('🔍 First expense:', JSON.stringify(myExp[0]));
     
     var container = document.getElementById('expenseListToday');
     if (!container) return;
@@ -1294,7 +1269,8 @@ async function addExpense() {
     amount: a,
     created_by: user.id,
     date: getToday(),
-    time: new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: true })
+    time: new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: true }),
+    shift: user.shift
   };
   
   console.log('📤 Sending expense:', JSON.stringify(payload));
