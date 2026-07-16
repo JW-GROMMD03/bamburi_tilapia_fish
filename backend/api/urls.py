@@ -94,4 +94,12 @@ urlpatterns = [
     path('glovo/', views.glovo_orders, name='glovo-orders'),
     path('glovo/<str:order_id>/', views.delete_glovo_order, name='delete-glovo-order'),
     
+        # ============ FINANCIAL MANAGEMENT ============
+    path('financial/entries/', views.financial_entries, name='financial-entries'),
+    path('financial/entries/<str:entry_id>/', views.delete_financial_entry, name='delete-financial-entry'),
+    path('financial/summary/', views.financial_summary, name='financial-summary'),
+    path('financial/surplus-adjust/', views.surplus_adjust, name='surplus-adjust'),
+    path('financial/analytics/', views.financial_analytics, name='financial-analytics'),
+    path('financial/report/', views.financial_report, name='financial-report'),
+    path('financial/report/whatsapp/', views.send_report_whatsapp, name='send-report-whatsapp'),
 ]

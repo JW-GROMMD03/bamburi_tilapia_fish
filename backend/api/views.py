@@ -1367,7 +1367,637 @@ def check_pending_approvals(request):
         return Response({'error': str(e)}, status=400)
     
     
+    # ============ FINANCIAL MANAGEMENT SYSTEM ============
+
+@api_view(['GET', 'POST'])
+def financial_entries(request):
+    """
+    Manage all financial entries:
+    - expenses, salaries, debts, advances, fish_purchase, mbuta_purchase
+    - Each entry has: entry_type, description, person_name, amount, payment_method, business_date
+    """
+    if request.method == 'GET':
+        business_date = request.query_params.get('date', get_business_day())
+        entry_type = request.query_params.get('type', None)
+        
+        # Check if this date is editable (within 72 hours)
+        can_edit = is_date_editable(business_date)
+        
+        # Fetch entries from Supabase
+        entries = []
+        if SupabaseDB._ok():
+            try:
+                url = f"{SupabaseDB.BASE}/rest/v1/financial_entries?business_date=eq.{business_date}&order=created_at.desc"
+                headers = SupabaseDB._h()
+                r = requests.get(url, headers=headers)
+                if r.status_code == 200:
+                    entries = r.json()
+            except:
+                pass
+        
+        # Filter by type if provided
+        if entry_type:
+            entries = [e for e in entries if e.get('entry_type') == entry_type]
+        
+        return Response({
+            'entries': entries,
+            'can_edit': can_edit,
+            'business_date': business_date,
+            'lock_message': 'Editable' if can_edit else 'Locked (72+ hours elapsed)'
+        })
     
+    elif request.method == 'POST':
+        try:
+            data = request.data
+            business_date = data.get('business_date', get_business_day())
+            
+            # Check 72-hour lock
+            if not is_date_editable(business_date):
+                return Response({
+                    'error': 'This business day is locked (72+ hours elapsed). Cannot modify entries.'
+                }, status=403)
+            
+            entry = {
+                'business_date': business_date,
+                'entry_type': data.get('entry_type', 'expense'),
+                'description': data.get('description', ''),
+                'person_name': data.get('person_name', ''),
+                'amount': int(data.get('amount', 0)),
+                'payment_method': data.get('payment_method', 'cash'),
+                'shift': data.get('shift', get_current_shift()),
+                'created_by': str(data.get('created_by', 'admin')),
+                'created_at': datetime.now().isoformat()
+            }
+            
+            if SupabaseDB._ok():
+                url = f"{SupabaseDB.BASE}/rest/v1/financial_entries"
+                headers = SupabaseDB._h()
+                headers['Prefer'] = 'return=representation'
+                r = requests.post(url, headers=headers, json=entry)
+                if r.status_code in [200, 201]:
+                    result = r.json()
+                    saved = result[0] if isinstance(result, list) else result
+                    return Response(saved, status=201)
+            
+            # Fallback
+            entry['id'] = int(datetime.now().timestamp())
+            return Response(entry, status=201)
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=400)
+
+
+@api_view(['DELETE'])
+def delete_financial_entry(request, entry_id):
+    """Delete a financial entry (only if within 72 hours)"""
+    try:
+        # First get the entry to check its date
+        if SupabaseDB._ok():
+            url = f"{SupabaseDB.BASE}/rest/v1/financial_entries?id=eq.{entry_id}&select=*"
+            headers = SupabaseDB._h()
+            r = requests.get(url, headers=headers)
+            if r.status_code == 200:
+                entries = r.json()
+                if entries:
+                    entry = entries[0]
+                    business_date = entry.get('business_date')
+                    if not is_date_editable(business_date):
+                        return Response({
+                            'error': 'Cannot delete - business day is locked (72+ hours)'
+                        }, status=403)
+            
+            # Delete
+            del_url = f"{SupabaseDB.BASE}/rest/v1/financial_entries?id=eq.{entry_id}"
+            r = requests.delete(del_url, headers=headers)
+            if r.status_code in [200, 204]:
+                return Response({'message': 'Deleted'})
+        
+        return Response({'message': 'Deleted'})
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
+
+
+@api_view(['GET'])
+def financial_summary(request):
+    """
+    Get complete financial summary for a business day.
+    Shows: sales, deductions, cash at hand, real cash, MPesa balance, net profit
+    """
+    business_date = request.query_params.get('date', get_business_day())
+    
+    # Get transactions
+    transactions = SupabaseDB.get_tx(business_date) or []
+    
+    # Get cashier expenses
+    cashier_expenses = SupabaseDB.get_exp(business_date) or []
+    
+    # Get financial entries
+    fin_entries = []
+    if SupabaseDB._ok():
+        try:
+            url = f"{SupabaseDB.BASE}/rest/v1/financial_entries?business_date=eq.{business_date}&order=created_at.desc"
+            headers = SupabaseDB._h()
+            r = requests.get(url, headers=headers)
+            if r.status_code == 200:
+                fin_entries = r.json()
+        except:
+            pass
+    
+    # Calculate sales totals
+    cash_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'cash')
+    mpesa_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'mpesa')
+    total_sales = cash_sales + mpesa_sales
+    
+    # Cashier expenses
+    cashier_exp_total = sum(e.get('amount', 0) for e in cashier_expenses)
+    
+    # Categorize financial entries
+    expenses = [e for e in fin_entries if e.get('entry_type') == 'expense']
+    salaries = [e for e in fin_entries if e.get('entry_type') == 'salary']
+    debts = [e for e in fin_entries if e.get('entry_type') == 'debt']
+    advances = [e for e in fin_entries if e.get('entry_type') == 'advance']
+    fish_purchases = [e for e in fin_entries if e.get('entry_type') == 'fish_purchase']
+    mbuta_purchases = [e for e in fin_entries if e.get('entry_type') == 'mbuta_purchase']
+    
+    # Calculate deductions
+    def sum_by_method(entries, method):
+        return sum(e.get('amount', 0) for e in entries if e.get('payment_method') == method)
+    
+    # Admin expenses
+    admin_exp_cash = sum_by_method(expenses, 'cash')
+    admin_exp_mpesa = sum_by_method(expenses, 'mpesa')
+    admin_exp_total = admin_exp_cash + admin_exp_mpesa
+    
+    # Salaries
+    salary_cash = sum_by_method(salaries, 'cash')
+    salary_mpesa = sum_by_method(salaries, 'mpesa')
+    salary_total = salary_cash + salary_mpesa
+    
+    # Debts
+    debt_cash = sum_by_method(debts, 'cash')
+    debt_mpesa = sum_by_method(debts, 'mpesa')
+    debt_total = debt_cash + debt_mpesa
+    
+    # Advances
+    advance_cash = sum_by_method(advances, 'cash')
+    advance_mpesa = sum_by_method(advances, 'mpesa')
+    advance_total = advance_cash + advance_mpesa
+    
+    # Fish & Mbuta purchases (always MPesa)
+    fish_total = sum(e.get('amount', 0) for e in fish_purchases)
+    mbuta_total = sum(e.get('amount', 0) for e in mbuta_purchases)
+    
+    # Total deductions
+    total_cash_deductions = cashier_exp_total + admin_exp_cash + salary_cash + debt_cash + advance_cash
+    total_mpesa_deductions = admin_exp_mpesa + salary_mpesa + debt_mpesa + advance_mpesa + fish_total + mbuta_total
+    total_deductions = total_cash_deductions + total_mpesa_deductions
+    
+    # Balances
+    cash_at_hand = cash_sales - total_cash_deductions
+    mpesa_balance = mpesa_sales - total_mpesa_deductions
+    net_profit = cash_at_hand + mpesa_balance
+    
+    # Get surplus adjustments
+    surplus_data = get_surplus_data(business_date)
+    
+    return Response({
+        'business_date': business_date,
+        'can_edit': is_date_editable(business_date),
+        'sales': {
+            'cash_sales': cash_sales,
+            'mpesa_sales': mpesa_sales,
+            'total_sales': total_sales,
+            'transaction_count': len(transactions)
+        },
+        'cashier_expenses': {
+            'total': cashier_exp_total,
+            'items': cashier_expenses
+        },
+        'deductions': {
+            'admin_expenses': {'cash': admin_exp_cash, 'mpesa': admin_exp_mpesa, 'total': admin_exp_total, 'items': expenses},
+            'salaries': {'cash': salary_cash, 'mpesa': salary_mpesa, 'total': salary_total, 'items': salaries},
+            'debts': {'cash': debt_cash, 'mpesa': debt_mpesa, 'total': debt_total, 'items': debts},
+            'advances': {'cash': advance_cash, 'mpesa': advance_mpesa, 'total': advance_total, 'items': advances},
+            'fish_purchase': {'total': fish_total, 'items': fish_purchases},
+            'mbuta_purchase': {'total': mbuta_total, 'items': mbuta_purchases}
+        },
+        'totals': {
+            'total_cash_deductions': total_cash_deductions,
+            'total_mpesa_deductions': total_mpesa_deductions,
+            'total_deductions': total_deductions,
+            'cash_at_hand': cash_at_hand,
+            'mpesa_balance': mpesa_balance,
+            'net_profit': net_profit
+        },
+        'surplus': surplus_data
+    })
+
+
+@api_view(['POST'])
+def surplus_adjust(request):
+    """
+    Handle surplus/shortage adjustments.
+    If real > system: distribute surplus proportionally to sales categories.
+    If real < system: flag as money lost.
+    """
+    try:
+        data = request.data
+        business_date = data.get('business_date', get_business_day())
+        
+        if not is_date_editable(business_date):
+            return Response({'error': 'Business day is locked'}, status=403)
+        
+        payment_method = data.get('payment_method', 'cash')  # cash or mpesa
+        real_amount = int(data.get('real_amount', 0))
+        
+        # Get current system amount
+        transactions = SupabaseDB.get_tx(business_date) or []
+        
+        if payment_method == 'cash':
+            system_amount = sum(t.get('total', 0) for t in transactions if t.get('method') == 'cash')
+            # Subtract cash deductions
+            fin_entries = get_fin_entries_for_date(business_date)
+            cash_deductions = sum(e.get('amount', 0) for e in fin_entries if e.get('payment_method') == 'cash')
+            system_amount -= cash_deductions
+        else:
+            system_amount = sum(t.get('total', 0) for t in transactions if t.get('method') == 'mpesa')
+            fin_entries = get_fin_entries_for_date(business_date)
+            mpesa_deductions = sum(e.get('amount', 0) for e in fin_entries if e.get('payment_method') == 'mpesa')
+            system_amount -= mpesa_deductions
+        
+        difference = real_amount - system_amount
+        
+        if difference < 0:
+            # Money is lost - flag it
+            return Response({
+                'success': False,
+                'message': f'⚠️ MONEY LOST: KES {abs(difference):,} is missing in {payment_method}. The system amount (KES {system_amount:,}) is greater than the real amount (KES {real_amount:,}).',
+                'difference': difference,
+                'status': 'loss'
+            })
+        elif difference == 0:
+            return Response({
+                'success': True,
+                'message': '✅ Amounts match perfectly!',
+                'difference': 0,
+                'status': 'match'
+            })
+        else:
+            # Surplus - distribute proportionally to sales categories
+            distribution = distribute_surplus(transactions, difference, payment_method)
+            
+            # Save surplus record
+            surplus_entry = {
+                'business_date': business_date,
+                'entry_type': 'surplus_adjustment',
+                'description': f'Surplus distribution ({payment_method})',
+                'person_name': 'System',
+                'amount': difference,
+                'payment_method': payment_method,
+                'shift': 'day',
+                'created_by': str(data.get('created_by', 'admin')),
+                'created_at': datetime.now().isoformat(),
+                'distribution': json.dumps(distribution)
+            }
+            
+            if SupabaseDB._ok():
+                url = f"{SupabaseDB.BASE}/rest/v1/financial_entries"
+                headers = SupabaseDB._h()
+                headers['Prefer'] = 'return=representation'
+                requests.post(url, headers=headers, json=surplus_entry)
+            
+            return Response({
+                'success': True,
+                'message': f'✅ Surplus of KES {difference:,} distributed proportionally to sales categories.',
+                'difference': difference,
+                'distribution': distribution,
+                'status': 'surplus'
+            })
+            
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
+
+
+def distribute_surplus(transactions, surplus, payment_method):
+    """Distribute surplus proportionally based on sales percentages"""
+    # Filter by payment method
+    method_tx = [t for t in transactions if t.get('method') == payment_method]
+    
+    # Calculate category totals
+    categories = {}
+    total_sales = 0
+    
+    for tx in method_tx:
+        items = tx.get('items', [])
+        if isinstance(items, str):
+            try:
+                items = json.loads(items)
+            except:
+                items = []
+        
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            name = item.get('name', '').lower()
+            amt = item.get('price', 0) * item.get('qty', 1)
+            cat = detect_category(name)
+            
+            if cat not in categories:
+                categories[cat] = 0
+            categories[cat] += amt
+            total_sales += amt
+    
+    # Distribute surplus
+    distribution = {}
+    remaining = surplus
+    
+    for cat, cat_total in sorted(categories.items(), key=lambda x: x[1], reverse=True):
+        if total_sales > 0:
+            share = round((cat_total / total_sales) * surplus)
+        else:
+            share = 0
+        distribution[cat] = {
+            'original': cat_total,
+            'percentage': round((cat_total / total_sales * 100) if total_sales > 0 else 0, 1),
+            'surplus_added': share
+        }
+        remaining -= share
+    
+    # Add any remainder to the largest category
+    if remaining != 0 and distribution:
+        largest_cat = max(distribution, key=lambda k: distribution[k]['original'])
+        distribution[largest_cat]['surplus_added'] += remaining
+    
+    return distribution
+
+
+def is_date_editable(business_date):
+    """Check if a business date is still editable (within 72 hours)"""
+    try:
+        target_date = datetime.strptime(business_date, '%Y-%m-%d')
+        now = datetime.now()
+        
+        # Calculate business day start (09:30)
+        business_start = target_date.replace(hour=9, minute=30, second=0, microsecond=0)
+        
+        # Lock time is 72 hours after business day starts
+        lock_time = business_start + timedelta(hours=72)
+        
+        return now < lock_time
+    except:
+        return False
+
+
+def get_fin_entries_for_date(business_date):
+    """Helper to get financial entries for a date"""
+    entries = []
+    if SupabaseDB._ok():
+        try:
+            url = f"{SupabaseDB.BASE}/rest/v1/financial_entries?business_date=eq.{business_date}"
+            headers = SupabaseDB._h()
+            r = requests.get(url, headers=headers)
+            if r.status_code == 200:
+                entries = r.json()
+        except:
+            pass
+    return entries
+
+
+def get_surplus_data(business_date):
+    """Get surplus adjustment data"""
+    entries = get_fin_entries_for_date(business_date)
+    surplus_entries = [e for e in entries if e.get('entry_type') == 'surplus_adjustment']
+    
+    if surplus_entries:
+        latest = surplus_entries[0]
+        distribution = latest.get('distribution', '{}')
+        if isinstance(distribution, str):
+            try:
+                distribution = json.loads(distribution)
+            except:
+                distribution = {}
+        return {
+            'adjusted': True,
+            'amount': latest.get('amount', 0),
+            'method': latest.get('payment_method', 'cash'),
+            'distribution': distribution
+        }
+    return {'adjusted': False}
+
+
+@api_view(['GET'])
+def financial_analytics(request):
+    """Get financial analytics data for charts"""
+    period = request.query_params.get('period', 'month')  # week, month, year
+    
+    now = datetime.now()
+    
+    if period == 'week':
+        days = 7
+    elif period == 'year':
+        days = 365
+    else:
+        days = 30  # month default
+    
+    # Collect data for each day
+    daily_data = []
+    
+    for i in range(days):
+        d = (now - timedelta(days=i)).strftime('%Y-%m-%d')
+        
+        transactions = SupabaseDB.get_tx(d) or []
+        entries = get_fin_entries_for_date(d)
+        expenses = SupabaseDB.get_exp(d) or []
+        
+        cash_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'cash')
+        mpesa_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'mpesa')
+        total_sales = cash_sales + mpesa_sales
+        
+        total_deductions = sum(e.get('amount', 0) for e in entries) + sum(e.get('amount', 0) for e in expenses)
+        net_profit = total_sales - total_deductions
+        
+        daily_data.append({
+            'date': d,
+            'total_sales': total_sales,
+            'cash_sales': cash_sales,
+            'mpesa_sales': mpesa_sales,
+            'deductions': total_deductions,
+            'net_profit': net_profit,
+            'transaction_count': len(transactions)
+        })
+    
+    # Sort by date ascending
+    daily_data.sort(key=lambda x: x['date'])
+    
+    # Calculate monthly totals for leaderboard
+    monthly_totals = {}
+    for d in daily_data:
+        month_key = d['date'][:7]  # YYYY-MM
+        if month_key not in monthly_totals:
+            monthly_totals[month_key] = {'sales': 0, 'profit': 0, 'count': 0}
+        monthly_totals[month_key]['sales'] += d['total_sales']
+        monthly_totals[month_key]['profit'] += d['net_profit']
+        monthly_totals[month_key]['count'] += 1
+    
+    # Create leaderboard
+    leaderboard = [
+        {
+            'month': month,
+            'total_sales': data['sales'],
+            'net_profit': data['profit'],
+            'days': data['count'],
+            'avg_daily_profit': round(data['profit'] / data['count']) if data['count'] > 0 else 0
+        }
+        for month, data in sorted(monthly_totals.items(), key=lambda x: x[1]['profit'], reverse=True)
+    ]
+    
+    return Response({
+        'daily_data': daily_data,
+        'leaderboard': leaderboard,
+        'period': period
+    })
+
+
+@api_view(['GET'])
+def financial_report(request):
+    """Generate full financial report for a business day"""
+    business_date = request.query_params.get('date', get_business_day())
+    
+    # Get summary
+    summary_data = financial_summary(request).data
+    
+    # Build HTML report
+    now = datetime.now()
+    html = f"""
+    <html><head><meta charset="UTF-8"><style>
+        body {{ font-family: Arial, sans-serif; padding: 30px; color: #1e293b; }}
+        h1 {{ text-align: center; color: #0f172a; border-bottom: 3px solid #f59e0b; padding-bottom: 10px; }}
+        h2 {{ color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; margin-top: 25px; }}
+        table {{ width: 100%; border-collapse: collapse; margin: 15px 0; }}
+        th {{ background: #0f172a; color: white; padding: 10px; text-align: left; font-size: 12px; }}
+        td {{ padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; }}
+        .total-row {{ background: #f0fdf4; font-weight: bold; }}
+        .summary-box {{ background: #f8fafd; border: 2px solid #0f172a; border-radius: 10px; padding: 15px; margin: 15px 0; }}
+        .footer {{ text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #f59e0b; font-size: 10px; color: #64748b; }}
+        .positive {{ color: #10b981; }}
+        .negative {{ color: #ef4444; }}
+    </style></head><body>
+    <h1>🐟 BAMBURI TILAPIA FISH HOTEL<br>FINANCIAL REPORT</h1>
+    <div class="summary-box">
+        <p><strong>📅 Business Date:</strong> {business_date}</p>
+        <p><strong>🕐 Generated:</strong> {now.strftime('%d/%m/%Y %H:%M')}</p>
+        <p><strong>🔒 Status:</strong> {'Locked' if not is_date_editable(business_date) else 'Editable'}</p>
+    </div>
+    
+    <h2>💰 SALES SUMMARY</h2>
+    <table>
+        <tr><td>💵 Cash Sales</td><td><strong>KES {summary_data['sales']['cash_sales']:,}</strong></td></tr>
+        <tr><td>📱 M-Pesa Sales</td><td><strong>KES {summary_data['sales']['mpesa_sales']:,}</strong></td></tr>
+        <tr class="total-row"><td>Total Sales</td><td><strong>KES {summary_data['sales']['total_sales']:,}</strong></td></tr>
+        <tr><td>📊 Transactions</td><td>{summary_data['sales']['transaction_count']}</td></tr>
+    </table>
+    
+    <h2>🧾 DEDUCTIONS</h2>
+    <table>
+        <tr><th>Category</th><th>Cash</th><th>M-Pesa</th><th>Total</th></tr>
+    """
+    
+    for cat_key, cat_label in [
+        ('admin_expenses', '📋 Admin Expenses'),
+        ('salaries', '👔 Salaries'),
+        ('debts', '🤝 Debts'),
+        ('advances', '⏰ Advances'),
+        ('fish_purchase', '🐟 Fish Purchase'),
+        ('mbuta_purchase', '🐠 Mbuta Purchase')
+    ]:
+        cat_data = summary_data['deductions'].get(cat_key, {})
+        html += f"""
+        <tr>
+            <td>{cat_label}</td>
+            <td>KES {cat_data.get('cash', 0):,}</td>
+            <td>KES {cat_data.get('mpesa', 0):,}</td>
+            <td><strong>KES {cat_data.get('total', 0):,}</strong></td>
+        </tr>"""
+    
+    html += f"""
+        <tr class="total-row">
+            <td><strong>TOTAL DEDUCTIONS</strong></td>
+            <td><strong>KES {summary_data['totals']['total_cash_deductions']:,}</strong></td>
+            <td><strong>KES {summary_data['totals']['total_mpesa_deductions']:,}</strong></td>
+            <td><strong>KES {summary_data['totals']['total_deductions']:,}</strong></td>
+        </tr>
+    </table>
+    
+    <h2>💵 FINAL BALANCES</h2>
+    <table>
+        <tr><td>💵 Cash at Hand</td><td><strong>KES {summary_data['totals']['cash_at_hand']:,}</strong></td></tr>
+        <tr><td>📱 M-Pesa Balance</td><td><strong>KES {summary_data['totals']['mpesa_balance']:,}</strong></td></tr>
+        <tr class="total-row"><td>📊 NET PROFIT</td><td><strong>KES {summary_data['totals']['net_profit']:,}</strong></td></tr>
+    </table>
+    
+    <div class="footer">
+        <p>Generated by FishFlow Pro • Bamburi Tilapia Fish Hotel</p>
+        <p>This is an official financial document</p>
+    </div>
+    </body></html>
+    """
+    
+    return Response({
+        'html': html,
+        'summary': summary_data,
+        'business_date': business_date
+    })
+
+
+@api_view(['POST'])
+def send_report_whatsapp(request):
+    """Send financial report to WhatsApp"""
+    try:
+        business_date = request.data.get('date', get_business_day())
+        
+        # Generate summary
+        request.GET = {'date': business_date}  # Simulate GET params
+        summary_data = financial_summary(request).data
+        
+        # Build WhatsApp message
+        msg = f"""🐟 *BAMBURI TILAPIA - FINANCIAL REPORT*
+📅 *Date:* {business_date}
+═══════════════════════════
+
+💰 *SALES:*
+💵 Cash: KES {summary_data['sales']['cash_sales']:,}
+📱 M-Pesa: KES {summary_data['sales']['mpesa_sales']:,}
+📊 Total: KES {summary_data['sales']['total_sales']:,}
+
+🧾 *DEDUCTIONS:*
+📋 Expenses: KES {summary_data['deductions']['admin_expenses']['total']:,}
+👔 Salaries: KES {summary_data['deductions']['salaries']['total']:,}
+🤝 Debts: KES {summary_data['deductions']['debts']['total']:,}
+⏰ Advances: KES {summary_data['deductions']['advances']['total']:,}
+🐟 Fish: KES {summary_data['deductions']['fish_purchase']['total']:,}
+🐠 Mbuta: KES {summary_data['deductions']['mbuta_purchase']['total']:,}
+📊 Total Deductions: KES {summary_data['totals']['total_deductions']:,}
+
+💵 *BALANCES:*
+Cash at Hand: KES {summary_data['totals']['cash_at_hand']:,}
+M-Pesa Balance: KES {summary_data['totals']['mpesa_balance']:,}
+📊 *NET PROFIT: KES {summary_data['totals']['net_profit']:,}*
+
+═══════════════════════════
+✅ Generated by FishFlow Pro
+🏨 Bamburi Tilapia Fish Hotel"""
+
+        # Open WhatsApp with message
+        whatsapp_url = f"https://wa.me/254792988239?text={requests.utils.quote(msg)}"
+        
+        return Response({
+            'success': True,
+            'whatsapp_url': whatsapp_url,
+            'message': msg
+        })
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
 
 
 

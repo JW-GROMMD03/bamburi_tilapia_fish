@@ -994,6 +994,8 @@ flex-wrap:wrap;
   <button class="nav-btn" onclick="switchPanel('glovo', this)">🛵 Glovo Orders</button>
   <button class="nav-btn" onclick="switchPanel('history', this)">📜 History</button>
   <button class="nav-btn" onclick="switchPanel('records', this)">📊 Records</button>
+  <button class="nav-btn" onclick="switchPanel('calculation', this)">🧮 Admin Calculation</button>
+  <button class="nav-btn" onclick="switchPanel('report', this)">📋 Report</button>
 </nav>
 
 <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
@@ -1294,9 +1296,169 @@ flex-wrap:wrap;
         <canvas id="recordsChart"></canvas>
     </div>
 </div>
+<!-- ADMIN CALCULATION PANEL -->
+<div class="panel" id="calculation">
+  <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-bottom: 20px;">
+    <div><label>📅 Business Date:</label>
+      <input type="date" id="calcDate" style="padding: 10px; border-radius: 10px; border: 1px solid var(--border);" onchange="loadCalculationPanel()">
+    </div>
+    <button class="btn" onclick="loadCalculationPanel()">🔄 Load</button>
+    <span id="lockStatus" style="font-weight: 700; padding: 6px 14px; border-radius: 8px;"></span>
+  </div>
+
+  <!-- Cash at Hand & Real Cash -->
+  <div class="cards" style="margin-bottom: 20px;">
+    <div class="card" style="background: linear-gradient(135deg, #dcfce7, #f0fdf4);">
+      <h3>💵 System Cash at Hand</h3>
+      <p id="systemCash" style="font-size: 28px;">KES 0</p>
+    </div>
+    <div class="card" style="background: linear-gradient(135deg, #fef3c7, #fffbeb);">
+      <h3>🏦 Real Cash at Hand</h3>
+      <input type="number" id="realCash" placeholder="Enter real cash amount" style="width:100%;padding:10px;border-radius:10px;border:2px solid #f59e0b;font-size:18px;margin-top:8px;">
+      <button class="btn-sm" onclick="adjustSurplus('cash')" style="background:#f59e0b;color:white;margin-top:8px;">🔄 Adjust Cash</button>
+    </div>
+    <div class="card" style="background: linear-gradient(135deg, #dbeafe, #eff6ff);">
+      <h3>📱 System M-Pesa</h3>
+      <p id="systemMpesa" style="font-size: 28px;">KES 0</p>
+    </div>
+    <div class="card" style="background: linear-gradient(135deg, #e8f4f8, #f0f9ff);">
+      <h3>📱 Real M-Pesa</h3>
+      <input type="number" id="realMpesa" placeholder="Enter real MPesa amount" style="width:100%;padding:10px;border-radius:10px;border:2px solid #3b82f6;font-size:18px;margin-top:8px;">
+      <button class="btn-sm" onclick="adjustSurplus('mpesa')" style="background:#3b82f6;color:white;margin-top:8px;">🔄 Adjust M-Pesa</button>
+    </div>
+  </div>
+
+  <!-- Deduction Sections -->
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+    
+    <!-- Admin Expenses -->
+    <div class="card" style="grid-column: 1/-1;">
+      <h3>🧾 Admin Expenses</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <input type="text" id="expDesc" placeholder="Description" style="flex:2;padding:10px;border-radius:10px;border:1px solid #ddd;">
+        <input type="number" id="expAmt" placeholder="Amount" style="flex:1;padding:10px;border-radius:10px;border:1px solid #ddd;">
+        <select id="expMethod" style="padding:10px;border-radius:10px;border:1px solid #ddd;">
+          <option value="cash">💵 Cash</option>
+          <option value="mpesa">📱 M-Pesa</option>
+        </select>
+        <button class="btn" onclick="addFinancialEntry('expense')">➕ Add</button>
+      </div>
+      <div id="expenseEntries" style="max-height:150px;overflow-y:auto;"></div>
+    </div>
+
+    <!-- Salaries -->
+    <div class="card">
+      <h3>👔 Salaries</h3>
+      <div style="display:flex;gap:8px;flex-direction:column;">
+        <input type="text" id="salName" placeholder="Name" style="padding:10px;border-radius:10px;border:1px solid #ddd;">
+        <input type="number" id="salAmt" placeholder="Amount" style="padding:10px;border-radius:10px;border:1px solid #ddd;">
+        <select id="salMethod" style="padding:10px;border-radius:10px;border:1px solid #ddd;">
+          <option value="cash">💵 Cash</option>
+          <option value="mpesa">📱 M-Pesa</option>
+        </select>
+        <button class="btn" onclick="addFinancialEntry('salary')">➕ Add Salary</button>
+      </div>
+      <div id="salaryEntries" style="max-height:120px;overflow-y:auto;margin-top:10px;"></div>
+    </div>
+
+    <!-- Debts -->
+    <div class="card">
+      <h3>🤝 Debts</h3>
+      <div style="display:flex;gap:8px;flex-direction:column;">
+        <input type="text" id="debtName" placeholder="Lender Name" style="padding:10px;border-radius:10px;border:1px solid #ddd;">
+        <input type="number" id="debtAmt" placeholder="Amount" style="padding:10px;border-radius:10px;border:1px solid #ddd;">
+        <select id="debtMethod" style="padding:10px;border-radius:10px;border:1px solid #ddd;">
+          <option value="cash">💵 Cash</option>
+          <option value="mpesa">📱 M-Pesa</option>
+        </select>
+        <button class="btn" onclick="addFinancialEntry('debt')">➕ Add Debt</button>
+      </div>
+      <div id="debtEntries" style="max-height:120px;overflow-y:auto;margin-top:10px;"></div>
+    </div>
+
+    <!-- Advances -->
+    <div class="card">
+      <h3>⏰ Advances</h3>
+      <div style="display:flex;gap:8px;flex-direction:column;">
+        <input type="text" id="advName" placeholder="Name" style="padding:10px;border-radius:10px;border:1px solid #ddd;">
+        <input type="number" id="advAmt" placeholder="Amount" style="padding:10px;border-radius:10px;border:1px solid #ddd;">
+        <select id="advMethod" style="padding:10px;border-radius:10px;border:1px solid #ddd;">
+          <option value="cash">💵 Cash</option>
+          <option value="mpesa">📱 M-Pesa</option>
+        </select>
+        <button class="btn" onclick="addFinancialEntry('advance')">➕ Add Advance</button>
+      </div>
+      <div id="advanceEntries" style="max-height:120px;overflow-y:auto;margin-top:10px;"></div>
+    </div>
+
+    <!-- Fish Purchase -->
+    <div class="card">
+      <h3>🐟 Fish Purchase</h3>
+      <div style="display:flex;gap:8px;flex-direction:column;">
+        <input type="number" id="fishAmt" placeholder="Amount (deducted from MPesa)" style="padding:10px;border-radius:10px;border:1px solid #ddd;">
+        <button class="btn" onclick="addFinancialEntry('fish_purchase')">➕ Add Fish Purchase</button>
+      </div>
+      <div id="fishEntries" style="max-height:120px;overflow-y:auto;margin-top:10px;"></div>
+    </div>
+
+    <!-- Mbuta Purchase -->
+    <div class="card">
+      <h3>🐠 Mbuta Purchase</h3>
+      <div style="display:flex;gap:8px;flex-direction:column;">
+        <input type="number" id="mbutaAmt" placeholder="Amount (deducted from MPesa)" style="padding:10px;border-radius:10px;border:1px solid #ddd;">
+        <button class="btn" onclick="addFinancialEntry('mbuta_purchase')">➕ Add Mbuta Purchase</button>
+      </div>
+      <div id="mbutaEntries" style="max-height:120px;overflow-y:auto;margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <!-- Totals Summary -->
+  <div class="cards" style="margin-bottom:20px;">
+    <div class="card" style="background:#fef2f2;">
+      <h3>💵 Total Cash Deductions</h3>
+      <p id="totalCashDeductions" style="font-size:24px;color:#dc2626;">KES 0</p>
+    </div>
+    <div class="card" style="background:#dbeafe;">
+      <h3>📱 Total MPesa Deductions</h3>
+      <p id="totalMpesaDeductions" style="font-size:24px;color:#1e40af;">KES 0</p>
+    </div>
+    <div class="card" style="background:#fef3c7;">
+      <h3>📊 Grand Total Deductions</h3>
+      <p id="grandTotalDeductions" style="font-size:24px;color:#92400e;">KES 0</p>
+    </div>
+    <div class="card" style="background: linear-gradient(135deg, #dcfce7, #f0fdf4);">
+      <h3>📈 NET PROFIT</h3>
+      <p id="netProfitDisplay" style="font-size:28px;color:#166534;">KES 0</p>
+    </div>
+  </div>
+
+  <!-- Analytics Charts -->
+  <div class="grid-2" style="margin-bottom:20px;">
+    <div class="chart-box"><h3>📊 Deductions Breakdown</h3><canvas id="deductionsChart"></canvas></div>
+    <div class="chart-box"><h3>📈 Profit Trend (30 Days)</h3><canvas id="profitTrendChart"></canvas></div>
+  </div>
+  <div class="chart-box" style="margin-bottom:20px;">
+    <h3>🏆 Monthly Profit Leaderboard</h3>
+    <div id="leaderboardTable" style="max-height:300px;overflow-y:auto;"></div>
+  </div>
+</div>
+
+<!-- REPORT PANEL -->
+<div class="panel" id="report">
+  <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-bottom: 20px;">
+    <div><label>📅 Business Date:</label>
+      <input type="date" id="reportDate" style="padding: 10px; border-radius: 10px; border: 1px solid var(--border);" onchange="loadReportPanel()">
+    </div>
+    <button class="btn" onclick="loadReportPanel()">🔄 Load Report</button>
+    <button class="btn" onclick="downloadReportPDF()" style="background:#10b981;">📥 Download PDF</button>
+    <button class="btn" onclick="sendReportWhatsApp()" style="background:#25D366;">📱 Send WhatsApp</button>
+  </div>
+
+  <div id="reportContent">
+    <div class="loading">Select a date and load the report</div>
+  </div>
+</div>
 </main>
-
-
 
 <script>
 // ============ CONFIGURATION ============
@@ -2419,6 +2581,12 @@ function switchPanel(panel, btn) {
   }
   if (panel === 'records') { 
     loadRecords(); 
+  }
+  if (panel === 'calculation') {
+    loadCalculationPanel();
+  }
+  if (panel === 'report') {
+    loadReportPanel();
   }
 }
 
@@ -3999,6 +4167,338 @@ async function confirmDeleteItem() {
 
 // Add event listener for category change
 document.getElementById('itemCategory')?.addEventListener('change', toggleSodaBrandField);
+
+// ============ ADMIN CALCULATION PANEL ============
+let calculationData = null;
+let deductionsChart = null;
+let profitTrendChart = null;
+
+async function loadCalculationPanel() {
+  const businessDate = document.getElementById('calcDate').value || new Date().toISOString().split('T')[0];
+  document.getElementById('calcDate').value = businessDate;
+  
+  try {
+    const data = await apiRequest(`financial/summary/?date=${businessDate}`);
+    calculationData = data;
+    
+    // Update lock status
+    const lockStatus = document.getElementById('lockStatus');
+    if (data.can_edit) {
+      lockStatus.innerHTML = '🔓 Editable';
+      lockStatus.style.background = '#dcfce7';
+      lockStatus.style.color = '#166534';
+    } else {
+      lockStatus.innerHTML = '🔒 Locked (72+ hrs)';
+      lockStatus.style.background = '#fee2e2';
+      lockStatus.style.color = '#991b1b';
+    }
+    
+    // Update system amounts
+    document.getElementById('systemCash').textContent = 'KES ' + (data.totals.cash_at_hand || 0).toLocaleString();
+    document.getElementById('systemMpesa').textContent = 'KES ' + (data.totals.mpesa_balance || 0).toLocaleString();
+    
+    // Update totals
+    document.getElementById('totalCashDeductions').textContent = 'KES ' + (data.totals.total_cash_deductions || 0).toLocaleString();
+    document.getElementById('totalMpesaDeductions').textContent = 'KES ' + (data.totals.total_mpesa_deductions || 0).toLocaleString();
+    document.getElementById('grandTotalDeductions').textContent = 'KES ' + (data.totals.total_deductions || 0).toLocaleString();
+    document.getElementById('netProfitDisplay').textContent = 'KES ' + (data.totals.net_profit || 0).toLocaleString();
+    
+    // Render entry lists
+    renderEntryList('expenseEntries', data.deductions.admin_expenses.items, 'expense');
+    renderEntryList('salaryEntries', data.deductions.salaries.items, 'salary');
+    renderEntryList('debtEntries', data.deductions.debts.items, 'debt');
+    renderEntryList('advanceEntries', data.deductions.advances.items, 'advance');
+    renderEntryList('fishEntries', data.deductions.fish_purchase.items, 'fish_purchase');
+    renderEntryList('mbutaEntries', data.deductions.mbuta_purchase.items, 'mbuta_purchase');
+    
+    // Load analytics
+    loadFinancialAnalytics();
+    
+  } catch (error) {
+    console.error('Calculation error:', error);
+    toast('Failed to load calculation data', 'error');
+  }
+}
+
+function renderEntryList(containerId, items, type) {
+  const container = document.getElementById(containerId);
+  if (!items || items.length === 0) {
+    container.innerHTML = '<p style="color:#888;font-size:12px;">No entries</p>';
+    return;
+  }
+  
+  container.innerHTML = items.map(e => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:#f8fafd;border-radius:6px;margin-bottom:4px;font-size:12px;">
+      <span>${escapeHtml(e.person_name || e.description || '')} - KES ${(e.amount || 0).toLocaleString()}</span>
+      <span style="display:flex;align-items:center;gap:4px;">
+        <span class="badge ${e.payment_method === 'mpesa' ? 'info' : 'success'}">${e.payment_method === 'mpesa' ? '📱' : '💵'}</span>
+        <button onclick="deleteFinancialEntry('${e.id}')" style="background:none;border:none;color:red;cursor:pointer;">✕</button>
+      </span>
+    </div>
+  `).join('');
+}
+
+async function addFinancialEntry(type) {
+  const businessDate = document.getElementById('calcDate').value;
+  
+  if (!calculationData || !calculationData.can_edit) {
+    toast('This business day is locked. Cannot add entries.', 'error');
+    return;
+  }
+  
+  let entryData = {
+    business_date: businessDate,
+    entry_type: type,
+    created_by: currentUser?.id || 'admin'
+  };
+  
+  switch(type) {
+    case 'expense':
+      entryData.description = document.getElementById('expDesc').value;
+      entryData.amount = parseInt(document.getElementById('expAmt').value) || 0;
+      entryData.payment_method = document.getElementById('expMethod').value;
+      if (!entryData.description || !entryData.amount) { toast('Fill all fields', 'error'); return; }
+      document.getElementById('expDesc').value = '';
+      document.getElementById('expAmt').value = '';
+      break;
+    case 'salary':
+      entryData.person_name = document.getElementById('salName').value;
+      entryData.amount = parseInt(document.getElementById('salAmt').value) || 0;
+      entryData.payment_method = document.getElementById('salMethod').value;
+      if (!entryData.person_name || !entryData.amount) { toast('Fill all fields', 'error'); return; }
+      document.getElementById('salName').value = '';
+      document.getElementById('salAmt').value = '';
+      break;
+    case 'debt':
+      entryData.person_name = document.getElementById('debtName').value;
+      entryData.amount = parseInt(document.getElementById('debtAmt').value) || 0;
+      entryData.payment_method = document.getElementById('debtMethod').value;
+      if (!entryData.person_name || !entryData.amount) { toast('Fill all fields', 'error'); return; }
+      document.getElementById('debtName').value = '';
+      document.getElementById('debtAmt').value = '';
+      break;
+    case 'advance':
+      entryData.person_name = document.getElementById('advName').value;
+      entryData.amount = parseInt(document.getElementById('advAmt').value) || 0;
+      entryData.payment_method = document.getElementById('advMethod').value;
+      if (!entryData.person_name || !entryData.amount) { toast('Fill all fields', 'error'); return; }
+      document.getElementById('advName').value = '';
+      document.getElementById('advAmt').value = '';
+      break;
+    case 'fish_purchase':
+      entryData.amount = parseInt(document.getElementById('fishAmt').value) || 0;
+      entryData.payment_method = 'mpesa';
+      entryData.description = 'Fish Purchase';
+      if (!entryData.amount) { toast('Enter amount', 'error'); return; }
+      document.getElementById('fishAmt').value = '';
+      break;
+    case 'mbuta_purchase':
+      entryData.amount = parseInt(document.getElementById('mbutaAmt').value) || 0;
+      entryData.payment_method = 'mpesa';
+      entryData.description = 'Mbuta Purchase';
+      if (!entryData.amount) { toast('Enter amount', 'error'); return; }
+      document.getElementById('mbutaAmt').value = '';
+      break;
+  }
+  
+  try {
+    await apiRequest('financial/entries/', 'POST', entryData);
+    toast('✅ Entry added');
+    loadCalculationPanel();
+  } catch (error) {
+    toast('Failed: ' + error.message, 'error');
+  }
+}
+
+async function deleteFinancialEntry(entryId) {
+  if (!confirm('Delete this entry?')) return;
+  try {
+    await apiRequest(`financial/entries/${entryId}/`, 'DELETE');
+    toast('🗑️ Deleted');
+    loadCalculationPanel();
+  } catch (error) {
+    toast('Failed: ' + error.message, 'error');
+  }
+}
+
+async function adjustSurplus(method) {
+  const businessDate = document.getElementById('calcDate').value;
+  const realAmount = parseInt(document.getElementById(method === 'cash' ? 'realCash' : 'realMpesa').value) || 0;
+  
+  if (!realAmount) { toast('Enter real amount', 'error'); return; }
+  
+  try {
+    const result = await apiRequest('financial/surplus-adjust/', 'POST', {
+      business_date: businessDate,
+      payment_method: method,
+      real_amount: realAmount,
+      created_by: currentUser?.id || 'admin'
+    });
+    
+    if (result.success) {
+      toast(result.message);
+    } else {
+      toast(result.message, 'error');
+    }
+    
+    loadCalculationPanel();
+  } catch (error) {
+    toast('Failed: ' + error.message, 'error');
+  }
+}
+
+async function loadFinancialAnalytics() {
+  try {
+    const analytics = await apiRequest('financial/analytics/?period=month');
+    
+    // Deductions Pie Chart
+    if (calculationData) {
+      const ctx = document.getElementById('deductionsChart');
+      if (deductionsChart) deductionsChart.destroy();
+      
+      const d = calculationData.deductions;
+      deductionsChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Admin Expenses', 'Salaries', 'Debts', 'Advances', 'Fish Purchase', 'Mbuta Purchase'],
+          datasets: [{
+            data: [
+              d.admin_expenses.total, d.salaries.total, d.debts.total,
+              d.advances.total, d.fish_purchase.total, d.mbuta_purchase.total
+            ],
+            backgroundColor: ['#ef4444', '#f59e0b', '#8b5cf6', '#ec4899', '#3b82f6', '#10b981']
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: 'bottom' } }
+        }
+      });
+    }
+    
+    // Profit Trend Chart
+    const trendCtx = document.getElementById('profitTrendChart');
+    if (profitTrendChart) profitTrendChart.destroy();
+    
+    const dailyData = analytics.daily_data || [];
+    profitTrendChart = new Chart(trendCtx, {
+      type: 'line',
+      data: {
+        labels: dailyData.map(d => d.date),
+        datasets: [{
+          label: 'Net Profit',
+          data: dailyData.map(d => d.net_profit),
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'top' } }
+      }
+    });
+    
+    // Leaderboard
+    const leaderboard = analytics.leaderboard || [];
+    document.getElementById('leaderboardTable').innerHTML = `
+      <table>
+        <thead><tr><th>Rank</th><th>Month</th><th>Total Sales</th><th>Net Profit</th><th>Avg Daily Profit</th></tr></thead>
+        <tbody>
+          ${leaderboard.map((m, i) => `
+            <tr>
+              <td><span class="badge ${i === 0 ? 'success' : i < 3 ? 'warning' : 'info'}">#${i + 1}</span></td>
+              <td>${m.month}</td>
+              <td>KES ${m.total_sales.toLocaleString()}</td>
+              <td>KES ${m.net_profit.toLocaleString()}</td>
+              <td>KES ${m.avg_daily_profit.toLocaleString()}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+    
+  } catch (error) {
+    console.error('Analytics error:', error);
+  }
+}
+
+// ============ REPORT PANEL ============
+let reportData = null;
+
+async function loadReportPanel() {
+  const businessDate = document.getElementById('reportDate').value || new Date().toISOString().split('T')[0];
+  document.getElementById('reportDate').value = businessDate;
+  
+  try {
+    reportData = await apiRequest(`financial/report/?date=${businessDate}`);
+    
+    const s = reportData.summary;
+    document.getElementById('reportContent').innerHTML = `
+      <div class="cards" style="margin-bottom:20px;">
+        <div class="card"><h3>💰 Total Sales</h3><p>KES ${s.sales.total_sales.toLocaleString()}</p></div>
+        <div class="card"><h3>💵 Cash at Hand</h3><p>KES ${s.totals.cash_at_hand.toLocaleString()}</p></div>
+        <div class="card"><h3>📱 M-Pesa Balance</h3><p>KES ${s.totals.mpesa_balance.toLocaleString()}</p></div>
+        <div class="card" style="background:#dcfce7;"><h3>📈 NET PROFIT</h3><p>KES ${s.totals.net_profit.toLocaleString()}</p></div>
+      </div>
+      
+      <div class="table-wrapper" style="margin-bottom:20px;">
+        <h3 style="padding:15px;">🧾 Deductions Breakdown</h3>
+        <table>
+          <thead><tr><th>Category</th><th>Cash</th><th>M-Pesa</th><th>Total</th></tr></thead>
+          <tbody>
+            <tr><td>📋 Admin Expenses</td><td>KES ${s.deductions.admin_expenses.cash.toLocaleString()}</td><td>KES ${s.deductions.admin_expenses.mpesa.toLocaleString()}</td><td><strong>KES ${s.deductions.admin_expenses.total.toLocaleString()}</strong></td></tr>
+            <tr><td>👔 Salaries</td><td>KES ${s.deductions.salaries.cash.toLocaleString()}</td><td>KES ${s.deductions.salaries.mpesa.toLocaleString()}</td><td><strong>KES ${s.deductions.salaries.total.toLocaleString()}</strong></td></tr>
+            <tr><td>🤝 Debts</td><td>KES ${s.deductions.debts.cash.toLocaleString()}</td><td>KES ${s.deductions.debts.mpesa.toLocaleString()}</td><td><strong>KES ${s.deductions.debts.total.toLocaleString()}</strong></td></tr>
+            <tr><td>⏰ Advances</td><td>KES ${s.deductions.advances.cash.toLocaleString()}</td><td>KES ${s.deductions.advances.mpesa.toLocaleString()}</td><td><strong>KES ${s.deductions.advances.total.toLocaleString()}</strong></td></tr>
+            <tr><td>🐟 Fish Purchase</td><td>-</td><td>KES ${s.deductions.fish_purchase.total.toLocaleString()}</td><td><strong>KES ${s.deductions.fish_purchase.total.toLocaleString()}</strong></td></tr>
+            <tr><td>🐠 Mbuta Purchase</td><td>-</td><td>KES ${s.deductions.mbuta_purchase.total.toLocaleString()}</td><td><strong>KES ${s.deductions.mbuta_purchase.total.toLocaleString()}</strong></td></tr>
+            <tr style="background:#fef2f2;font-weight:bold;">
+              <td>TOTAL</td><td>KES ${s.totals.total_cash_deductions.toLocaleString()}</td><td>KES ${s.totals.total_mpesa_deductions.toLocaleString()}</td><td><strong>KES ${s.totals.total_deductions.toLocaleString()}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>`;
+    
+  } catch (error) {
+    console.error('Report error:', error);
+    toast('Failed to load report', 'error');
+  }
+}
+
+function downloadReportPDF() {
+  if (!reportData || !reportData.html) {
+    toast('Load a report first', 'error');
+    return;
+  }
+  
+  const blob = new Blob([reportData.html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Financial_Report_${reportData.business_date}.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  
+  toast('📥 Report downloaded');
+}
+
+async function sendReportWhatsApp() {
+  const businessDate = document.getElementById('reportDate').value;
+  
+  try {
+    const result = await apiRequest('financial/report/whatsapp/', 'POST', { date: businessDate });
+    
+    if (result.whatsapp_url) {
+      window.open(result.whatsapp_url, '_blank');
+      toast('📱 Opening WhatsApp...');
+    }
+  } catch (error) {
+    toast('Failed: ' + error.message, 'error');
+  }
+}
 
 </script>
 
