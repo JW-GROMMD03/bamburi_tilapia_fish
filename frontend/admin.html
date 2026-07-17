@@ -4178,25 +4178,16 @@ let deductionsChart = null;
 let profitTrendChart = null;
 
 async function loadCalculationPanel() {
-   // Clear any cached API responses to force fresh data
   const businessDate = document.getElementById('calcDate').value || new Date().toISOString().split('T')[0];
   document.getElementById('calcDate').value = businessDate;
   
   console.log('📊 Loading calculation panel for:', businessDate);
   
   try {
-    // FORCE fresh fetch - add timestamp to bust any cache
     const data = await apiRequest(`financial/summary/?date=${businessDate}&_=${Date.now()}`);
     console.log('📊 Summary response:', JSON.stringify(data?.totals));
     calculationData = data;
-  const businessDate = document.getElementById('calcDate').value || new Date().toISOString().split('T')[0];
-  document.getElementById('calcDate').value = businessDate;
-  
-  try {
-    const data = await apiRequest(`financial/summary/?date=${businessDate}`);
-    calculationData = data;
     
-    // Update lock status
     const lockStatus = document.getElementById('lockStatus');
     if (data.can_edit) {
       lockStatus.innerHTML = '🔓 Editable';
@@ -4208,23 +4199,19 @@ async function loadCalculationPanel() {
       lockStatus.style.color = '#991b1b';
     }
     
-    // Update system amounts
     document.getElementById('systemCash').textContent = 'KES ' + (data.totals.cash_at_hand || 0).toLocaleString();
     document.getElementById('systemMpesa').textContent = 'KES ' + (data.totals.mpesa_balance || 0).toLocaleString();
     
-    // Show calculated amounts next to real inputs
     var calcCashEl = document.getElementById('calcSystemCash');
     if (calcCashEl) calcCashEl.textContent = 'KES ' + (data.totals.cash_at_hand || 0).toLocaleString();
     var calcMpesaEl = document.getElementById('calcSystemMpesa');
     if (calcMpesaEl) calcMpesaEl.textContent = 'KES ' + (data.totals.mpesa_balance || 0).toLocaleString();
     
-    // Update totals
     document.getElementById('totalCashDeductions').textContent = 'KES ' + (data.totals.total_cash_deductions || 0).toLocaleString();
     document.getElementById('totalMpesaDeductions').textContent = 'KES ' + (data.totals.total_mpesa_deductions || 0).toLocaleString();
     document.getElementById('grandTotalDeductions').textContent = 'KES ' + (data.totals.total_deductions || 0).toLocaleString();
     document.getElementById('netProfitDisplay').textContent = 'KES ' + (data.totals.net_profit || 0).toLocaleString();
     
-    // Render entry lists
     renderEntryList('expenseEntries', data.deductions.admin_expenses.items, 'expense');
     renderEntryList('salaryEntries', data.deductions.salaries.items, 'salary');
     renderEntryList('debtEntries', data.deductions.debts.items, 'debt');
@@ -4232,7 +4219,6 @@ async function loadCalculationPanel() {
     renderEntryList('fishEntries', data.deductions.fish_purchase.items, 'fish_purchase');
     renderEntryList('mbutaEntries', data.deductions.mbuta_purchase.items, 'mbuta_purchase');
     
-    // Load analytics
     loadFinancialAnalytics();
     
   } catch (error) {
@@ -4247,7 +4233,6 @@ function renderEntryList(containerId, items, type) {
     container.innerHTML = '<p style="color:#888;font-size:12px;">No entries</p>';
     return;
   }
-  
   container.innerHTML = items.map(e => `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:#f8fafd;border-radius:6px;margin-bottom:4px;font-size:12px;">
       <span>${escapeHtml(e.person_name || e.description || '')} - KES ${(e.amount || 0).toLocaleString()}</span>
@@ -4261,74 +4246,58 @@ function renderEntryList(containerId, items, type) {
 
 async function addFinancialEntry(type) {
   const businessDate = document.getElementById('calcDate').value;
-  
   if (!calculationData || !calculationData.can_edit) {
     toast('This business day is locked. Cannot add entries.', 'error');
     return;
   }
-  
-  let entryData = {
-    business_date: businessDate,
-    entry_type: type,
-    created_by: currentUser?.id || 'admin'
-  };
-  
+  let entryData = { business_date: businessDate, entry_type: type, created_by: currentUser?.id || 'admin' };
   switch(type) {
     case 'expense':
       entryData.description = document.getElementById('expDesc').value;
       entryData.amount = parseInt(document.getElementById('expAmt').value) || 0;
       entryData.payment_method = document.getElementById('expMethod').value;
       if (!entryData.description || !entryData.amount) { toast('Fill all fields', 'error'); return; }
-      document.getElementById('expDesc').value = '';
-      document.getElementById('expAmt').value = '';
+      document.getElementById('expDesc').value = ''; document.getElementById('expAmt').value = '';
       break;
     case 'salary':
       entryData.person_name = document.getElementById('salName').value;
       entryData.amount = parseInt(document.getElementById('salAmt').value) || 0;
       entryData.payment_method = document.getElementById('salMethod').value;
       if (!entryData.person_name || !entryData.amount) { toast('Fill all fields', 'error'); return; }
-      document.getElementById('salName').value = '';
-      document.getElementById('salAmt').value = '';
+      document.getElementById('salName').value = ''; document.getElementById('salAmt').value = '';
       break;
     case 'debt':
       entryData.person_name = document.getElementById('debtName').value;
       entryData.amount = parseInt(document.getElementById('debtAmt').value) || 0;
       entryData.payment_method = document.getElementById('debtMethod').value;
       if (!entryData.person_name || !entryData.amount) { toast('Fill all fields', 'error'); return; }
-      document.getElementById('debtName').value = '';
-      document.getElementById('debtAmt').value = '';
+      document.getElementById('debtName').value = ''; document.getElementById('debtAmt').value = '';
       break;
     case 'advance':
       entryData.person_name = document.getElementById('advName').value;
       entryData.amount = parseInt(document.getElementById('advAmt').value) || 0;
       entryData.payment_method = document.getElementById('advMethod').value;
       if (!entryData.person_name || !entryData.amount) { toast('Fill all fields', 'error'); return; }
-      document.getElementById('advName').value = '';
-      document.getElementById('advAmt').value = '';
+      document.getElementById('advName').value = ''; document.getElementById('advAmt').value = '';
       break;
     case 'fish_purchase':
       entryData.amount = parseInt(document.getElementById('fishAmt').value) || 0;
-      entryData.payment_method = 'mpesa';
-      entryData.description = 'Fish Purchase';
+      entryData.payment_method = 'mpesa'; entryData.description = 'Fish Purchase';
       if (!entryData.amount) { toast('Enter amount', 'error'); return; }
       document.getElementById('fishAmt').value = '';
       break;
     case 'mbuta_purchase':
       entryData.amount = parseInt(document.getElementById('mbutaAmt').value) || 0;
-      entryData.payment_method = 'mpesa';
-      entryData.description = 'Mbuta Purchase';
+      entryData.payment_method = 'mpesa'; entryData.description = 'Mbuta Purchase';
       if (!entryData.amount) { toast('Enter amount', 'error'); return; }
       document.getElementById('mbutaAmt').value = '';
       break;
   }
-  
   try {
     await apiRequest('financial/entries/', 'POST', entryData);
     toast('✅ Entry added');
     loadCalculationPanel();
-  } catch (error) {
-    toast('Failed: ' + error.message, 'error');
-  }
+  } catch (error) { toast('Failed: ' + error.message, 'error'); }
 }
 
 async function deleteFinancialEntry(entryId) {
@@ -4337,145 +4306,48 @@ async function deleteFinancialEntry(entryId) {
     await apiRequest(`financial/entries/${entryId}/`, 'DELETE');
     toast('🗑️ Deleted');
     loadCalculationPanel();
-  } catch (error) {
-    toast('Failed: ' + error.message, 'error');
-  }
+  } catch (error) { toast('Failed: ' + error.message, 'error'); }
 }
 
 async function adjustSurplus(method) {
   const businessDate = document.getElementById('calcDate').value;
   const inputId = method === 'cash' ? 'realCash' : 'realMpesa';
   const realAmount = parseInt(document.getElementById(inputId).value) || 0;
-  
   if (!realAmount) { toast('Enter real amount', 'error'); return; }
-  
   const btn = event.target;
   btn.disabled = true;
   const originalText = btn.textContent;
   btn.textContent = '⏳ Processing...';
-  
   try {
-    console.log('🔧 Sending surplus adjustment:', { method, realAmount, businessDate });
-    
     const result = await apiRequest('financial/surplus-adjust/', 'POST', {
-      business_date: businessDate,
-      payment_method: method,
-      real_amount: realAmount,
-      created_by: currentUser?.id || 'admin'
+      business_date: businessDate, payment_method: method, real_amount: realAmount, created_by: currentUser?.id || 'admin'
     });
-    
-    console.log('🔧 Surplus result:', JSON.stringify(result));
-    
     if (result.success) {
       toast(result.message);
-      
-      // WIPE the input immediately
       document.getElementById(inputId).value = '';
-      
-      // Show what changed
-      if (result.new_amounts) {
-        console.log('🔧 New amounts:', result.new_amounts);
-      }
-      
-      // FORCE multiple refreshes with increasing delays to ensure DB commit
-      setTimeout(async () => {
-        console.log('🔄 Refresh attempt 1 (1.5s)...');
-        await loadCalculationPanel();
-      }, 1500);
-      
-      setTimeout(async () => {
-        console.log('🔄 Refresh attempt 2 (3s)...');
-        await loadCalculationPanel();
-        // Also refresh dashboard
-        await loadDashboard();
-      }, 3000);
-      
-    } else {
-      toast(result.message, 'error');
-    }
-  } catch (error) {
-    console.error('❌ Surplus error:', error);
-    toast('Failed: ' + error.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalText;
-  }
+      setTimeout(async () => { await loadCalculationPanel(); }, 1500);
+      setTimeout(async () => { await loadCalculationPanel(); await loadDashboard(); }, 3000);
+    } else { toast(result.message, 'error'); }
+  } catch (error) { toast('Failed: ' + error.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = originalText; }
 }
 
 async function loadFinancialAnalytics() {
   try {
     const analytics = await apiRequest('financial/analytics/?period=month');
-    
-    // Deductions Pie Chart
     if (calculationData) {
       const ctx = document.getElementById('deductionsChart');
       if (deductionsChart) deductionsChart.destroy();
-      
       const d = calculationData.deductions;
-      deductionsChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: ['Admin Expenses', 'Salaries', 'Debts', 'Advances', 'Fish Purchase', 'Mbuta Purchase'],
-          datasets: [{
-            data: [
-              d.admin_expenses.total, d.salaries.total, d.debts.total,
-              d.advances.total, d.fish_purchase.total, d.mbuta_purchase.total
-            ],
-            backgroundColor: ['#ef4444', '#f59e0b', '#8b5cf6', '#ec4899', '#3b82f6', '#10b981']
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { position: 'bottom' } }
-        }
-      });
+      deductionsChart = new Chart(ctx, { type: 'doughnut', data: { labels: ['Admin Expenses', 'Salaries', 'Debts', 'Advances', 'Fish Purchase', 'Mbuta Purchase'], datasets: [{ data: [d.admin_expenses.total, d.salaries.total, d.debts.total, d.advances.total, d.fish_purchase.total, d.mbuta_purchase.total], backgroundColor: ['#ef4444', '#f59e0b', '#8b5cf6', '#ec4899', '#3b82f6', '#10b981'] }] }, options: { responsive: true, plugins: { legend: { position: 'bottom' } } } });
     }
-    
-    // Profit Trend Chart
     const trendCtx = document.getElementById('profitTrendChart');
     if (profitTrendChart) profitTrendChart.destroy();
-    
     const dailyData = analytics.daily_data || [];
-    profitTrendChart = new Chart(trendCtx, {
-      type: 'line',
-      data: {
-        labels: dailyData.map(d => d.date),
-        datasets: [{
-          label: 'Net Profit',
-          data: dailyData.map(d => d.net_profit),
-          borderColor: '#10b981',
-          backgroundColor: 'rgba(16, 185, 129, 0.1)',
-          fill: true,
-          tension: 0.4
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { position: 'top' } }
-      }
-    });
-    
-    // Leaderboard
+    profitTrendChart = new Chart(trendCtx, { type: 'line', data: { labels: dailyData.map(d => d.date), datasets: [{ label: 'Net Profit', data: dailyData.map(d => d.net_profit), borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.4 }] }, options: { responsive: true, plugins: { legend: { position: 'top' } } } });
     const leaderboard = analytics.leaderboard || [];
-    document.getElementById('leaderboardTable').innerHTML = `
-      <table>
-        <thead><tr><th>Rank</th><th>Month</th><th>Total Sales</th><th>Net Profit</th><th>Avg Daily Profit</th></tr></thead>
-        <tbody>
-          ${leaderboard.map((m, i) => `
-            <tr>
-              <td><span class="badge ${i === 0 ? 'success' : i < 3 ? 'warning' : 'info'}">#${i + 1}</span></td>
-              <td>${m.month}</td>
-              <td>KES ${m.total_sales.toLocaleString()}</td>
-              <td>KES ${m.net_profit.toLocaleString()}</td>
-              <td>KES ${m.avg_daily_profit.toLocaleString()}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>`;
-    
-  } catch (error) {
-    console.error('Analytics error:', error);
-  }
+    document.getElementById('leaderboardTable').innerHTML = `<table><thead><tr><th>Rank</th><th>Month</th><th>Total Sales</th><th>Net Profit</th><th>Avg Daily Profit</th></tr></thead><tbody>${leaderboard.map((m, i) => `<tr><td><span class="badge ${i === 0 ? 'success' : i < 3 ? 'warning' : 'info'}">#${i + 1}</span></td><td>${m.month}</td><td>KES ${m.total_sales.toLocaleString()}</td><td>KES ${m.net_profit.toLocaleString()}</td><td>KES ${m.avg_daily_profit.toLocaleString()}</td></tr>`).join('')}</tbody></table>`;
+  } catch (error) { console.error('Analytics error:', error); }
 }
 
 // ============ REPORT PANEL ============
@@ -4484,90 +4356,34 @@ let reportData = null;
 async function loadReportPanel() {
   const businessDate = document.getElementById('reportDate').value || new Date().toISOString().split('T')[0];
   document.getElementById('reportDate').value = businessDate;
-  
   document.getElementById('reportContent').innerHTML = '<div class="loading">⏳ Loading report...</div>';
-  
   try {
     reportData = await apiRequest(`financial/report/?date=${businessDate}`);
-    
-    if (!reportData || !reportData.summary) {
-      throw new Error('No report data returned');
-    }
-    
+    if (!reportData || !reportData.summary) throw new Error('No report data returned');
     const s = reportData.summary;
-    document.getElementById('reportContent').innerHTML = `
-      <div class="cards" style="margin-bottom:20px;">
-        <div class="card"><h3>💰 Total Sales</h3><p>KES ${(s.sales?.total_sales || 0).toLocaleString()}</p></div>
-        <div class="card"><h3>💵 Cash at Hand</h3><p>KES ${(s.totals?.cash_at_hand || 0).toLocaleString()}</p></div>
-        <div class="card"><h3>📱 M-Pesa Balance</h3><p>KES ${(s.totals?.mpesa_balance || 0).toLocaleString()}</p></div>
-        <div class="card" style="background:#dcfce7;"><h3>📈 NET PROFIT</h3><p>KES ${(s.totals?.net_profit || 0).toLocaleString()}</p></div>
-      </div>
-      
-      <div class="table-wrapper" style="margin-bottom:20px;">
-        <h3 style="padding:15px;">🧾 Deductions Breakdown</h3>
-        <table>
-          <thead><tr><th>Category</th><th>Cash</th><th>M-Pesa</th><th>Total</th></tr></thead>
-          <tbody>
-            <tr><td>📋 Admin Expenses</td><td>KES ${(s.deductions?.admin_expenses?.cash || 0).toLocaleString()}</td><td>KES ${(s.deductions?.admin_expenses?.mpesa || 0).toLocaleString()}</td><td><strong>KES ${(s.deductions?.admin_expenses?.total || 0).toLocaleString()}</strong></td></tr>
-            <tr><td>👔 Salaries</td><td>KES ${(s.deductions?.salaries?.cash || 0).toLocaleString()}</td><td>KES ${(s.deductions?.salaries?.mpesa || 0).toLocaleString()}</td><td><strong>KES ${(s.deductions?.salaries?.total || 0).toLocaleString()}</strong></td></tr>
-            <tr><td>🤝 Debts</td><td>KES ${(s.deductions?.debts?.cash || 0).toLocaleString()}</td><td>KES ${(s.deductions?.debts?.mpesa || 0).toLocaleString()}</td><td><strong>KES ${(s.deductions?.debts?.total || 0).toLocaleString()}</strong></td></tr>
-            <tr><td>⏰ Advances</td><td>KES ${(s.deductions?.advances?.cash || 0).toLocaleString()}</td><td>KES ${(s.deductions?.advances?.mpesa || 0).toLocaleString()}</td><td><strong>KES ${(s.deductions?.advances?.total || 0).toLocaleString()}</strong></td></tr>
-            <tr><td>🐟 Fish Purchase</td><td>-</td><td>KES ${(s.deductions?.fish_purchase?.total || 0).toLocaleString()}</td><td><strong>KES ${(s.deductions?.fish_purchase?.total || 0).toLocaleString()}</strong></td></tr>
-            <tr><td>🐠 Mbuta Purchase</td><td>-</td><td>KES ${(s.deductions?.mbuta_purchase?.total || 0).toLocaleString()}</td><td><strong>KES ${(s.deductions?.mbuta_purchase?.total || 0).toLocaleString()}</strong></td></tr>
-            <tr style="background:#fef2f2;font-weight:bold;">
-              <td>TOTAL</td><td>KES ${(s.totals?.total_cash_deductions || 0).toLocaleString()}</td><td>KES ${(s.totals?.total_mpesa_deductions || 0).toLocaleString()}</td><td><strong>KES ${(s.totals?.total_deductions || 0).toLocaleString()}</strong></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>`;
-    
+    document.getElementById('reportContent').innerHTML = `<div class="cards" style="margin-bottom:20px;"><div class="card"><h3>💰 Total Sales</h3><p>KES ${(s.sales?.total_sales || 0).toLocaleString()}</p></div><div class="card"><h3>💵 Cash at Hand</h3><p>KES ${(s.totals?.cash_at_hand || 0).toLocaleString()}</p></div><div class="card"><h3>📱 M-Pesa Balance</h3><p>KES ${(s.totals?.mpesa_balance || 0).toLocaleString()}</p></div><div class="card" style="background:#dcfce7;"><h3>📈 NET PROFIT</h3><p>KES ${(s.totals?.net_profit || 0).toLocaleString()}</p></div></div><div class="table-wrapper" style="margin-bottom:20px;"><h3 style="padding:15px;">🧾 Deductions Breakdown</h3><table><thead><tr><th>Category</th><th>Cash</th><th>M-Pesa</th><th>Total</th></tr></thead><tbody><tr><td>📋 Admin Expenses</td><td>KES ${(s.deductions?.admin_expenses?.cash || 0).toLocaleString()}</td><td>KES ${(s.deductions?.admin_expenses?.mpesa || 0).toLocaleString()}</td><td><strong>KES ${(s.deductions?.admin_expenses?.total || 0).toLocaleString()}</strong></td></tr><tr><td>👔 Salaries</td><td>KES ${(s.deductions?.salaries?.cash || 0).toLocaleString()}</td><td>KES ${(s.deductions?.salaries?.mpesa || 0).toLocaleString()}</td><td><strong>KES ${(s.deductions?.salaries?.total || 0).toLocaleString()}</strong></td></tr><tr><td>🤝 Debts</td><td>KES ${(s.deductions?.debts?.cash || 0).toLocaleString()}</td><td>KES ${(s.deductions?.debts?.mpesa || 0).toLocaleString()}</td><td><strong>KES ${(s.deductions?.debts?.total || 0).toLocaleString()}</strong></td></tr><tr><td>⏰ Advances</td><td>KES ${(s.deductions?.advances?.cash || 0).toLocaleString()}</td><td>KES ${(s.deductions?.advances?.mpesa || 0).toLocaleString()}</td><td><strong>KES ${(s.deductions?.advances?.total || 0).toLocaleString()}</strong></td></tr><tr><td>🐟 Fish Purchase</td><td>-</td><td>KES ${(s.deductions?.fish_purchase?.total || 0).toLocaleString()}</td><td><strong>KES ${(s.deductions?.fish_purchase?.total || 0).toLocaleString()}</strong></td></tr><tr><td>🐠 Mbuta Purchase</td><td>-</td><td>KES ${(s.deductions?.mbuta_purchase?.total || 0).toLocaleString()}</td><td><strong>KES ${(s.deductions?.mbuta_purchase?.total || 0).toLocaleString()}</strong></td></tr><tr style="background:#fef2f2;font-weight:bold;"><td>TOTAL</td><td>KES ${(s.totals?.total_cash_deductions || 0).toLocaleString()}</td><td>KES ${(s.totals?.total_mpesa_deductions || 0).toLocaleString()}</td><td><strong>KES ${(s.totals?.total_deductions || 0).toLocaleString()}</strong></td></tr></tbody></table></div>`;
   } catch (error) {
-    console.error('Report error:', error);
-    document.getElementById('reportContent').innerHTML = `
-      <div style="text-align:center;padding:40px;color:#888;">
-        <p style="font-size:3rem;">📋</p>
-        <p><strong>Failed to load report</strong></p>
-        <p style="font-size:12px;">${error.message || 'The report endpoint may not be available yet.'}</p>
-        <button class="btn" onclick="loadReportPanel()">🔄 Retry</button>
-      </div>`;
+    document.getElementById('reportContent').innerHTML = `<div style="text-align:center;padding:40px;color:#888;"><p style="font-size:3rem;">📋</p><p><strong>Failed to load report</strong></p><p style="font-size:12px;">${error.message || 'Endpoint may not be available'}</p><button class="btn" onclick="loadReportPanel()">🔄 Retry</button></div>`;
   }
 }
 
 function downloadReportPDF() {
-  if (!reportData || !reportData.html) {
-    toast('Load a report first', 'error');
-    return;
-  }
-  
+  if (!reportData || !reportData.html) { toast('Load a report first', 'error'); return; }
   const blob = new Blob([reportData.html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `Financial_Report_${reportData.business_date}.html`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  
+  const a = document.createElement('a'); a.href = url; a.download = `Financial_Report_${reportData.business_date}.html`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
   toast('📥 Report downloaded');
 }
 
 async function sendReportWhatsApp() {
   const businessDate = document.getElementById('reportDate').value;
-  
   try {
     const result = await apiRequest('financial/report/whatsapp/', 'POST', { date: businessDate });
-    
-    if (result.whatsapp_url) {
-      window.open(result.whatsapp_url, '_blank');
-      toast('📱 Opening WhatsApp...');
-    }
-  } catch (error) {
-    toast('Failed: ' + error.message, 'error');
-  }
+    if (result.whatsapp_url) { window.open(result.whatsapp_url, '_blank'); toast('📱 Opening WhatsApp...'); }
+  } catch (error) { toast('Failed: ' + error.message, 'error'); }
 }
 
 </script>
-
 </body>
 </html>
