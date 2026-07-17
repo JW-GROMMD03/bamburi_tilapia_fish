@@ -304,7 +304,7 @@ class SupabaseDB:
                 'cash_amount': data.get('cash_amount', data.get('cashAmt', 0)),
                 'mpesa_amount': data.get('mpesa_amount', data.get('mpesaAmt', 0)),
                 'items': data.get('items', '[]'),
-                'cashier_id': str(data.get('cashier_id', '')),
+                'cashier_id': str(data.get('cashier_id', '00000000-0000-0000-0000-000000000000')),
                 'cashier_name': str(data.get('cashier_name', '')),
                 'shift': str(data.get('shift', 'day')),
                 'created_at': data.get('created_at', datetime.now().isoformat())

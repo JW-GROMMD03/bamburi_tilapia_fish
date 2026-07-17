@@ -1759,7 +1759,7 @@ def surplus_adjust(request):
                 'cash_amount': dist['surplus_allocated'] if payment_method == 'cash' else 0,
                 'mpesa_amount': dist['surplus_allocated'] if payment_method == 'mpesa' else 0,
                 'items': json.dumps(correction_items),
-                'cashier_id': 'system',
+                'cashier_id': '00000000-0000-0000-0000-000000000000',  # System UUID instead of "system"
                 'cashier_name': 'System (Surplus Correction)',
                 'shift': 'day',
                 'created_at': now.isoformat()
