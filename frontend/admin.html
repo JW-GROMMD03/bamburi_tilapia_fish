@@ -1311,19 +1311,23 @@ flex-wrap:wrap;
     <div class="card" style="background: linear-gradient(135deg, #dcfce7, #f0fdf4);">
       <h3>💵 System Cash at Hand</h3>
       <p id="systemCash" style="font-size: 28px;">KES 0</p>
+      <small style="color:#166534;">Cash Sales − All Cash Deductions</small>
     </div>
     <div class="card" style="background: linear-gradient(135deg, #fef3c7, #fffbeb);">
       <h3>🏦 Real Cash at Hand</h3>
-      <input type="number" id="realCash" placeholder="Enter real cash amount" style="width:100%;padding:10px;border-radius:10px;border:2px solid #f59e0b;font-size:18px;margin-top:8px;">
+      <p style="font-size:14px;color:#888;margin-bottom:4px;">System says: <strong id="calcSystemCash" style="color:#0b3954;">KES 0</strong></p>
+      <input type="number" id="realCash" placeholder="Enter actual cash counted" style="width:100%;padding:10px;border-radius:10px;border:2px solid #f59e0b;font-size:18px;margin-top:4px;">
       <button class="btn-sm" onclick="adjustSurplus('cash')" style="background:#f59e0b;color:white;margin-top:8px;">🔄 Adjust Cash</button>
     </div>
     <div class="card" style="background: linear-gradient(135deg, #dbeafe, #eff6ff);">
-      <h3>📱 System M-Pesa</h3>
+      <h3>📱 System M-Pesa Balance</h3>
       <p id="systemMpesa" style="font-size: 28px;">KES 0</p>
+      <small style="color:#1e40af;">M-Pesa Sales − All M-Pesa Deductions</small>
     </div>
     <div class="card" style="background: linear-gradient(135deg, #e8f4f8, #f0f9ff);">
-      <h3>📱 Real M-Pesa</h3>
-      <input type="number" id="realMpesa" placeholder="Enter real MPesa amount" style="width:100%;padding:10px;border-radius:10px;border:2px solid #3b82f6;font-size:18px;margin-top:8px;">
+      <h3>📱 Real M-Pesa Balance</h3>
+      <p style="font-size:14px;color:#888;margin-bottom:4px;">System says: <strong id="calcSystemMpesa" style="color:#0b3954;">KES 0</strong></p>
+      <input type="number" id="realMpesa" placeholder="Enter actual M-Pesa balance" style="width:100%;padding:10px;border-radius:10px;border:2px solid #3b82f6;font-size:18px;margin-top:4px;">
       <button class="btn-sm" onclick="adjustSurplus('mpesa')" style="background:#3b82f6;color:white;margin-top:8px;">🔄 Adjust M-Pesa</button>
     </div>
   </div>
@@ -4197,6 +4201,12 @@ async function loadCalculationPanel() {
     document.getElementById('systemCash').textContent = 'KES ' + (data.totals.cash_at_hand || 0).toLocaleString();
     document.getElementById('systemMpesa').textContent = 'KES ' + (data.totals.mpesa_balance || 0).toLocaleString();
     
+    // Show calculated amounts next to real inputs
+    var calcCashEl = document.getElementById('calcSystemCash');
+    if (calcCashEl) calcCashEl.textContent = 'KES ' + (data.totals.cash_at_hand || 0).toLocaleString();
+    var calcMpesaEl = document.getElementById('calcSystemMpesa');
+    if (calcMpesaEl) calcMpesaEl.textContent = 'KES ' + (data.totals.mpesa_balance || 0).toLocaleString();
+    
     // Update totals
     document.getElementById('totalCashDeductions').textContent = 'KES ' + (data.totals.total_cash_deductions || 0).toLocaleString();
     document.getElementById('totalMpesaDeductions').textContent = 'KES ' + (data.totals.total_mpesa_deductions || 0).toLocaleString();
@@ -4323,9 +4333,15 @@ async function deleteFinancialEntry(entryId) {
 
 async function adjustSurplus(method) {
   const businessDate = document.getElementById('calcDate').value;
-  const realAmount = parseInt(document.getElementById(method === 'cash' ? 'realCash' : 'realMpesa').value) || 0;
+  const inputId = method === 'cash' ? 'realCash' : 'realMpesa';
+  const realAmount = parseInt(document.getElementById(inputId).value) || 0;
   
   if (!realAmount) { toast('Enter real amount', 'error'); return; }
+  
+  // Disable button during request
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = '⏳ Processing...';
   
   try {
     const result = await apiRequest('financial/surplus-adjust/', 'POST', {
@@ -4341,9 +4357,16 @@ async function adjustSurplus(method) {
       toast(result.message, 'error');
     }
     
-    loadCalculationPanel();
+    // WIPE the input immediately to avoid double entry
+    document.getElementById(inputId).value = '';
+    
+    // Reload panel to show updated amounts
+    await loadCalculationPanel();
   } catch (error) {
     toast('Failed: ' + error.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = method === 'cash' ? '🔄 Adjust Cash' : '🔄 Adjust M-Pesa';
   }
 }
 
@@ -4430,16 +4453,22 @@ async function loadReportPanel() {
   const businessDate = document.getElementById('reportDate').value || new Date().toISOString().split('T')[0];
   document.getElementById('reportDate').value = businessDate;
   
+  document.getElementById('reportContent').innerHTML = '<div class="loading">⏳ Loading report...</div>';
+  
   try {
     reportData = await apiRequest(`financial/report/?date=${businessDate}`);
+    
+    if (!reportData || !reportData.summary) {
+      throw new Error('No report data returned');
+    }
     
     const s = reportData.summary;
     document.getElementById('reportContent').innerHTML = `
       <div class="cards" style="margin-bottom:20px;">
-        <div class="card"><h3>💰 Total Sales</h3><p>KES ${s.sales.total_sales.toLocaleString()}</p></div>
-        <div class="card"><h3>💵 Cash at Hand</h3><p>KES ${s.totals.cash_at_hand.toLocaleString()}</p></div>
-        <div class="card"><h3>📱 M-Pesa Balance</h3><p>KES ${s.totals.mpesa_balance.toLocaleString()}</p></div>
-        <div class="card" style="background:#dcfce7;"><h3>📈 NET PROFIT</h3><p>KES ${s.totals.net_profit.toLocaleString()}</p></div>
+        <div class="card"><h3>💰 Total Sales</h3><p>KES ${(s.sales?.total_sales || 0).toLocaleString()}</p></div>
+        <div class="card"><h3>💵 Cash at Hand</h3><p>KES ${(s.totals?.cash_at_hand || 0).toLocaleString()}</p></div>
+        <div class="card"><h3>📱 M-Pesa Balance</h3><p>KES ${(s.totals?.mpesa_balance || 0).toLocaleString()}</p></div>
+        <div class="card" style="background:#dcfce7;"><h3>📈 NET PROFIT</h3><p>KES ${(s.totals?.net_profit || 0).toLocaleString()}</p></div>
       </div>
       
       <div class="table-wrapper" style="margin-bottom:20px;">
@@ -4447,14 +4476,14 @@ async function loadReportPanel() {
         <table>
           <thead><tr><th>Category</th><th>Cash</th><th>M-Pesa</th><th>Total</th></tr></thead>
           <tbody>
-            <tr><td>📋 Admin Expenses</td><td>KES ${s.deductions.admin_expenses.cash.toLocaleString()}</td><td>KES ${s.deductions.admin_expenses.mpesa.toLocaleString()}</td><td><strong>KES ${s.deductions.admin_expenses.total.toLocaleString()}</strong></td></tr>
-            <tr><td>👔 Salaries</td><td>KES ${s.deductions.salaries.cash.toLocaleString()}</td><td>KES ${s.deductions.salaries.mpesa.toLocaleString()}</td><td><strong>KES ${s.deductions.salaries.total.toLocaleString()}</strong></td></tr>
-            <tr><td>🤝 Debts</td><td>KES ${s.deductions.debts.cash.toLocaleString()}</td><td>KES ${s.deductions.debts.mpesa.toLocaleString()}</td><td><strong>KES ${s.deductions.debts.total.toLocaleString()}</strong></td></tr>
-            <tr><td>⏰ Advances</td><td>KES ${s.deductions.advances.cash.toLocaleString()}</td><td>KES ${s.deductions.advances.mpesa.toLocaleString()}</td><td><strong>KES ${s.deductions.advances.total.toLocaleString()}</strong></td></tr>
-            <tr><td>🐟 Fish Purchase</td><td>-</td><td>KES ${s.deductions.fish_purchase.total.toLocaleString()}</td><td><strong>KES ${s.deductions.fish_purchase.total.toLocaleString()}</strong></td></tr>
-            <tr><td>🐠 Mbuta Purchase</td><td>-</td><td>KES ${s.deductions.mbuta_purchase.total.toLocaleString()}</td><td><strong>KES ${s.deductions.mbuta_purchase.total.toLocaleString()}</strong></td></tr>
+            <tr><td>📋 Admin Expenses</td><td>KES ${(s.deductions?.admin_expenses?.cash || 0).toLocaleString()}</td><td>KES ${(s.deductions?.admin_expenses?.mpesa || 0).toLocaleString()}</td><td><strong>KES ${(s.deductions?.admin_expenses?.total || 0).toLocaleString()}</strong></td></tr>
+            <tr><td>👔 Salaries</td><td>KES ${(s.deductions?.salaries?.cash || 0).toLocaleString()}</td><td>KES ${(s.deductions?.salaries?.mpesa || 0).toLocaleString()}</td><td><strong>KES ${(s.deductions?.salaries?.total || 0).toLocaleString()}</strong></td></tr>
+            <tr><td>🤝 Debts</td><td>KES ${(s.deductions?.debts?.cash || 0).toLocaleString()}</td><td>KES ${(s.deductions?.debts?.mpesa || 0).toLocaleString()}</td><td><strong>KES ${(s.deductions?.debts?.total || 0).toLocaleString()}</strong></td></tr>
+            <tr><td>⏰ Advances</td><td>KES ${(s.deductions?.advances?.cash || 0).toLocaleString()}</td><td>KES ${(s.deductions?.advances?.mpesa || 0).toLocaleString()}</td><td><strong>KES ${(s.deductions?.advances?.total || 0).toLocaleString()}</strong></td></tr>
+            <tr><td>🐟 Fish Purchase</td><td>-</td><td>KES ${(s.deductions?.fish_purchase?.total || 0).toLocaleString()}</td><td><strong>KES ${(s.deductions?.fish_purchase?.total || 0).toLocaleString()}</strong></td></tr>
+            <tr><td>🐠 Mbuta Purchase</td><td>-</td><td>KES ${(s.deductions?.mbuta_purchase?.total || 0).toLocaleString()}</td><td><strong>KES ${(s.deductions?.mbuta_purchase?.total || 0).toLocaleString()}</strong></td></tr>
             <tr style="background:#fef2f2;font-weight:bold;">
-              <td>TOTAL</td><td>KES ${s.totals.total_cash_deductions.toLocaleString()}</td><td>KES ${s.totals.total_mpesa_deductions.toLocaleString()}</td><td><strong>KES ${s.totals.total_deductions.toLocaleString()}</strong></td>
+              <td>TOTAL</td><td>KES ${(s.totals?.total_cash_deductions || 0).toLocaleString()}</td><td>KES ${(s.totals?.total_mpesa_deductions || 0).toLocaleString()}</td><td><strong>KES ${(s.totals?.total_deductions || 0).toLocaleString()}</strong></td>
             </tr>
           </tbody>
         </table>
@@ -4462,7 +4491,13 @@ async function loadReportPanel() {
     
   } catch (error) {
     console.error('Report error:', error);
-    toast('Failed to load report', 'error');
+    document.getElementById('reportContent').innerHTML = `
+      <div style="text-align:center;padding:40px;color:#888;">
+        <p style="font-size:3rem;">📋</p>
+        <p><strong>Failed to load report</strong></p>
+        <p style="font-size:12px;">${error.message || 'The report endpoint may not be available yet.'}</p>
+        <button class="btn" onclick="loadReportPanel()">🔄 Retry</button>
+      </div>`;
   }
 }
 
