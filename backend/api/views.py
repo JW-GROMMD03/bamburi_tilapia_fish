@@ -1605,13 +1605,14 @@ def financial_summary(request):
         'surplus': surplus_data
     })
 
-
 @api_view(['POST'])
 def surplus_adjust(request):
     """
     Handle surplus adjustments.
-    When real > system: Creates correction transactions to account for unrecorded sales.
-    The surplus is distributed proportionally to day shift sales categories.
+    When counted cash > system cash: Creates correction transactions with proportional item distribution.
+    Example: System cash=13,000, Counted=15,000, Surplus=2,000
+    If only fish 250 was sold in cash, fish quantity increases proportionally.
+    Total cash sales updates to reflect the surplus.
     """
     try:
         data = request.data
@@ -1621,39 +1622,32 @@ def surplus_adjust(request):
             return Response({'error': 'Business day is locked'}, status=403)
         
         payment_method = data.get('payment_method', 'cash')
-        real_amount = int(data.get('real_amount', 0))
+        counted_amount = int(data.get('real_amount', 0))
         
         # Get all transactions for this date
         transactions = SupabaseDB.get_tx(business_date) or []
-        
-        # Get financial entries for deductions
         fin_entries = get_fin_entries_for_date(business_date)
         cashier_expenses = SupabaseDB.get_exp(business_date) or []
         
+        # Filter by payment method for distribution
+        method_tx = [t for t in transactions if t.get('method') == payment_method and t.get('shift') == 'day']
+        
         if payment_method == 'cash':
-            # Calculate system cash at hand
             cash_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'cash')
             fin_cash_deductions = sum(e.get('amount', 0) for e in fin_entries if e.get('payment_method') == 'cash')
             cashier_exp_deductions = sum(e.get('amount', 0) for e in cashier_expenses)
             system_amount = cash_sales - fin_cash_deductions - cashier_exp_deductions
-            
-            # Only consider day shift transactions for distribution
-            method_tx = [t for t in transactions if t.get('method') == 'cash' and t.get('shift') == 'day']
         else:
-            # Calculate system mpesa balance
             mpesa_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'mpesa')
             fin_mpesa_deductions = sum(e.get('amount', 0) for e in fin_entries if e.get('payment_method') == 'mpesa')
             system_amount = mpesa_sales - fin_mpesa_deductions
-            
-            # Only consider day shift transactions for distribution
-            method_tx = [t for t in transactions if t.get('method') == 'mpesa' and t.get('shift') == 'day']
         
-        difference = real_amount - system_amount
+        difference = counted_amount - system_amount
         
         if difference < 0:
             return Response({
                 'success': False,
-                'message': f'⚠️ MONEY LOST: KES {abs(difference):,} is missing in {payment_method}. System (KES {system_amount:,}) > Real (KES {real_amount:,}).',
+                'message': f'⚠️ MONEY LOST: KES {abs(difference):,} missing in {payment_method}. System: KES {system_amount:,}, Counted: KES {counted_amount:,}.',
                 'difference': difference,
                 'status': 'loss'
             })
@@ -1664,73 +1658,174 @@ def surplus_adjust(request):
                 'difference': 0,
                 'status': 'match'
             })
-        else:
-            # Surplus - distribute and CREATE correction transactions
-            distribution = distribute_surplus(method_tx, difference, payment_method)
+        
+        # === SURPLUS: Distribute proportionally to item-level ===
+        # Step 1: Calculate total sales and per-item percentages
+        item_stats = {}  # key: item_name, value: {total_amount, quantity, price}
+        total_method_sales = 0
+        
+        for tx in method_tx:
+            items = tx.get('items', [])
+            if isinstance(items, str):
+                try:
+                    items = json.loads(items)
+                except:
+                    items = []
             
-            # CREATE correction transactions for each category
-            created_tx_ids = []
-            now = datetime.now()
-            
-            for cat, dist in distribution.items():
-                if dist['surplus_added'] <= 0:
+            for item in items:
+                if not isinstance(item, dict):
                     continue
+                name = item.get('name', 'Unknown')
+                price = item.get('price', 0)
+                qty = item.get('qty', 1)
+                item_total = price * qty
                 
-                # Create a correction transaction
-                correction_item = {
-                    'name': f'{cat} (Correction)',
-                    'price': dist['surplus_added'],
-                    'qty': 1
-                }
-                
-                correction_tx = {
-                    'date': business_date,
-                    'time': now.strftime('%H:%M'),
-                    'total': dist['surplus_added'],
-                    'method': payment_method,
-                    'cash_amount': dist['surplus_added'] if payment_method == 'cash' else 0,
-                    'mpesa_amount': dist['surplus_added'] if payment_method == 'mpesa' else 0,
-                    'items': json.dumps([correction_item]),
-                    'cashier_id': 'system',
-                    'cashier_name': 'System (Surplus Correction)',
-                    'shift': 'day',
-                    'created_at': now.isoformat()
-                }
-                
-                saved = SupabaseDB.save_tx(correction_tx)
-                if saved:
-                    created_tx_ids.append(saved.get('id'))
+                if name not in item_stats:
+                    item_stats[name] = {'total_amount': 0, 'quantity': 0, 'price': price}
+                item_stats[name]['total_amount'] += item_total
+                item_stats[name]['quantity'] += qty
+                total_method_sales += item_total
+        
+        if total_method_sales == 0:
+            return Response({
+                'success': False,
+                'message': 'No sales found for distribution. Cannot allocate surplus.',
+                'status': 'error'
+            })
+        
+        # Step 2: Distribute surplus proportionally, tracking remainder
+        distribution = []
+        remaining = difference
+        
+        for name, stats in sorted(item_stats.items(), key=lambda x: x[1]['total_amount'], reverse=True):
+            percentage = (stats['total_amount'] / total_method_sales) * 100
+            # Calculate proportional share
+            exact_share = (stats['total_amount'] / total_method_sales) * difference
+            rounded_share = int(round(exact_share))
             
-            # Save surplus record
-            surplus_entry = {
-                'business_date': business_date,
-                'entry_type': 'surplus_adjustment',
-                'description': f'Surplus distribution ({payment_method}) - {len(created_tx_ids)} corrections created',
-                'person_name': 'System',
-                'amount': difference,
-                'payment_method': payment_method,
+            # Calculate how many extra items this represents
+            item_price = stats['price']
+            if item_price > 0:
+                extra_qty = rounded_share // item_price
+                actual_amount = extra_qty * item_price
+            else:
+                extra_qty = 0
+                actual_amount = 0
+            
+            distribution.append({
+                'item_name': name,
+                'item_price': item_price,
+                'original_amount': stats['total_amount'],
+                'original_quantity': stats['quantity'],
+                'percentage': round(percentage, 1),
+                'surplus_allocated': actual_amount,
+                'extra_quantity': extra_qty,
+                'new_total_amount': stats['total_amount'] + actual_amount,
+                'new_quantity': stats['quantity'] + extra_qty
+            })
+            remaining -= actual_amount
+        
+        # Step 3: Handle remainder - add to the largest item
+        if remaining > 0 and distribution:
+            largest = distribution[0]
+            largest_price = largest['item_price']
+            if largest_price > 0:
+                extra_qty = remaining // largest_price
+                if extra_qty == 0:
+                    extra_qty = 1
+                    remaining = largest_price  # Use full price for 1 item
+                else:
+                    remaining = extra_qty * largest_price
+                
+                largest['surplus_allocated'] += remaining
+                largest['extra_quantity'] += extra_qty
+                largest['new_total_amount'] = largest['original_amount'] + largest['surplus_allocated']
+                largest['new_quantity'] = largest['original_quantity'] + largest['extra_quantity']
+        
+        # Step 4: Create correction transactions for each item with surplus
+        created_tx_ids = []
+        now = datetime.now()
+        
+        for dist in distribution:
+            if dist['extra_quantity'] <= 0 or dist['surplus_allocated'] <= 0:
+                continue
+            
+            # Create correction items
+            correction_items = [{
+                'name': dist['item_name'],
+                'price': dist['item_price'],
+                'qty': dist['extra_quantity']
+            }]
+            
+            correction_tx = {
+                'date': business_date,
+                'time': now.strftime('%H:%M'),
+                'total': dist['surplus_allocated'],
+                'method': payment_method,
+                'cash_amount': dist['surplus_allocated'] if payment_method == 'cash' else 0,
+                'mpesa_amount': dist['surplus_allocated'] if payment_method == 'mpesa' else 0,
+                'items': json.dumps(correction_items),
+                'cashier_id': 'system',
+                'cashier_name': 'System (Surplus Correction)',
                 'shift': 'day',
-                'created_by': str(data.get('created_by', 'admin')),
-                'created_at': now.isoformat(),
-                'distribution': json.dumps(distribution)
+                'created_at': now.isoformat()
             }
             
-            if SupabaseDB._ok():
-                url = f"{SupabaseDB.BASE}/rest/v1/financial_entries"
-                headers = SupabaseDB._h()
-                headers['Prefer'] = 'return=representation'
-                requests.post(url, headers=headers, json=surplus_entry)
-            
-            return Response({
-                'success': True,
-                'message': f'✅ Surplus of KES {difference:,} distributed across {len(created_tx_ids)} categories. {len(created_tx_ids)} correction transactions created.',
-                'difference': difference,
-                'distribution': distribution,
-                'corrections_created': len(created_tx_ids),
-                'status': 'surplus'
-            })
+            saved = SupabaseDB.save_tx(correction_tx)
+            if saved:
+                created_tx_ids.append({
+                    'id': saved.get('id'),
+                    'item': dist['item_name'],
+                    'qty_added': dist['extra_quantity'],
+                    'amount': dist['surplus_allocated']
+                })
+        
+        # Step 5: Save surplus record
+        surplus_entry = {
+            'business_date': business_date,
+            'entry_type': 'surplus_adjustment',
+            'description': f'Surplus {payment_method}: KES {difference:,} → {len(created_tx_ids)} corrections',
+            'person_name': 'System',
+            'amount': difference,
+            'payment_method': payment_method,
+            'shift': 'day',
+            'created_by': str(data.get('created_by', 'admin')),
+            'created_at': now.isoformat(),
+            'distribution': json.dumps(distribution)
+        }
+        
+        if SupabaseDB._ok():
+            url = f"{SupabaseDB.BASE}/rest/v1/financial_entries"
+            headers = SupabaseDB._h()
+            headers['Prefer'] = 'return=representation'
+            requests.post(url, headers=headers, json=surplus_entry)
+        
+        # Calculate new totals
+        if payment_method == 'cash':
+            new_cash_sales = cash_sales + difference
+            new_cash_at_hand = new_cash_sales - fin_cash_deductions - cashier_exp_deductions
+        else:
+            new_mpesa_sales = mpesa_sales + difference
+            new_mpesa_balance = new_mpesa_sales - fin_mpesa_deductions
+        
+        return Response({
+            'success': True,
+            'message': f'✅ Surplus KES {difference:,} distributed to {len(created_tx_ids)} items. System now matches counted amount.',
+            'difference': difference,
+            'distribution': distribution,
+            'corrections_created': created_tx_ids,
+            'status': 'surplus',
+            'new_amounts': {
+                'system_amount': counted_amount,
+                'total_sales': new_cash_sales if payment_method == 'cash' else new_mpesa_sales,
+                'cash_at_hand': new_cash_at_hand if payment_method == 'cash' else None,
+                'mpesa_balance': new_mpesa_balance if payment_method == 'mpesa' else None
+            }
+        })
             
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return Response({'error': str(e)}, status=400)
 
 
@@ -2010,53 +2105,92 @@ def financial_report(request):
         now = datetime.now()
         lock_status = 'Locked (72+ hrs)' if not is_date_editable(business_date) else 'Editable'
         
-        html = f"""<html><head><meta charset="UTF-8"><style>
-            body {{ font-family: Arial, sans-serif; padding: 30px; color: #1e293b; }}
-            h1 {{ text-align: center; color: #0f172a; border-bottom: 3px solid #f59e0b; padding-bottom: 10px; }}
-            h2 {{ color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; margin-top: 25px; }}
+        html = f"""<!DOCTYPE html>
+        <html><head><meta charset="UTF-8"><style>
+            body {{ font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1e293b; position: relative; }}
+            h1 {{ text-align: center; color: #0f172a; border-bottom: 3px solid #f59e0b; padding-bottom: 15px; font-size: 22px; }}
+            h2 {{ color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-top: 30px; font-size: 16px; }}
             table {{ width: 100%; border-collapse: collapse; margin: 15px 0; }}
-            th {{ background: #0f172a; color: white; padding: 10px; text-align: left; font-size: 12px; }}
-            td {{ padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; }}
+            th {{ background: #0f172a; color: white; padding: 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }}
+            td {{ padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 11px; }}
             .total-row {{ background: #f0fdf4; font-weight: bold; }}
-            .summary-box {{ background: #f8fafd; border: 2px solid #0f172a; border-radius: 10px; padding: 15px; margin: 15px 0; }}
-            .footer {{ text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #f59e0b; font-size: 10px; color: #64748b; }}
+            .total-row td {{ border-top: 2px solid #0f172a; }}
+            .summary-box {{ background: #f8fafd; border: 2px solid #0f172a; border-radius: 12px; padding: 20px; margin: 20px 0; }}
+            .footer {{ text-align: center; margin-top: 40px; padding-top: 20px; border-top: 2px solid #f59e0b; font-size: 9px; color: #64748b; }}
+            .positive {{ color: #10b981; font-weight: 700; }}
+            .negative {{ color: #ef4444; font-weight: 700; }}
+            .header-logo {{ text-align: center; font-size: 40px; margin-bottom: 5px; }}
+            .watermark-container {{
+                position: fixed;
+                top: 0; left: 0;
+                width: 100%; height: 100%;
+                pointer-events: none;
+                z-index: 0;
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                justify-content: center;
+                gap: 250px;
+                opacity: 0.04;
+            }}
+            .watermark-text {{
+                font-size: 55px;
+                font-weight: 900;
+                color: #000;
+                transform: rotate(-25deg);
+                white-space: nowrap;
+                letter-spacing: 8px;
+            }}
+            .content {{ position: relative; z-index: 1; }}
         </style></head><body>
-        <h1>🐟 BAMBURI TILAPIA FISH HOTEL<br>FINANCIAL REPORT</h1>
+        <div class="watermark-container">
+            <span class="watermark-text">CONFIDENTIAL</span>
+            <span class="watermark-text">CONFIDENTIAL</span>
+            <span class="watermark-text">CONFIDENTIAL</span>
+            <span class="watermark-text">CONFIDENTIAL</span>
+            <span class="watermark-text">CONFIDENTIAL</span>
+            <span class="watermark-text">CONFIDENTIAL</span>
+        </div>
+        <div class="content">
+        <div class="header-logo">🐟</div>
+        <h1>BAMBURI TILAPIA FISH HOTEL<br><span style="font-size:14px;color:#64748b;">FINANCIAL REPORT</span></h1>
         <div class="summary-box">
             <p><strong>📅 Business Date:</strong> {business_date}</p>
             <p><strong>🕐 Generated:</strong> {now.strftime('%d/%m/%Y %H:%M')}</p>
             <p><strong>🔒 Status:</strong> {lock_status}</p>
+            <p><strong>🏨 Establishment:</strong> Bamburi Tilapia Fish Hotel</p>
         </div>
         <h2>💰 SALES SUMMARY</h2>
         <table>
             <tr><td>💵 Cash Sales</td><td><strong>KES {cash_sales:,}</strong></td></tr>
             <tr><td>📱 M-Pesa Sales</td><td><strong>KES {mpesa_sales:,}</strong></td></tr>
             <tr class="total-row"><td>Total Sales</td><td><strong>KES {total_sales:,}</strong></td></tr>
-            <tr><td>📊 Transactions</td><td>{len(transactions)}</td></tr>
+            <tr><td>📊 Total Transactions</td><td>{len(transactions)}</td></tr>
         </table>
-        <h2>🧾 DEDUCTIONS</h2>
+        <h2>🧾 DEDUCTIONS BREAKDOWN</h2>
         <table>
-            <tr><th>Category</th><th>Cash</th><th>M-Pesa</th><th>Total</th></tr>
-            <tr><td>📋 Cashier Expenses</td><td>KES {cashier_exp_total:,}</td><td>-</td><td><strong>KES {cashier_exp_total:,}</strong></td></tr>
-            <tr><td>📋 Admin Expenses</td><td>KES {admin_exp_cash:,}</td><td>KES {admin_exp_mpesa:,}</td><td><strong>KES {admin_exp_total:,}</strong></td></tr>
-            <tr><td>👔 Salaries</td><td>KES {salary_cash:,}</td><td>KES {salary_mpesa:,}</td><td><strong>KES {salary_total:,}</strong></td></tr>
-            <tr><td>🤝 Debts</td><td>KES {debt_cash:,}</td><td>KES {debt_mpesa:,}</td><td><strong>KES {debt_total:,}</strong></td></tr>
-            <tr><td>⏰ Advances</td><td>KES {advance_cash:,}</td><td>KES {advance_mpesa:,}</td><td><strong>KES {advance_total:,}</strong></td></tr>
-            <tr><td>🐟 Fish Purchase</td><td>-</td><td>KES {fish_total:,}</td><td><strong>KES {fish_total:,}</strong></td></tr>
-            <tr><td>🐠 Mbuta Purchase</td><td>-</td><td>KES {mbuta_total:,}</td><td><strong>KES {mbuta_total:,}</strong></td></tr>
-            <tr class="total-row"><td><strong>TOTAL DEDUCTIONS</strong></td><td><strong>KES {total_cash_deductions:,}</strong></td><td><strong>KES {total_mpesa_deductions:,}</strong></td><td><strong>KES {total_deductions:,}</strong></td></tr>
+            <tr><th>Category</th><th>Cash (KES)</th><th>M-Pesa (KES)</th><th>Total (KES)</th></tr>
+            <tr><td>📋 Cashier Expenses</td><td>{cashier_exp_total:,}</td><td>-</td><td><strong>{cashier_exp_total:,}</strong></td></tr>
+            <tr><td>📋 Admin Expenses</td><td>{admin_exp_cash:,}</td><td>{admin_exp_mpesa:,}</td><td><strong>{admin_exp_total:,}</strong></td></tr>
+            <tr><td>👔 Salaries</td><td>{salary_cash:,}</td><td>{salary_mpesa:,}</td><td><strong>{salary_total:,}</strong></td></tr>
+            <tr><td>🤝 Debts</td><td>{debt_cash:,}</td><td>{debt_mpesa:,}</td><td><strong>{debt_total:,}</strong></td></tr>
+            <tr><td>⏰ Advances</td><td>{advance_cash:,}</td><td>{advance_mpesa:,}</td><td><strong>{advance_total:,}</strong></td></tr>
+            <tr><td>🐟 Fish Purchase</td><td>-</td><td>{fish_total:,}</td><td><strong>{fish_total:,}</strong></td></tr>
+            <tr><td>🐠 Mbuta Purchase</td><td>-</td><td>{mbuta_total:,}</td><td><strong>{mbuta_total:,}</strong></td></tr>
+            <tr class="total-row"><td><strong>TOTAL DEDUCTIONS</strong></td><td><strong>{total_cash_deductions:,}</strong></td><td><strong>{total_mpesa_deductions:,}</strong></td><td><strong>{total_deductions:,}</strong></td></tr>
         </table>
         <h2>💵 FINAL BALANCES</h2>
         <table>
             <tr><td>💵 Cash at Hand</td><td><strong>KES {cash_at_hand:,}</strong></td></tr>
             <tr><td>📱 M-Pesa Balance</td><td><strong>KES {mpesa_balance:,}</strong></td></tr>
-            <tr class="total-row"><td>📊 NET PROFIT</td><td><strong>KES {net_profit:,}</strong></td></tr>
+            <tr class="total-row"><td>📊 <strong>NET PROFIT</strong></td><td><strong>KES {net_profit:,}</strong></td></tr>
         </table>
         <div class="footer">
-            <p>Generated by FishFlow Pro • Bamburi Tilapia Fish Hotel</p>
-            <p>This is an official financial document</p>
+            <p>Generated by FishFlow Pro • {now.strftime('%d/%m/%Y %H:%M')}</p>
+            <p>BAMBURI TILAPIA FISH HOTEL - Official Financial Document</p>
+            <p style="color:#ef4444;font-weight:700;">⚠️ CONFIDENTIAL - FOR AUTHORIZED PERSONNEL ONLY</p>
         </div>
-        </body></html>"""
+        </div></body></html>"""
         
         return Response({
             'html': html,
@@ -2077,39 +2211,63 @@ def send_report_whatsapp(request):
     try:
         business_date = request.data.get('date', get_business_day())
         
-        # Generate summary
-        request.GET = {'date': business_date}  # Simulate GET params
-        summary_data = financial_summary(request).data
+        # Get data directly
+        transactions = SupabaseDB.get_tx(business_date) or []
+        cashier_expenses = SupabaseDB.get_exp(business_date) or []
+        fin_entries = get_fin_entries_for_date(business_date)
         
-        # Build WhatsApp message
+        cash_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'cash')
+        mpesa_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'mpesa')
+        total_sales = cash_sales + mpesa_sales
+        
+        def sum_by_method(entries, method):
+            return sum(e.get('amount', 0) for e in entries if e.get('payment_method') == method)
+        
+        expenses = [e for e in fin_entries if e.get('entry_type') == 'expense']
+        salaries = [e for e in fin_entries if e.get('entry_type') == 'salary']
+        debts = [e for e in fin_entries if e.get('entry_type') == 'debt']
+        advances = [e for e in fin_entries if e.get('entry_type') == 'advance']
+        fish_purchases = [e for e in fin_entries if e.get('entry_type') == 'fish_purchase']
+        mbuta_purchases = [e for e in fin_entries if e.get('entry_type') == 'mbuta_purchase']
+        
+        cashier_exp_total = sum(e.get('amount', 0) for e in cashier_expenses)
+        
+        total_cash_deductions = cashier_exp_total + sum_by_method(expenses, 'cash') + sum_by_method(salaries, 'cash') + sum_by_method(debts, 'cash') + sum_by_method(advances, 'cash')
+        total_mpesa_deductions = sum_by_method(expenses, 'mpesa') + sum_by_method(salaries, 'mpesa') + sum_by_method(debts, 'mpesa') + sum_by_method(advances, 'mpesa') + sum(e.get('amount', 0) for e in fish_purchases) + sum(e.get('amount', 0) for e in mbuta_purchases)
+        
+        cash_at_hand = cash_sales - total_cash_deductions
+        mpesa_balance = mpesa_sales - total_mpesa_deductions
+        net_profit = cash_at_hand + mpesa_balance
+        
         msg = f"""🐟 *BAMBURI TILAPIA - FINANCIAL REPORT*
 📅 *Date:* {business_date}
-═══════════════════════════
+{'═' * 30}
 
 💰 *SALES:*
-💵 Cash: KES {summary_data['sales']['cash_sales']:,}
-📱 M-Pesa: KES {summary_data['sales']['mpesa_sales']:,}
-📊 Total: KES {summary_data['sales']['total_sales']:,}
+💵 Cash Sales: KES {cash_sales:,}
+📱 M-Pesa Sales: KES {mpesa_sales:,}
+📊 Total Sales: KES {total_sales:,}
+📋 Transactions: {len(transactions)}
 
 🧾 *DEDUCTIONS:*
-📋 Expenses: KES {summary_data['deductions']['admin_expenses']['total']:,}
-👔 Salaries: KES {summary_data['deductions']['salaries']['total']:,}
-🤝 Debts: KES {summary_data['deductions']['debts']['total']:,}
-⏰ Advances: KES {summary_data['deductions']['advances']['total']:,}
-🐟 Fish: KES {summary_data['deductions']['fish_purchase']['total']:,}
-🐠 Mbuta: KES {summary_data['deductions']['mbuta_purchase']['total']:,}
-📊 Total Deductions: KES {summary_data['totals']['total_deductions']:,}
+📋 Cashier Expenses: KES {cashier_exp_total:,}
+👔 Salaries: KES {sum(e.get('amount', 0) for e in salaries):,}
+🤝 Debts: KES {sum(e.get('amount', 0) for e in debts):,}
+⏰ Advances: KES {sum(e.get('amount', 0) for e in advances):,}
+🐟 Fish Purchase: KES {sum(e.get('amount', 0) for e in fish_purchases):,}
+🐠 Mbuta Purchase: KES {sum(e.get('amount', 0) for e in mbuta_purchases):,}
+📊 Total Deductions: KES {total_cash_deductions + total_mpesa_deductions:,}
 
 💵 *BALANCES:*
-Cash at Hand: KES {summary_data['totals']['cash_at_hand']:,}
-M-Pesa Balance: KES {summary_data['totals']['mpesa_balance']:,}
-📊 *NET PROFIT: KES {summary_data['totals']['net_profit']:,}*
+💵 Cash at Hand: KES {cash_at_hand:,}
+📱 M-Pesa Balance: KES {mpesa_balance:,}
+📊 *NET PROFIT: KES {net_profit:,}*
 
-═══════════════════════════
+{'═' * 30}
 ✅ Generated by FishFlow Pro
-🏨 Bamburi Tilapia Fish Hotel"""
+🏨 Bamburi Tilapia Fish Hotel
+⚠️ CONFIDENTIAL REPORT"""
 
-        # Open WhatsApp with message
         whatsapp_url = f"https://wa.me/254792988239?text={requests.utils.quote(msg)}"
         
         return Response({
@@ -2119,7 +2277,9 @@ M-Pesa Balance: KES {summary_data['totals']['mpesa_balance']:,}
         })
         
     except Exception as e:
-        return Response({'error': str(e)}, status=400)
+        import traceback
+        traceback.print_exc()
+        return Response({'error': str(e)}, status=500)
 
 
 
