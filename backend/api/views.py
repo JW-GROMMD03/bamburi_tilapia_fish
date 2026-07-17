@@ -1609,9 +1609,9 @@ def financial_summary(request):
 @api_view(['POST'])
 def surplus_adjust(request):
     """
-    Handle surplus/shortage adjustments.
-    If real > system: distribute surplus proportionally to sales categories.
-    If real < system: flag as money lost.
+    Handle surplus adjustments.
+    When real > system: Creates correction transactions to account for unrecorded sales.
+    The surplus is distributed proportionally to day shift sales categories.
     """
     try:
         data = request.data
@@ -1620,44 +1620,40 @@ def surplus_adjust(request):
         if not is_date_editable(business_date):
             return Response({'error': 'Business day is locked'}, status=403)
         
-        payment_method = data.get('payment_method', 'cash')  # cash or mpesa
+        payment_method = data.get('payment_method', 'cash')
         real_amount = int(data.get('real_amount', 0))
         
-       
-               # Get current system amount (Cash at Hand = Cash Sales - ALL cash deductions)
+        # Get all transactions for this date
         transactions = SupabaseDB.get_tx(business_date) or []
         
-        # Get ALL deductions (financial entries + cashier expenses)
+        # Get financial entries for deductions
         fin_entries = get_fin_entries_for_date(business_date)
         cashier_expenses = SupabaseDB.get_exp(business_date) or []
         
         if payment_method == 'cash':
-            # Total cash sales
+            # Calculate system cash at hand
             cash_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'cash')
-            
-            # All cash deductions: financial entries + cashier expenses
             fin_cash_deductions = sum(e.get('amount', 0) for e in fin_entries if e.get('payment_method') == 'cash')
             cashier_exp_deductions = sum(e.get('amount', 0) for e in cashier_expenses)
-            
-            # System cash at hand
             system_amount = cash_sales - fin_cash_deductions - cashier_exp_deductions
+            
+            # Only consider day shift transactions for distribution
+            method_tx = [t for t in transactions if t.get('method') == 'cash' and t.get('shift') == 'day']
         else:
-            # Total mpesa sales
+            # Calculate system mpesa balance
             mpesa_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'mpesa')
-            
-            # All mpesa deductions
             fin_mpesa_deductions = sum(e.get('amount', 0) for e in fin_entries if e.get('payment_method') == 'mpesa')
-            
-            # System mpesa balance
             system_amount = mpesa_sales - fin_mpesa_deductions
+            
+            # Only consider day shift transactions for distribution
+            method_tx = [t for t in transactions if t.get('method') == 'mpesa' and t.get('shift') == 'day']
         
         difference = real_amount - system_amount
         
         if difference < 0:
-            # Money is lost - flag it
             return Response({
                 'success': False,
-                'message': f'⚠️ MONEY LOST: KES {abs(difference):,} is missing in {payment_method}. The system amount (KES {system_amount:,}) is greater than the real amount (KES {real_amount:,}).',
+                'message': f'⚠️ MONEY LOST: KES {abs(difference):,} is missing in {payment_method}. System (KES {system_amount:,}) > Real (KES {real_amount:,}).',
                 'difference': difference,
                 'status': 'loss'
             })
@@ -1669,20 +1665,53 @@ def surplus_adjust(request):
                 'status': 'match'
             })
         else:
-            # Surplus - distribute proportionally to sales categories
-            distribution = distribute_surplus(transactions, difference, payment_method)
+            # Surplus - distribute and CREATE correction transactions
+            distribution = distribute_surplus(method_tx, difference, payment_method)
+            
+            # CREATE correction transactions for each category
+            created_tx_ids = []
+            now = datetime.now()
+            
+            for cat, dist in distribution.items():
+                if dist['surplus_added'] <= 0:
+                    continue
+                
+                # Create a correction transaction
+                correction_item = {
+                    'name': f'{cat} (Correction)',
+                    'price': dist['surplus_added'],
+                    'qty': 1
+                }
+                
+                correction_tx = {
+                    'date': business_date,
+                    'time': now.strftime('%H:%M'),
+                    'total': dist['surplus_added'],
+                    'method': payment_method,
+                    'cash_amount': dist['surplus_added'] if payment_method == 'cash' else 0,
+                    'mpesa_amount': dist['surplus_added'] if payment_method == 'mpesa' else 0,
+                    'items': json.dumps([correction_item]),
+                    'cashier_id': 'system',
+                    'cashier_name': 'System (Surplus Correction)',
+                    'shift': 'day',
+                    'created_at': now.isoformat()
+                }
+                
+                saved = SupabaseDB.save_tx(correction_tx)
+                if saved:
+                    created_tx_ids.append(saved.get('id'))
             
             # Save surplus record
             surplus_entry = {
                 'business_date': business_date,
                 'entry_type': 'surplus_adjustment',
-                'description': f'Surplus distribution ({payment_method})',
+                'description': f'Surplus distribution ({payment_method}) - {len(created_tx_ids)} corrections created',
                 'person_name': 'System',
                 'amount': difference,
                 'payment_method': payment_method,
                 'shift': 'day',
                 'created_by': str(data.get('created_by', 'admin')),
-                'created_at': datetime.now().isoformat(),
+                'created_at': now.isoformat(),
                 'distribution': json.dumps(distribution)
             }
             
@@ -1694,9 +1723,10 @@ def surplus_adjust(request):
             
             return Response({
                 'success': True,
-                'message': f'✅ Surplus of KES {difference:,} distributed proportionally to sales categories.',
+                'message': f'✅ Surplus of KES {difference:,} distributed across {len(created_tx_ids)} categories. {len(created_tx_ids)} correction transactions created.',
                 'difference': difference,
                 'distribution': distribution,
+                'corrections_created': len(created_tx_ids),
                 'status': 'surplus'
             })
             
@@ -1887,92 +1917,158 @@ def financial_analytics(request):
 @api_view(['GET'])
 def financial_report(request):
     """Generate full financial report for a business day"""
-    business_date = request.query_params.get('date', get_business_day())
-    
-    # Get summary
-    summary_data = financial_summary(request).data
-    
-    # Build HTML report
-    now = datetime.now()
-    html = f"""
-    <html><head><meta charset="UTF-8"><style>
-        body {{ font-family: Arial, sans-serif; padding: 30px; color: #1e293b; }}
-        h1 {{ text-align: center; color: #0f172a; border-bottom: 3px solid #f59e0b; padding-bottom: 10px; }}
-        h2 {{ color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; margin-top: 25px; }}
-        table {{ width: 100%; border-collapse: collapse; margin: 15px 0; }}
-        th {{ background: #0f172a; color: white; padding: 10px; text-align: left; font-size: 12px; }}
-        td {{ padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; }}
-        .total-row {{ background: #f0fdf4; font-weight: bold; }}
-        .summary-box {{ background: #f8fafd; border: 2px solid #0f172a; border-radius: 10px; padding: 15px; margin: 15px 0; }}
-        .footer {{ text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #f59e0b; font-size: 10px; color: #64748b; }}
-        .positive {{ color: #10b981; }}
-        .negative {{ color: #ef4444; }}
-    </style></head><body>
-    <h1>🐟 BAMBURI TILAPIA FISH HOTEL<br>FINANCIAL REPORT</h1>
-    <div class="summary-box">
-        <p><strong>📅 Business Date:</strong> {business_date}</p>
-        <p><strong>🕐 Generated:</strong> {now.strftime('%d/%m/%Y %H:%M')}</p>
-        <p><strong>🔒 Status:</strong> {'Locked' if not is_date_editable(business_date) else 'Editable'}</p>
-    </div>
-    
-    <h2>💰 SALES SUMMARY</h2>
-    <table>
-        <tr><td>💵 Cash Sales</td><td><strong>KES {summary_data['sales']['cash_sales']:,}</strong></td></tr>
-        <tr><td>📱 M-Pesa Sales</td><td><strong>KES {summary_data['sales']['mpesa_sales']:,}</strong></td></tr>
-        <tr class="total-row"><td>Total Sales</td><td><strong>KES {summary_data['sales']['total_sales']:,}</strong></td></tr>
-        <tr><td>📊 Transactions</td><td>{summary_data['sales']['transaction_count']}</td></tr>
-    </table>
-    
-    <h2>🧾 DEDUCTIONS</h2>
-    <table>
-        <tr><th>Category</th><th>Cash</th><th>M-Pesa</th><th>Total</th></tr>
-    """
-    
-    for cat_key, cat_label in [
-        ('admin_expenses', '📋 Admin Expenses'),
-        ('salaries', '👔 Salaries'),
-        ('debts', '🤝 Debts'),
-        ('advances', '⏰ Advances'),
-        ('fish_purchase', '🐟 Fish Purchase'),
-        ('mbuta_purchase', '🐠 Mbuta Purchase')
-    ]:
-        cat_data = summary_data['deductions'].get(cat_key, {})
-        html += f"""
-        <tr>
-            <td>{cat_label}</td>
-            <td>KES {cat_data.get('cash', 0):,}</td>
-            <td>KES {cat_data.get('mpesa', 0):,}</td>
-            <td><strong>KES {cat_data.get('total', 0):,}</strong></td>
-        </tr>"""
-    
-    html += f"""
-        <tr class="total-row">
-            <td><strong>TOTAL DEDUCTIONS</strong></td>
-            <td><strong>KES {summary_data['totals']['total_cash_deductions']:,}</strong></td>
-            <td><strong>KES {summary_data['totals']['total_mpesa_deductions']:,}</strong></td>
-            <td><strong>KES {summary_data['totals']['total_deductions']:,}</strong></td>
-        </tr>
-    </table>
-    
-    <h2>💵 FINAL BALANCES</h2>
-    <table>
-        <tr><td>💵 Cash at Hand</td><td><strong>KES {summary_data['totals']['cash_at_hand']:,}</strong></td></tr>
-        <tr><td>📱 M-Pesa Balance</td><td><strong>KES {summary_data['totals']['mpesa_balance']:,}</strong></td></tr>
-        <tr class="total-row"><td>📊 NET PROFIT</td><td><strong>KES {summary_data['totals']['net_profit']:,}</strong></td></tr>
-    </table>
-    
-    <div class="footer">
-        <p>Generated by FishFlow Pro • Bamburi Tilapia Fish Hotel</p>
-        <p>This is an official financial document</p>
-    </div>
-    </body></html>
-    """
-    
-    return Response({
-        'html': html,
-        'summary': summary_data,
-        'business_date': business_date
-    })
+    try:
+        business_date = request.query_params.get('date', get_business_day())
+        
+        # Get transactions
+        transactions = SupabaseDB.get_tx(business_date) or []
+        
+        # Get cashier expenses
+        cashier_expenses = SupabaseDB.get_exp(business_date) or []
+        
+        # Get financial entries
+        fin_entries = get_fin_entries_for_date(business_date)
+        
+        # Calculate sales totals
+        cash_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'cash')
+        mpesa_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'mpesa')
+        total_sales = cash_sales + mpesa_sales
+        
+        # Cashier expenses total
+        cashier_exp_total = sum(e.get('amount', 0) for e in cashier_expenses)
+        
+        # Categorize financial entries
+        def sum_by_method(entries, method):
+            return sum(e.get('amount', 0) for e in entries if e.get('payment_method') == method)
+        
+        expenses = [e for e in fin_entries if e.get('entry_type') == 'expense']
+        salaries = [e for e in fin_entries if e.get('entry_type') == 'salary']
+        debts = [e for e in fin_entries if e.get('entry_type') == 'debt']
+        advances = [e for e in fin_entries if e.get('entry_type') == 'advance']
+        fish_purchases = [e for e in fin_entries if e.get('entry_type') == 'fish_purchase']
+        mbuta_purchases = [e for e in fin_entries if e.get('entry_type') == 'mbuta_purchase']
+        
+        admin_exp_cash = sum_by_method(expenses, 'cash')
+        admin_exp_mpesa = sum_by_method(expenses, 'mpesa')
+        admin_exp_total = admin_exp_cash + admin_exp_mpesa
+        
+        salary_cash = sum_by_method(salaries, 'cash')
+        salary_mpesa = sum_by_method(salaries, 'mpesa')
+        salary_total = salary_cash + salary_mpesa
+        
+        debt_cash = sum_by_method(debts, 'cash')
+        debt_mpesa = sum_by_method(debts, 'mpesa')
+        debt_total = debt_cash + debt_mpesa
+        
+        advance_cash = sum_by_method(advances, 'cash')
+        advance_mpesa = sum_by_method(advances, 'mpesa')
+        advance_total = advance_cash + advance_mpesa
+        
+        fish_total = sum(e.get('amount', 0) for e in fish_purchases)
+        mbuta_total = sum(e.get('amount', 0) for e in mbuta_purchases)
+        
+        total_cash_deductions = cashier_exp_total + admin_exp_cash + salary_cash + debt_cash + advance_cash
+        total_mpesa_deductions = admin_exp_mpesa + salary_mpesa + debt_mpesa + advance_mpesa + fish_total + mbuta_total
+        total_deductions = total_cash_deductions + total_mpesa_deductions
+        
+        cash_at_hand = cash_sales - total_cash_deductions
+        mpesa_balance = mpesa_sales - total_mpesa_deductions
+        net_profit = cash_at_hand + mpesa_balance
+        
+        summary = {
+            'business_date': business_date,
+            'can_edit': is_date_editable(business_date),
+            'sales': {
+                'cash_sales': cash_sales,
+                'mpesa_sales': mpesa_sales,
+                'total_sales': total_sales,
+                'transaction_count': len(transactions)
+            },
+            'cashier_expenses': {
+                'total': cashier_exp_total,
+                'items': cashier_expenses
+            },
+            'deductions': {
+                'admin_expenses': {'cash': admin_exp_cash, 'mpesa': admin_exp_mpesa, 'total': admin_exp_total, 'items': expenses},
+                'salaries': {'cash': salary_cash, 'mpesa': salary_mpesa, 'total': salary_total, 'items': salaries},
+                'debts': {'cash': debt_cash, 'mpesa': debt_mpesa, 'total': debt_total, 'items': debts},
+                'advances': {'cash': advance_cash, 'mpesa': advance_mpesa, 'total': advance_total, 'items': advances},
+                'fish_purchase': {'total': fish_total, 'items': fish_purchases},
+                'mbuta_purchase': {'total': mbuta_total, 'items': mbuta_purchases}
+            },
+            'totals': {
+                'total_cash_deductions': total_cash_deductions,
+                'total_mpesa_deductions': total_mpesa_deductions,
+                'total_deductions': total_deductions,
+                'cash_at_hand': cash_at_hand,
+                'mpesa_balance': mpesa_balance,
+                'net_profit': net_profit
+            }
+        }
+        
+        # Build HTML report
+        now = datetime.now()
+        lock_status = 'Locked (72+ hrs)' if not is_date_editable(business_date) else 'Editable'
+        
+        html = f"""<html><head><meta charset="UTF-8"><style>
+            body {{ font-family: Arial, sans-serif; padding: 30px; color: #1e293b; }}
+            h1 {{ text-align: center; color: #0f172a; border-bottom: 3px solid #f59e0b; padding-bottom: 10px; }}
+            h2 {{ color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; margin-top: 25px; }}
+            table {{ width: 100%; border-collapse: collapse; margin: 15px 0; }}
+            th {{ background: #0f172a; color: white; padding: 10px; text-align: left; font-size: 12px; }}
+            td {{ padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; }}
+            .total-row {{ background: #f0fdf4; font-weight: bold; }}
+            .summary-box {{ background: #f8fafd; border: 2px solid #0f172a; border-radius: 10px; padding: 15px; margin: 15px 0; }}
+            .footer {{ text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #f59e0b; font-size: 10px; color: #64748b; }}
+        </style></head><body>
+        <h1>🐟 BAMBURI TILAPIA FISH HOTEL<br>FINANCIAL REPORT</h1>
+        <div class="summary-box">
+            <p><strong>📅 Business Date:</strong> {business_date}</p>
+            <p><strong>🕐 Generated:</strong> {now.strftime('%d/%m/%Y %H:%M')}</p>
+            <p><strong>🔒 Status:</strong> {lock_status}</p>
+        </div>
+        <h2>💰 SALES SUMMARY</h2>
+        <table>
+            <tr><td>💵 Cash Sales</td><td><strong>KES {cash_sales:,}</strong></td></tr>
+            <tr><td>📱 M-Pesa Sales</td><td><strong>KES {mpesa_sales:,}</strong></td></tr>
+            <tr class="total-row"><td>Total Sales</td><td><strong>KES {total_sales:,}</strong></td></tr>
+            <tr><td>📊 Transactions</td><td>{len(transactions)}</td></tr>
+        </table>
+        <h2>🧾 DEDUCTIONS</h2>
+        <table>
+            <tr><th>Category</th><th>Cash</th><th>M-Pesa</th><th>Total</th></tr>
+            <tr><td>📋 Cashier Expenses</td><td>KES {cashier_exp_total:,}</td><td>-</td><td><strong>KES {cashier_exp_total:,}</strong></td></tr>
+            <tr><td>📋 Admin Expenses</td><td>KES {admin_exp_cash:,}</td><td>KES {admin_exp_mpesa:,}</td><td><strong>KES {admin_exp_total:,}</strong></td></tr>
+            <tr><td>👔 Salaries</td><td>KES {salary_cash:,}</td><td>KES {salary_mpesa:,}</td><td><strong>KES {salary_total:,}</strong></td></tr>
+            <tr><td>🤝 Debts</td><td>KES {debt_cash:,}</td><td>KES {debt_mpesa:,}</td><td><strong>KES {debt_total:,}</strong></td></tr>
+            <tr><td>⏰ Advances</td><td>KES {advance_cash:,}</td><td>KES {advance_mpesa:,}</td><td><strong>KES {advance_total:,}</strong></td></tr>
+            <tr><td>🐟 Fish Purchase</td><td>-</td><td>KES {fish_total:,}</td><td><strong>KES {fish_total:,}</strong></td></tr>
+            <tr><td>🐠 Mbuta Purchase</td><td>-</td><td>KES {mbuta_total:,}</td><td><strong>KES {mbuta_total:,}</strong></td></tr>
+            <tr class="total-row"><td><strong>TOTAL DEDUCTIONS</strong></td><td><strong>KES {total_cash_deductions:,}</strong></td><td><strong>KES {total_mpesa_deductions:,}</strong></td><td><strong>KES {total_deductions:,}</strong></td></tr>
+        </table>
+        <h2>💵 FINAL BALANCES</h2>
+        <table>
+            <tr><td>💵 Cash at Hand</td><td><strong>KES {cash_at_hand:,}</strong></td></tr>
+            <tr><td>📱 M-Pesa Balance</td><td><strong>KES {mpesa_balance:,}</strong></td></tr>
+            <tr class="total-row"><td>📊 NET PROFIT</td><td><strong>KES {net_profit:,}</strong></td></tr>
+        </table>
+        <div class="footer">
+            <p>Generated by FishFlow Pro • Bamburi Tilapia Fish Hotel</p>
+            <p>This is an official financial document</p>
+        </div>
+        </body></html>"""
+        
+        return Response({
+            'html': html,
+            'summary': summary,
+            'business_date': business_date
+        })
+        
+    except Exception as e:
+        print(f"Report error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response({'error': str(e)}, status=500)
 
 
 @api_view(['POST'])
