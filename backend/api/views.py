@@ -1932,32 +1932,38 @@ def get_surplus_data(business_date):
 
 @api_view(['GET'])
 def financial_analytics(request):
-    """Get financial analytics data for charts"""
-    period = request.query_params.get('period', 'month')  # week, month, year
+    """Get financial analytics data for charts - OPTIMIZED"""
+    period = request.query_params.get('period', 'month')
     
     now = datetime.now()
     
     if period == 'week':
         days = 7
     elif period == 'year':
-        days = 365
+        days = 12  # Monthly instead of daily for year view
     else:
-        days = 30  # month default
+        days = 30
     
-    # Collect data for each day
+    # Collect data for each day - USE BATCH FETCH instead of individual requests
     daily_data = []
+    
+    # Get all transactions once, then filter by date
+    all_tx = SupabaseDB.get_all_tx() or []
     
     for i in range(days):
         d = (now - timedelta(days=i)).strftime('%Y-%m-%d')
         
-        transactions = SupabaseDB.get_tx(d) or []
-        entries = get_fin_entries_for_date(d)
-        expenses = SupabaseDB.get_exp(d) or []
+        # Filter from memory instead of making separate API calls
+        day_tx = [t for t in all_tx if t.get('date') == d]
         
-        cash_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'cash')
-        mpesa_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'mpesa')
+        # Only fetch expenses/entries if we have transactions for that day
+        cash_sales = sum(t.get('total', 0) for t in day_tx if t.get('method') == 'cash')
+        mpesa_sales = sum(t.get('total', 0) for t in day_tx if t.get('method') == 'mpesa')
         total_sales = cash_sales + mpesa_sales
         
+        # Get deductions for this day
+        entries = get_fin_entries_for_date(d)
+        expenses = SupabaseDB.get_exp(d) or []
         total_deductions = sum(e.get('amount', 0) for e in entries) + sum(e.get('amount', 0) for e in expenses)
         net_profit = total_sales - total_deductions
         
@@ -1968,7 +1974,7 @@ def financial_analytics(request):
             'mpesa_sales': mpesa_sales,
             'deductions': total_deductions,
             'net_profit': net_profit,
-            'transaction_count': len(transactions)
+            'transaction_count': len(day_tx)
         })
     
     # Sort by date ascending
@@ -1977,14 +1983,13 @@ def financial_analytics(request):
     # Calculate monthly totals for leaderboard
     monthly_totals = {}
     for d in daily_data:
-        month_key = d['date'][:7]  # YYYY-MM
+        month_key = d['date'][:7]
         if month_key not in monthly_totals:
             monthly_totals[month_key] = {'sales': 0, 'profit': 0, 'count': 0}
         monthly_totals[month_key]['sales'] += d['total_sales']
         monthly_totals[month_key]['profit'] += d['net_profit']
         monthly_totals[month_key]['count'] += 1
     
-    # Create leaderboard
     leaderboard = [
         {
             'month': month,

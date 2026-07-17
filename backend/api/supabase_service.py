@@ -596,7 +596,7 @@ class SupabaseDB:
             r = requests.get(
                 f'{cls.BASE}/rest/v1/transactions', 
                 headers=cls._h(), 
-                params={'order': 'created_at.desc', 'limit': '2000'}
+                params={'order': 'created_at.desc', 'limit': '3000'}
             )
             if r.status_code == 200:
                 data = r.json()

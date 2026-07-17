@@ -4233,8 +4233,10 @@ async function loadCalculationPanel() {
     renderEntryList('fishEntries', data.deductions.fish_purchase.items, 'fish_purchase');
     renderEntryList('mbutaEntries', data.deductions.mbuta_purchase.items, 'mbuta_purchase');
     
-    // Load analytics
+    // Only load analytics if charts are visible
+if (document.getElementById('deductionsChart')) {
     loadFinancialAnalytics();
+}
     
   } catch (error) {
     console.error('Calculation error:', error);
