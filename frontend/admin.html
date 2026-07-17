@@ -4315,23 +4315,38 @@ async function adjustSurplus(method) {
   const businessDate = document.getElementById('calcDate').value;
   const inputId = method === 'cash' ? 'realCash' : 'realMpesa';
   const realAmount = parseInt(document.getElementById(inputId).value) || 0;
+  
   if (!realAmount) { toast('Enter real amount', 'error'); return; }
+  
   const btn = event.target;
   btn.disabled = true;
   const originalText = btn.textContent;
   btn.textContent = '⏳ Processing...';
+  
   try {
     const result = await apiRequest('financial/surplus-adjust/', 'POST', {
-      business_date: businessDate, payment_method: method, real_amount: realAmount, created_by: currentUser?.id || 'admin'
+      business_date: businessDate,
+      payment_method: method,
+      real_amount: realAmount,
+      created_by: currentUser?.id || 'admin'
     });
+    
     if (result.success) {
       toast(result.message);
-      document.getElementById(inputId).value = '';
+      document.getElementById(inputId).value = ''; // WIPE input
+      
+      // Refresh after delay
       setTimeout(async () => { await loadCalculationPanel(); }, 1500);
       setTimeout(async () => { await loadCalculationPanel(); await loadDashboard(); }, 3000);
-    } else { toast(result.message, 'error'); }
-  } catch (error) { toast('Failed: ' + error.message, 'error'); }
-  finally { btn.disabled = false; btn.textContent = originalText; }
+    } else {
+      toast(result.message, 'error');
+    }
+  } catch (error) {
+    toast('Failed: ' + error.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 }
 
 async function loadFinancialAnalytics() {
