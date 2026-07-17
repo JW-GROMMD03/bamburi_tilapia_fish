@@ -1309,26 +1309,32 @@ flex-wrap:wrap;
   <!-- Cash at Hand & Real Cash -->
   <div class="cards" style="margin-bottom: 20px;">
     <div class="card" style="background: linear-gradient(135deg, #dcfce7, #f0fdf4);">
-      <h3>💵 System Cash at Hand</h3>
-      <p id="systemCash" style="font-size: 28px;">KES 0</p>
-      <small style="color:#166534;">Cash Sales − All Cash Deductions</small>
+      <h3>💵 Cash at Hand</h3>
+      <p style="font-size: 14px; color: #888;">Before deductions</p>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+        <input type="number" id="editCashAtHand" placeholder="Edit cash at hand" style="flex:2;padding:10px;border-radius:10px;border:2px solid #10b981;font-size:18px;">
+        <button class="btn-sm" onclick="updateCashAtHand()" style="background:#10b981;color:white;flex:1;padding:10px;">💾 Save</button>
+      </div>
+      <small style="color:#166534;display:block;margin-top:6px;">Current: <strong id="currentCashAtHand">KES 0</strong></small>
     </div>
     <div class="card" style="background: linear-gradient(135deg, #fef3c7, #fffbeb);">
-      <h3>🏦 Real Cash at Hand</h3>
-      <p style="font-size:14px;color:#888;margin-bottom:4px;">System says: <strong id="calcSystemCash" style="color:#0b3954;">KES 0</strong></p>
-      <input type="number" id="realCash" placeholder="Enter actual cash counted" style="width:100%;padding:10px;border-radius:10px;border:2px solid #f59e0b;font-size:18px;margin-top:4px;">
-      <button class="btn-sm" onclick="adjustSurplus('cash')" style="background:#f59e0b;color:white;margin-top:8px;">🔄 Adjust Cash</button>
+      <h3>💵 Total Cash Sales (After Edit)</h3>
+      <p id="totalCashSales" style="font-size: 28px;">KES 0</p>
+      <small style="color:#92400e;">Cash at Hand + All Cash Deductions</small>
     </div>
     <div class="card" style="background: linear-gradient(135deg, #dbeafe, #eff6ff);">
-      <h3>📱 System M-Pesa Balance</h3>
-      <p id="systemMpesa" style="font-size: 28px;">KES 0</p>
-      <small style="color:#1e40af;">M-Pesa Sales − All M-Pesa Deductions</small>
+      <h3>📱 M-Pesa Balance</h3>
+      <p style="font-size: 14px; color: #888;">Before deductions</p>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+        <input type="number" id="editMpesaBalance" placeholder="Edit M-Pesa balance" style="flex:2;padding:10px;border-radius:10px;border:2px solid #3b82f6;font-size:18px;">
+        <button class="btn-sm" onclick="updateMpesaBalance()" style="background:#3b82f6;color:white;flex:1;padding:10px;">💾 Save</button>
+      </div>
+      <small style="color:#1e40af;display:block;margin-top:6px;">Current: <strong id="currentMpesaBalance">KES 0</strong></small>
     </div>
     <div class="card" style="background: linear-gradient(135deg, #e8f4f8, #f0f9ff);">
-      <h3>📱 Real M-Pesa Balance</h3>
-      <p style="font-size:14px;color:#888;margin-bottom:4px;">System says: <strong id="calcSystemMpesa" style="color:#0b3954;">KES 0</strong></p>
-      <input type="number" id="realMpesa" placeholder="Enter actual M-Pesa balance" style="width:100%;padding:10px;border-radius:10px;border:2px solid #3b82f6;font-size:18px;margin-top:4px;">
-      <button class="btn-sm" onclick="adjustSurplus('mpesa')" style="background:#3b82f6;color:white;margin-top:8px;">🔄 Adjust M-Pesa</button>
+      <h3>📱 Total M-Pesa Sales (After Edit)</h3>
+      <p id="totalMpesaSales" style="font-size: 28px;">KES 0</p>
+      <small style="color:#1e40af;">M-Pesa Balance + All M-Pesa Deductions</small>
     </div>
   </div>
 
@@ -4198,8 +4204,15 @@ async function loadCalculationPanel() {
     }
     
     // Update system amounts
-    document.getElementById('systemCash').textContent = 'KES ' + (data.totals.cash_at_hand || 0).toLocaleString();
-    document.getElementById('systemMpesa').textContent = 'KES ' + (data.totals.mpesa_balance || 0).toLocaleString();
+    // Show current cash at hand and mpesa balance
+    document.getElementById('currentCashAtHand').textContent = 'KES ' + (data.totals.cash_at_hand || 0).toLocaleString();
+    document.getElementById('currentMpesaBalance').textContent = 'KES ' + (data.totals.mpesa_balance || 0).toLocaleString();
+    
+    // Show total sales (cash at hand + deductions = total cash sales before deductions)
+    var totalCashSales = (data.totals.cash_at_hand || 0) + (data.totals.total_cash_deductions || 0);
+    var totalMpesaSales = (data.totals.mpesa_balance || 0) + (data.totals.total_mpesa_deductions || 0);
+    document.getElementById('totalCashSales').textContent = 'KES ' + totalCashSales.toLocaleString();
+    document.getElementById('totalMpesaSales').textContent = 'KES ' + totalMpesaSales.toLocaleString();
     
     var calcCashEl = document.getElementById('calcSystemCash');
     if (calcCashEl) calcCashEl.textContent = 'KES ' + (data.totals.cash_at_hand || 0).toLocaleString();
@@ -4348,6 +4361,73 @@ async function adjustSurplus(method) {
     btn.textContent = originalText;
   }
 }
+
+async function updateCashAtHand() {
+  const businessDate = document.getElementById('calcDate').value;
+  const newCashAtHand = parseInt(document.getElementById('editCashAtHand').value) || 0;
+  
+  if (!newCashAtHand) { toast('Enter the cash at hand amount', 'error'); return; }
+  
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = '⏳ Saving...';
+  
+  try {
+    const result = await apiRequest('financial/surplus-adjust/', 'POST', {
+      business_date: businessDate,
+      payment_method: 'cash',
+      real_amount: newCashAtHand,
+      created_by: currentUser?.id || 'admin'
+    });
+    
+    if (result.success) {
+      toast('✅ Cash at hand updated to KES ' + newCashAtHand.toLocaleString());
+      document.getElementById('editCashAtHand').value = '';
+      setTimeout(async () => { await loadCalculationPanel(); }, 1500);
+    } else {
+      toast(result.message, 'error');
+    }
+  } catch (error) {
+    toast('Failed: ' + error.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 Save';
+  }
+}
+
+async function updateMpesaBalance() {
+  const businessDate = document.getElementById('calcDate').value;
+  const newMpesaBalance = parseInt(document.getElementById('editMpesaBalance').value) || 0;
+  
+  if (!newMpesaBalance) { toast('Enter the M-Pesa balance', 'error'); return; }
+  
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = '⏳ Saving...';
+  
+  try {
+    const result = await apiRequest('financial/surplus-adjust/', 'POST', {
+      business_date: businessDate,
+      payment_method: 'mpesa',
+      real_amount: newMpesaBalance,
+      created_by: currentUser?.id || 'admin'
+    });
+    
+    if (result.success) {
+      toast('✅ M-Pesa balance updated to KES ' + newMpesaBalance.toLocaleString());
+      document.getElementById('editMpesaBalance').value = '';
+      setTimeout(async () => { await loadCalculationPanel(); }, 1500);
+    } else {
+      toast(result.message, 'error');
+    }
+  } catch (error) {
+    toast('Failed: ' + error.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 Save';
+  }
+}
+
 
 async function loadFinancialAnalytics() {
   try {
