@@ -4178,6 +4178,17 @@ let deductionsChart = null;
 let profitTrendChart = null;
 
 async function loadCalculationPanel() {
+   // Clear any cached API responses to force fresh data
+  const businessDate = document.getElementById('calcDate').value || new Date().toISOString().split('T')[0];
+  document.getElementById('calcDate').value = businessDate;
+  
+  console.log('📊 Loading calculation panel for:', businessDate);
+  
+  try {
+    // FORCE fresh fetch - add timestamp to bust any cache
+    const data = await apiRequest(`financial/summary/?date=${businessDate}&_=${Date.now()}`);
+    console.log('📊 Summary response:', JSON.stringify(data?.totals));
+    calculationData = data;
   const businessDate = document.getElementById('calcDate').value || new Date().toISOString().split('T')[0];
   document.getElementById('calcDate').value = businessDate;
   
@@ -4338,13 +4349,14 @@ async function adjustSurplus(method) {
   
   if (!realAmount) { toast('Enter real amount', 'error'); return; }
   
-  // Get the button that was clicked
   const btn = event.target;
   btn.disabled = true;
   const originalText = btn.textContent;
   btn.textContent = '⏳ Processing...';
   
   try {
+    console.log('🔧 Sending surplus adjustment:', { method, realAmount, businessDate });
+    
     const result = await apiRequest('financial/surplus-adjust/', 'POST', {
       business_date: businessDate,
       payment_method: method,
@@ -4352,7 +4364,7 @@ async function adjustSurplus(method) {
       created_by: currentUser?.id || 'admin'
     });
     
-    console.log('🔧 Surplus result:', result);
+    console.log('🔧 Surplus result:', JSON.stringify(result));
     
     if (result.success) {
       toast(result.message);
@@ -4360,23 +4372,29 @@ async function adjustSurplus(method) {
       // WIPE the input immediately
       document.getElementById(inputId).value = '';
       
-      // FORCE reload - wait 1 second for DB to settle, then reload
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      await loadCalculationPanel();
-      
-      // Also refresh the sales panel if visible
-      if (document.getElementById('sales').classList.contains('active')) {
-        await loadSales();
-      }
-      
       // Show what changed
       if (result.new_amounts) {
-        toast(`✅ Updated! System now: KES ${(result.new_amounts.system_amount || 0).toLocaleString()}`);
+        console.log('🔧 New amounts:', result.new_amounts);
       }
+      
+      // FORCE multiple refreshes with increasing delays to ensure DB commit
+      setTimeout(async () => {
+        console.log('🔄 Refresh attempt 1 (1.5s)...');
+        await loadCalculationPanel();
+      }, 1500);
+      
+      setTimeout(async () => {
+        console.log('🔄 Refresh attempt 2 (3s)...');
+        await loadCalculationPanel();
+        // Also refresh dashboard
+        await loadDashboard();
+      }, 3000);
+      
     } else {
       toast(result.message, 'error');
     }
   } catch (error) {
+    console.error('❌ Surplus error:', error);
     toast('Failed: ' + error.message, 'error');
   } finally {
     btn.disabled = false;
