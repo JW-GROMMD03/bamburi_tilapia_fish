@@ -266,12 +266,29 @@ class SupabaseDB:
         if not cls._ok(): return []
         if not d: d = str(date.today())
         try:
-            params = {'date': f'eq.{d}', 'order': 'created_at.desc'}
+            # For DATE columns, use the date string directly
+            url = f'{cls.BASE}/rest/v1/transactions'
+            params = {
+                'date': f'eq.{d}',
+                'order': 'created_at.desc',
+                'limit': '1000'  # Get all transactions for the day
+            }
             if cashier_id:
                 params['cashier_id'] = f'eq.{cashier_id}'
-            r = requests.get(f'{cls.BASE}/rest/v1/transactions', headers=cls._h(), params=params)
-            return r.json() if r.status_code == 200 else []
-        except:
+            
+            print(f"🔍 Fetching TX for date: {d}")
+            r = requests.get(url, headers=cls._h(), params=params)
+            print(f"📥 TX Fetch Response: {r.status_code}, Count: {len(r.json()) if r.status_code == 200 else 0}")
+            
+            if r.status_code == 200:
+                data = r.json()
+                # Filter again to ensure exact date match
+                filtered = [t for t in data if t.get('date') == d]
+                print(f"🔍 TX After filter: {len(filtered)} transactions")
+                return filtered
+            return []
+        except Exception as e:
+            print(f"❌ get_tx error: {e}")
             return []
     
     @classmethod
@@ -292,19 +309,22 @@ class SupabaseDB:
                 'shift': str(data.get('shift', 'day')),
                 'created_at': data.get('created_at', datetime.now().isoformat())
             }
-            print(f"💾 Saving TX to Supabase - Cashier: {tx_data['cashier_name']}")
+            print(f"💾 Saving TX - Date: {tx_data['date']}, Total: {tx_data['total']}, Method: {tx_data['method']}")
             r = requests.post(f'{cls.BASE}/rest/v1/transactions', headers=cls._h(), json=tx_data)
+            print(f"📥 TX Save Response: {r.status_code} - {r.text[:300]}")
             if r.status_code in [200, 201]:
                 res = r.json()
                 result = res[0] if isinstance(res, list) else res
-                print(f"✅ TX saved: {result.get('id')}")
+                print(f"✅ TX saved with ID: {result.get('id')}")
                 cls._update_inventory(data.get('items', []))
                 cls.log_audit(data.get('cashier_id'), 'sale', f"Sale: {data.get('total')}/=")
                 return result
             else:
-                print(f"❌ Save failed: {r.status_code} - {r.text[:200]}")
+                print(f"❌ TX Save FAILED: {r.status_code} - {r.text[:300]}")
         except Exception as e:
-            print(f"❌ Save error: {e}")
+            print(f"❌ TX Save error: {e}")
+            import traceback
+            traceback.print_exc()
         return None
     
     @classmethod
@@ -569,12 +589,20 @@ class SupabaseDB:
     
     @classmethod
     def get_all_tx(cls):
-        """Get ALL transactions (not just today)"""
+        """Get ALL transactions for admin/summary use"""
         if not cls._ok(): return []
         try:
-            r = requests.get(f'{cls.BASE}/rest/v1/transactions', 
-                           headers=cls._h(), 
-                           params={'order': 'created_at.desc', 'limit': '500'})
-            return r.json() if r.status_code == 200 else []
-        except:
+            # Fetch up to 2000 most recent transactions
+            r = requests.get(
+                f'{cls.BASE}/rest/v1/transactions', 
+                headers=cls._h(), 
+                params={'order': 'created_at.desc', 'limit': '2000'}
+            )
+            if r.status_code == 200:
+                data = r.json()
+                print(f"🔍 get_all_tx: {len(data)} transactions fetched")
+                return data
+            return []
+        except Exception as e:
+            print(f"❌ get_all_tx error: {e}")
             return []

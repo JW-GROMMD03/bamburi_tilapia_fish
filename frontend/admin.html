@@ -4338,9 +4338,10 @@ async function adjustSurplus(method) {
   
   if (!realAmount) { toast('Enter real amount', 'error'); return; }
   
-  // Disable button during request
+  // Get the button that was clicked
   const btn = event.target;
   btn.disabled = true;
+  const originalText = btn.textContent;
   btn.textContent = '⏳ Processing...';
   
   try {
@@ -4351,22 +4352,35 @@ async function adjustSurplus(method) {
       created_by: currentUser?.id || 'admin'
     });
     
+    console.log('🔧 Surplus result:', result);
+    
     if (result.success) {
       toast(result.message);
+      
+      // WIPE the input immediately
+      document.getElementById(inputId).value = '';
+      
+      // FORCE reload - wait 1 second for DB to settle, then reload
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      await loadCalculationPanel();
+      
+      // Also refresh the sales panel if visible
+      if (document.getElementById('sales').classList.contains('active')) {
+        await loadSales();
+      }
+      
+      // Show what changed
+      if (result.new_amounts) {
+        toast(`✅ Updated! System now: KES ${(result.new_amounts.system_amount || 0).toLocaleString()}`);
+      }
     } else {
       toast(result.message, 'error');
     }
-    
-    // WIPE the input immediately to avoid double entry
-    document.getElementById(inputId).value = '';
-    
-    // Reload panel to show updated amounts
-    await loadCalculationPanel();
   } catch (error) {
     toast('Failed: ' + error.message, 'error');
   } finally {
     btn.disabled = false;
-    btn.textContent = method === 'cash' ? '🔄 Adjust Cash' : '🔄 Adjust M-Pesa';
+    btn.textContent = originalText;
   }
 }
 

@@ -1498,25 +1498,16 @@ def financial_summary(request):
     """
     business_date = request.query_params.get('date', get_business_day())
     
-    # Get transactions
+    # Get transactions - FORCE fresh fetch, no cache
     transactions = SupabaseDB.get_tx(business_date) or []
     
     # Get cashier expenses
     cashier_expenses = SupabaseDB.get_exp(business_date) or []
     
     # Get financial entries
-    fin_entries = []
-    if SupabaseDB._ok():
-        try:
-            url = f"{SupabaseDB.BASE}/rest/v1/financial_entries?business_date=eq.{business_date}&order=created_at.desc"
-            headers = SupabaseDB._h()
-            r = requests.get(url, headers=headers)
-            if r.status_code == 200:
-                fin_entries = r.json()
-        except:
-            pass
+    fin_entries = get_fin_entries_for_date(business_date)
     
-    # Calculate sales totals
+    # Calculate sales totals - INCLUDING system correction transactions
     cash_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'cash')
     mpesa_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'mpesa')
     total_sales = cash_sales + mpesa_sales
@@ -1525,6 +1516,9 @@ def financial_summary(request):
     cashier_exp_total = sum(e.get('amount', 0) for e in cashier_expenses)
     
     # Categorize financial entries
+    def sum_by_method(entries, method):
+        return sum(e.get('amount', 0) for e in entries if e.get('payment_method') == method)
+    
     expenses = [e for e in fin_entries if e.get('entry_type') == 'expense']
     salaries = [e for e in fin_entries if e.get('entry_type') == 'salary']
     debts = [e for e in fin_entries if e.get('entry_type') == 'debt']
@@ -1532,31 +1526,22 @@ def financial_summary(request):
     fish_purchases = [e for e in fin_entries if e.get('entry_type') == 'fish_purchase']
     mbuta_purchases = [e for e in fin_entries if e.get('entry_type') == 'mbuta_purchase']
     
-    # Calculate deductions
-    def sum_by_method(entries, method):
-        return sum(e.get('amount', 0) for e in entries if e.get('payment_method') == method)
-    
-    # Admin expenses
     admin_exp_cash = sum_by_method(expenses, 'cash')
     admin_exp_mpesa = sum_by_method(expenses, 'mpesa')
     admin_exp_total = admin_exp_cash + admin_exp_mpesa
     
-    # Salaries
     salary_cash = sum_by_method(salaries, 'cash')
     salary_mpesa = sum_by_method(salaries, 'mpesa')
     salary_total = salary_cash + salary_mpesa
     
-    # Debts
     debt_cash = sum_by_method(debts, 'cash')
     debt_mpesa = sum_by_method(debts, 'mpesa')
     debt_total = debt_cash + debt_mpesa
     
-    # Advances
     advance_cash = sum_by_method(advances, 'cash')
     advance_mpesa = sum_by_method(advances, 'mpesa')
     advance_total = advance_cash + advance_mpesa
     
-    # Fish & Mbuta purchases (always MPesa)
     fish_total = sum(e.get('amount', 0) for e in fish_purchases)
     mbuta_total = sum(e.get('amount', 0) for e in mbuta_purchases)
     
@@ -1565,13 +1550,22 @@ def financial_summary(request):
     total_mpesa_deductions = admin_exp_mpesa + salary_mpesa + debt_mpesa + advance_mpesa + fish_total + mbuta_total
     total_deductions = total_cash_deductions + total_mpesa_deductions
     
-    # Balances
+    # FINAL BALANCES
     cash_at_hand = cash_sales - total_cash_deductions
     mpesa_balance = mpesa_sales - total_mpesa_deductions
     net_profit = cash_at_hand + mpesa_balance
     
     # Get surplus adjustments
     surplus_data = get_surplus_data(business_date)
+    
+    print(f"📊 Financial Summary for {business_date}:")
+    print(f"   Cash Sales: {cash_sales:,}")
+    print(f"   Cash Deductions: {total_cash_deductions:,}")
+    print(f"   Cash at Hand: {cash_at_hand:,}")
+    print(f"   MPesa Sales: {mpesa_sales:,}")
+    print(f"   MPesa Deductions: {total_mpesa_deductions:,}")
+    print(f"   MPesa Balance: {mpesa_balance:,}")
+    print(f"   Net Profit: {net_profit:,}")
     
     return Response({
         'business_date': business_date,
