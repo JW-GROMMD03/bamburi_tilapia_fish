@@ -4181,13 +4181,11 @@ async function loadCalculationPanel() {
   const businessDate = document.getElementById('calcDate').value || new Date().toISOString().split('T')[0];
   document.getElementById('calcDate').value = businessDate;
   
-  console.log('📊 Loading calculation panel for:', businessDate);
-  
   try {
     const data = await apiRequest(`financial/summary/?date=${businessDate}&_=${Date.now()}`);
-    console.log('📊 Summary response:', JSON.stringify(data?.totals));
     calculationData = data;
     
+    // Update lock status
     const lockStatus = document.getElementById('lockStatus');
     if (data.can_edit) {
       lockStatus.innerHTML = '🔓 Editable';
@@ -4199,6 +4197,7 @@ async function loadCalculationPanel() {
       lockStatus.style.color = '#991b1b';
     }
     
+    // Update system amounts
     document.getElementById('systemCash').textContent = 'KES ' + (data.totals.cash_at_hand || 0).toLocaleString();
     document.getElementById('systemMpesa').textContent = 'KES ' + (data.totals.mpesa_balance || 0).toLocaleString();
     
@@ -4207,11 +4206,13 @@ async function loadCalculationPanel() {
     var calcMpesaEl = document.getElementById('calcSystemMpesa');
     if (calcMpesaEl) calcMpesaEl.textContent = 'KES ' + (data.totals.mpesa_balance || 0).toLocaleString();
     
+    // Update totals
     document.getElementById('totalCashDeductions').textContent = 'KES ' + (data.totals.total_cash_deductions || 0).toLocaleString();
     document.getElementById('totalMpesaDeductions').textContent = 'KES ' + (data.totals.total_mpesa_deductions || 0).toLocaleString();
     document.getElementById('grandTotalDeductions').textContent = 'KES ' + (data.totals.total_deductions || 0).toLocaleString();
     document.getElementById('netProfitDisplay').textContent = 'KES ' + (data.totals.net_profit || 0).toLocaleString();
     
+    // Render entry lists
     renderEntryList('expenseEntries', data.deductions.admin_expenses.items, 'expense');
     renderEntryList('salaryEntries', data.deductions.salaries.items, 'salary');
     renderEntryList('debtEntries', data.deductions.debts.items, 'debt');
@@ -4219,6 +4220,7 @@ async function loadCalculationPanel() {
     renderEntryList('fishEntries', data.deductions.fish_purchase.items, 'fish_purchase');
     renderEntryList('mbutaEntries', data.deductions.mbuta_purchase.items, 'mbuta_purchase');
     
+    // Load analytics
     loadFinancialAnalytics();
     
   } catch (error) {
