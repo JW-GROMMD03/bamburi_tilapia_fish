@@ -1602,11 +1602,10 @@ def financial_summary(request):
 @api_view(['POST'])
 def surplus_adjust(request):
     """
-    Handle surplus adjustments.
-    When counted cash > system cash: Creates correction transactions with proportional item distribution.
-    Example: System cash=13,000, Counted=15,000, Surplus=2,000
-    If only fish 250 was sold in cash, fish quantity increases proportionally.
-    Total cash sales updates to reflect the surplus.
+    Simple surplus adjustment.
+    CASH: If counted(y) > system(x): x=y, total_sales(z) = z + (y-x)
+    MPESA: If counted(b) > system(a): a=b, total_sales(c) = c + (b-a)
+    If counted < system: REJECT (money lost)
     """
     try:
         data = request.data
@@ -1623,9 +1622,6 @@ def surplus_adjust(request):
         fin_entries = get_fin_entries_for_date(business_date)
         cashier_expenses = SupabaseDB.get_exp(business_date) or []
         
-        # Filter by payment method for distribution
-        method_tx = [t for t in transactions if t.get('method') == payment_method and t.get('shift') == 'day']
-        
         if payment_method == 'cash':
             cash_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'cash')
             fin_cash_deductions = sum(e.get('amount', 0) for e in fin_entries if e.get('payment_method') == 'cash')
@@ -1641,7 +1637,7 @@ def surplus_adjust(request):
         if difference < 0:
             return Response({
                 'success': False,
-                'message': f'⚠️ MONEY LOST: KES {abs(difference):,} missing in {payment_method}. System: KES {system_amount:,}, Counted: KES {counted_amount:,}.',
+                'message': f'⚠️ MONEY LOST: KES {abs(difference):,} missing in {payment_method}. System: KES {system_amount:,}, Counted: KES {counted_amount:,}. REJECTED.',
                 'difference': difference,
                 'status': 'loss'
             })
@@ -1653,139 +1649,43 @@ def surplus_adjust(request):
                 'status': 'match'
             })
         
-        # === SURPLUS: Distribute proportionally to item-level ===
-        # Step 1: Calculate total sales and per-item percentages
-        item_stats = {}  # key: item_name, value: {total_amount, quantity, price}
-        total_method_sales = 0
-        
-        for tx in method_tx:
-            items = tx.get('items', [])
-            if isinstance(items, str):
-                try:
-                    items = json.loads(items)
-                except:
-                    items = []
-            
-            for item in items:
-                if not isinstance(item, dict):
-                    continue
-                name = item.get('name', 'Unknown')
-                price = item.get('price', 0)
-                qty = item.get('qty', 1)
-                item_total = price * qty
-                
-                if name not in item_stats:
-                    item_stats[name] = {'total_amount': 0, 'quantity': 0, 'price': price}
-                item_stats[name]['total_amount'] += item_total
-                item_stats[name]['quantity'] += qty
-                total_method_sales += item_total
-        
-        if total_method_sales == 0:
-            return Response({
-                'success': False,
-                'message': 'No sales found for distribution. Cannot allocate surplus.',
-                'status': 'error'
-            })
-        
-        # Step 2: Distribute surplus proportionally, tracking remainder
-        distribution = []
-        remaining = difference
-        
-        for name, stats in sorted(item_stats.items(), key=lambda x: x[1]['total_amount'], reverse=True):
-            percentage = (stats['total_amount'] / total_method_sales) * 100
-            # Calculate proportional share
-            exact_share = (stats['total_amount'] / total_method_sales) * difference
-            rounded_share = int(round(exact_share))
-            
-            # Calculate how many extra items this represents
-            item_price = stats['price']
-            if item_price > 0:
-                extra_qty = rounded_share // item_price
-                actual_amount = extra_qty * item_price
-            else:
-                extra_qty = 0
-                actual_amount = 0
-            
-            distribution.append({
-                'item_name': name,
-                'item_price': item_price,
-                'original_amount': stats['total_amount'],
-                'original_quantity': stats['quantity'],
-                'percentage': round(percentage, 1),
-                'surplus_allocated': actual_amount,
-                'extra_quantity': extra_qty,
-                'new_total_amount': stats['total_amount'] + actual_amount,
-                'new_quantity': stats['quantity'] + extra_qty
-            })
-            remaining -= actual_amount
-        
-        # Step 3: Handle remainder - add to the largest item
-        if remaining > 0 and distribution:
-            largest = distribution[0]
-            largest_price = largest['item_price']
-            if largest_price > 0:
-                extra_qty = remaining // largest_price
-                if extra_qty == 0:
-                    extra_qty = 1
-                    remaining = largest_price  # Use full price for 1 item
-                else:
-                    remaining = extra_qty * largest_price
-                
-                largest['surplus_allocated'] += remaining
-                largest['extra_quantity'] += extra_qty
-                largest['new_total_amount'] = largest['original_amount'] + largest['surplus_allocated']
-                largest['new_quantity'] = largest['original_quantity'] + largest['extra_quantity']
-        
-        # Step 4: Create correction transactions for each item with surplus
-        created_tx_ids = []
+        # === SURPLUS: Create ONE correction transaction for the difference ===
         now = datetime.now()
         
-        for dist in distribution:
-            if dist['extra_quantity'] <= 0 or dist['surplus_allocated'] <= 0:
-                continue
-            
-            # Create correction items
-            correction_items = [{
-                'name': dist['item_name'],
-                'price': dist['item_price'],
-                'qty': dist['extra_quantity']
-            }]
-            
-            correction_tx = {
-                'date': business_date,
-                'time': now.strftime('%H:%M'),
-                'total': dist['surplus_allocated'],
-                'method': payment_method,
-                'cash_amount': dist['surplus_allocated'] if payment_method == 'cash' else 0,
-                'mpesa_amount': dist['surplus_allocated'] if payment_method == 'mpesa' else 0,
-                'items': json.dumps(correction_items),
-                'cashier_id': '00000000-0000-0000-0000-000000000000',  # System UUID instead of "system"
-                'cashier_name': 'System (Surplus Correction)',
-                'shift': 'day',
-                'created_at': now.isoformat()
-            }
-            
-            saved = SupabaseDB.save_tx(correction_tx)
-            if saved:
-                created_tx_ids.append({
-                    'id': saved.get('id'),
-                    'item': dist['item_name'],
-                    'qty_added': dist['extra_quantity'],
-                    'amount': dist['surplus_allocated']
-                })
+        # Create a single correction transaction for the surplus
+        correction_items = [{
+            'name': f'Surplus Correction ({payment_method})',
+            'price': difference,
+            'qty': 1
+        }]
         
-        # Step 5: Save surplus record
+        correction_tx = {
+            'date': business_date,
+            'time': now.strftime('%H:%M'),
+            'total': difference,
+            'method': payment_method,
+            'cash_amount': difference if payment_method == 'cash' else 0,
+            'mpesa_amount': difference if payment_method == 'mpesa' else 0,
+            'items': json.dumps(correction_items),
+            'cashier_id': '00000000-0000-0000-0000-000000000000',
+            'cashier_name': 'System (Surplus Correction)',
+            'shift': 'day',
+            'created_at': now.isoformat()
+        }
+        
+        saved = SupabaseDB.save_tx(correction_tx)
+        
+        # Save surplus record
         surplus_entry = {
             'business_date': business_date,
             'entry_type': 'surplus_adjustment',
-            'description': f'Surplus {payment_method}: KES {difference:,} → {len(created_tx_ids)} corrections',
+            'description': f'Surplus {payment_method}: KES {difference:,}',
             'person_name': 'System',
             'amount': difference,
             'payment_method': payment_method,
             'shift': 'day',
             'created_by': str(data.get('created_by', 'admin')),
-            'created_at': now.isoformat(),
-            'distribution': json.dumps(distribution)
+            'created_at': now.isoformat()
         }
         
         if SupabaseDB._ok():
@@ -1798,20 +1698,21 @@ def surplus_adjust(request):
         if payment_method == 'cash':
             new_cash_sales = cash_sales + difference
             new_cash_at_hand = new_cash_sales - fin_cash_deductions - cashier_exp_deductions
+            new_total_sales = new_cash_sales
         else:
             new_mpesa_sales = mpesa_sales + difference
             new_mpesa_balance = new_mpesa_sales - fin_mpesa_deductions
+            new_total_sales = new_mpesa_sales
         
         return Response({
             'success': True,
-            'message': f'✅ Surplus KES {difference:,} distributed to {len(created_tx_ids)} items. System now matches counted amount.',
+            'message': f'✅ {payment_method.upper()} updated! System now: KES {counted_amount:,}. Total {payment_method} sales: KES {new_total_sales:,}.',
             'difference': difference,
-            'distribution': distribution,
-            'corrections_created': created_tx_ids,
+            'correction_saved': saved is not None,
             'status': 'surplus',
             'new_amounts': {
                 'system_amount': counted_amount,
-                'total_sales': new_cash_sales if payment_method == 'cash' else new_mpesa_sales,
+                'total_sales': new_total_sales,
                 'cash_at_hand': new_cash_at_hand if payment_method == 'cash' else None,
                 'mpesa_balance': new_mpesa_balance if payment_method == 'mpesa' else None
             }

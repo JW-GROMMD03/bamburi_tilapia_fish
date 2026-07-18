@@ -1116,9 +1116,8 @@ async function renderBills() {
   // Filter for current cashier AND current shift
   var myTx = t.filter(function(tx) {
     var matchesCashier = (tx.cashier_id === user.id) || (tx.cashier_name === user.full_name);
-    var txTime = tx.created_at ? new Date(tx.created_at) : new Date();
-    var isCurrentShift = txTime >= shiftStart;
-    return matchesCashier && isCurrentShift;
+    var matchesShift = (tx.shift === user.shift);
+    return matchesCashier && matchesShift;
   });
   
   window.receiptsList = myTx;
@@ -1604,13 +1603,13 @@ async function updateDashboard() {
   var businessDay = getToday();
   var myShiftTx = t.filter(function(tx) {
     var mc = (tx.cashier_id === user.id) || (tx.cashier_name === user.full_name);
-    var tt = tx.created_at ? new Date(tx.created_at) : new Date();
-    return mc && tt >= shiftStart;
+    var matchesShift = (tx.shift === user.shift);
+    return mc && matchesShift;
   });
   var myShiftExp = e.filter(function(ex) {
-    var et = ex.created_at ? new Date(ex.created_at) : new Date();
     var ed = ex.date || (ex.created_at ? new Date(ex.created_at).toISOString().split('T')[0] : '');
-    return et >= shiftStart && ed === businessDay;
+    var matchesShift = !ex.shift || (ex.shift === user.shift);
+    return matchesShift && ed === businessDay;
   });
   var cat = { tilapia: { pieces: 0, amount: 0 }, mbuta: { pieces: 0, amount: 0 }, obambo: { pieces: 0, amount: 0 }, ugali: { pieces: 0, amount: 0 }, wetfry: { pieces: 0, amount: 0 }, soda: { pieces: 0, amount: 0 }, greens: { pieces: 0, amount: 0 }, chips: { pieces: 0, amount: 0 }, bag: { pieces: 0, amount: 0 }, fuluOmena: { pieces: 0, amount: 0 }, water: { pieces: 0, amount: 0 }, container: { pieces: 0, amount: 0 }, other: { pieces: 0, amount: 0 }, pepsi: { pieces: 0, amount: 0 }, cocacola: { pieces: 0, amount: 0 } };
   myShiftTx.forEach(function(tx) {
@@ -1698,8 +1697,8 @@ async function renderAnalysis() {
   // Filter for current shift only
   var myTx = t.filter(function(tx) {
     var matchesCashier = (tx.cashier_id === user.id) || (tx.cashier_name === user.full_name);
-    var txTime = tx.created_at ? new Date(tx.created_at) : new Date();
-    return matchesCashier && txTime >= shiftStart;
+    var matchesShift = (tx.shift === user.shift);
+    return matchesCashier && matchesShift;
   });
   
   if (myTx.length === 0) {
@@ -1888,21 +1887,25 @@ async function submitShiftReport() {
   var shiftStart = getShiftStartTime();
   var businessDay = getToday();
   
-  // ALL cashiers' transactions for this shift - filter by BOTH time AND business day
+  // FILTER BY SHIFT - only get transactions matching the current cashier's shift
   var allShiftTx = t.filter(function(tx) {
-    var txTime = tx.created_at ? new Date(tx.created_at) : new Date();
     var txDate = tx.date || (tx.created_at ? new Date(tx.created_at).toISOString().split('T')[0] : '');
-    // Transaction must be from current shift time AND current business day
-    return txTime >= shiftStart && txDate === businessDay;
+    var matchesShift = (tx.shift === user.shift);
+    var matchesDay = (txDate === businessDay);
+    return matchesShift && matchesDay;
   });
+  
+  console.log('📋 Report - Shift:', user.shift, '| Transactions found:', allShiftTx.length);
   
   // Get expenses for current shift
   var e = await apiCall('expenses/') || [];
   var allShiftExp = e.filter(function(ex) {
-    var exTime = ex.created_at ? new Date(ex.created_at) : new Date();
     var exDate = ex.date || (ex.created_at ? new Date(ex.created_at).toISOString().split('T')[0] : '');
-    return exTime >= shiftStart && exDate === businessDay;
+    var matchesShift = !ex.shift || (ex.shift === user.shift);
+    return matchesShift && exDate === businessDay;
   });
+  
+  console.log('📋 Report - Expenses found:', allShiftExp.length);
   
   var currentTotalSales = allShiftTx.reduce(function(s, t) { return s + (t.total || 0); }, 0);
   var totalExpenses = allShiftExp.reduce(function(s, e) { return s + (e.amount || 0); }, 0);
