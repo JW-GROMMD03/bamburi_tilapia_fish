@@ -1114,10 +1114,13 @@ async function renderBills() {
   var shiftStart = getShiftStartTime();
   
   // Filter for current cashier AND current shift
+  var businessDay = getToday();
   var myTx = t.filter(function(tx) {
     var matchesCashier = (tx.cashier_id === user.id) || (tx.cashier_name === user.full_name);
     var matchesShift = (tx.shift === user.shift);
-    return matchesCashier && matchesShift;
+    var txDate = tx.date || (tx.created_at ? new Date(tx.created_at).toISOString().split('T')[0] : '');
+    var matchesDay = (txDate === businessDay);
+    return matchesCashier && matchesShift && matchesDay;
   });
   
   window.receiptsList = myTx;
@@ -1604,7 +1607,9 @@ async function updateDashboard() {
   var myShiftTx = t.filter(function(tx) {
     var mc = (tx.cashier_id === user.id) || (tx.cashier_name === user.full_name);
     var matchesShift = (tx.shift === user.shift);
-    return mc && matchesShift;
+    var txDate = tx.date || (tx.created_at ? new Date(tx.created_at).toISOString().split('T')[0] : '');
+    var matchesDay = (txDate === businessDay);
+    return mc && matchesShift && matchesDay;
   });
   var myShiftExp = e.filter(function(ex) {
     var ed = ex.date || (ex.created_at ? new Date(ex.created_at).toISOString().split('T')[0] : '');
@@ -1695,10 +1700,13 @@ async function renderAnalysis() {
   var shiftStart = getShiftStartTime();
   
   // Filter for current shift only
+  var businessDay = getToday();
   var myTx = t.filter(function(tx) {
     var matchesCashier = (tx.cashier_id === user.id) || (tx.cashier_name === user.full_name);
     var matchesShift = (tx.shift === user.shift);
-    return matchesCashier && matchesShift;
+    var txDate = tx.date || (tx.created_at ? new Date(tx.created_at).toISOString().split('T')[0] : '');
+    var matchesDay = (txDate === businessDay);
+    return matchesCashier && matchesShift && matchesDay;
   });
   
   if (myTx.length === 0) {
