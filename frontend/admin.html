@@ -4187,8 +4187,11 @@ async function loadCalculationPanel() {
   const businessDate = document.getElementById('calcDate').value || new Date().toISOString().split('T')[0];
   document.getElementById('calcDate').value = businessDate;
   
+  console.log('📊 Loading calculation panel for:', businessDate);
+  
   try {
     const data = await apiRequest(`financial/summary/?date=${businessDate}&_=${Date.now()}`);
+    console.log('📊 Summary response:', JSON.stringify(data?.totals));
     calculationData = data;
     
     // Update lock status
@@ -4203,23 +4206,19 @@ async function loadCalculationPanel() {
       lockStatus.style.color = '#991b1b';
     }
     
-    // Update system amounts
-    // Show current cash at hand and mpesa balance
+    // Show current balances
     document.getElementById('currentCashAtHand').textContent = 'KES ' + (data.totals.cash_at_hand || 0).toLocaleString();
     document.getElementById('currentMpesaBalance').textContent = 'KES ' + (data.totals.mpesa_balance || 0).toLocaleString();
     
-    // Show total sales (cash at hand + deductions = total cash sales before deductions)
+    // Total Cash Sales = Cash at Hand + Cash Deductions
     var totalCashSales = (data.totals.cash_at_hand || 0) + (data.totals.total_cash_deductions || 0);
-    var totalMpesaSales = (data.totals.mpesa_balance || 0) + (data.totals.total_mpesa_deductions || 0);
     document.getElementById('totalCashSales').textContent = 'KES ' + totalCashSales.toLocaleString();
+    
+    // Total M-Pesa Sales = M-Pesa Balance + M-Pesa Deductions
+    var totalMpesaSales = (data.totals.mpesa_balance || 0) + (data.totals.total_mpesa_deductions || 0);
     document.getElementById('totalMpesaSales').textContent = 'KES ' + totalMpesaSales.toLocaleString();
     
-    var calcCashEl = document.getElementById('calcSystemCash');
-    if (calcCashEl) calcCashEl.textContent = 'KES ' + (data.totals.cash_at_hand || 0).toLocaleString();
-    var calcMpesaEl = document.getElementById('calcSystemMpesa');
-    if (calcMpesaEl) calcMpesaEl.textContent = 'KES ' + (data.totals.mpesa_balance || 0).toLocaleString();
-    
-    // Update totals
+    // Update deductions
     document.getElementById('totalCashDeductions').textContent = 'KES ' + (data.totals.total_cash_deductions || 0).toLocaleString();
     document.getElementById('totalMpesaDeductions').textContent = 'KES ' + (data.totals.total_mpesa_deductions || 0).toLocaleString();
     document.getElementById('grandTotalDeductions').textContent = 'KES ' + (data.totals.total_deductions || 0).toLocaleString();
@@ -4233,10 +4232,8 @@ async function loadCalculationPanel() {
     renderEntryList('fishEntries', data.deductions.fish_purchase.items, 'fish_purchase');
     renderEntryList('mbutaEntries', data.deductions.mbuta_purchase.items, 'mbuta_purchase');
     
-    // Only load analytics if charts are visible
-if (document.getElementById('deductionsChart')) {
+    // Load analytics
     loadFinancialAnalytics();
-}
     
   } catch (error) {
     console.error('Calculation error:', error);
@@ -4339,6 +4336,8 @@ async function adjustSurplus(method) {
   btn.textContent = '⏳ Processing...';
   
   try {
+    console.log('🔧 Sending surplus adjustment:', { method, realAmount, businessDate });
+    
     const result = await apiRequest('financial/surplus-adjust/', 'POST', {
       business_date: businessDate,
       payment_method: method,
@@ -4346,17 +4345,36 @@ async function adjustSurplus(method) {
       created_by: currentUser?.id || 'admin'
     });
     
+    console.log('🔧 Surplus result:', JSON.stringify(result));
+    
     if (result.success) {
       toast(result.message);
-      document.getElementById(inputId).value = ''; // WIPE input
       
-      // Refresh after delay
-      setTimeout(async () => { await loadCalculationPanel(); }, 1500);
-      setTimeout(async () => { await loadCalculationPanel(); await loadDashboard(); }, 3000);
+      // WIPE the input immediately
+      document.getElementById(inputId).value = '';
+      
+      // Show what changed
+      if (result.new_amounts) {
+        console.log('🔧 New amounts:', result.new_amounts);
+      }
+      
+      // Refresh after delay to let DB commit
+      setTimeout(async () => {
+        console.log('🔄 Refresh attempt 1 (1.5s)...');
+        await loadCalculationPanel();
+      }, 1500);
+      
+      setTimeout(async () => {
+        console.log('🔄 Refresh attempt 2 (3s)...');
+        await loadCalculationPanel();
+        await loadDashboard();
+      }, 3000);
+      
     } else {
       toast(result.message, 'error');
     }
   } catch (error) {
+    console.error('❌ Surplus error:', error);
     toast('Failed: ' + error.message, 'error');
   } finally {
     btn.disabled = false;
