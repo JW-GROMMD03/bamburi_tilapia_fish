@@ -1604,7 +1604,7 @@ def surplus_adjust(request):
     """
     Surplus adjustment.
     CASH: If counted(y) > system(x): x=y, total_sales(z) = z + (y-x). If y < x: REJECT.
-    MPESA: Direct set. Total M-Pesa Sales = entered amount. Balance = Sales - Deductions. Allows any value.
+    MPESA: Admin enters TOTAL M-Pesa Sales. Balance = Sales - Deductions. Allows any value.
     """
     try:
         data = request.data
@@ -1697,12 +1697,18 @@ def surplus_adjust(request):
             })
         
         else:
-            # === MPESA: Direct set - allow any value ===
+            # === MPESA: Admin enters TOTAL M-Pesa Sales ===
+            # Balance = Total Sales - Deductions (deductions remain unchanged)
             mpesa_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'mpesa')
             fin_mpesa_deductions = sum(e.get('amount', 0) for e in fin_entries if e.get('payment_method') == 'mpesa')
-            system_amount = mpesa_sales - fin_mpesa_deductions
             
-            difference = counted_amount - system_amount
+            # Admin entered the TOTAL M-Pesa Sales
+            new_total_mpesa_sales = counted_amount
+            
+            # Calculate what the current total mpesa sales are
+            current_total_mpesa_sales = mpesa_sales
+            
+            difference = new_total_mpesa_sales - current_total_mpesa_sales
             
             if difference == 0:
                 return Response({
@@ -1714,7 +1720,8 @@ def surplus_adjust(request):
             
             now = datetime.now()
             
-            correction_items = [{'name': 'M-Pesa Balance Adjustment', 'price': abs(difference), 'qty': 1}]
+            # Create correction transaction for the difference
+            correction_items = [{'name': 'M-Pesa Sales Adjustment', 'price': abs(difference), 'qty': 1}]
             
             correction_tx = {
                 'date': business_date,
@@ -1750,17 +1757,17 @@ def surplus_adjust(request):
                 headers['Prefer'] = 'return=representation'
                 requests.post(url, headers=headers, json=surplus_entry)
             
-            # Total M-Pesa Sales = Exactly what admin entered
-            # System M-Pesa Balance = Total Sales - Deductions
-            new_mpesa_balance = counted_amount - fin_mpesa_deductions
+            # New Total M-Pesa Sales = What admin entered
+            # New M-Pesa Balance = Total Sales - Deductions
+            new_mpesa_balance = new_total_mpesa_sales - fin_mpesa_deductions
             
             return Response({
                 'success': True,
-                'message': f'✅ M-Pesa updated! Total Sales: KES {counted_amount:,}. Balance: KES {new_mpesa_balance:,}.',
+                'message': f'✅ M-Pesa updated! Total Sales: KES {new_total_mpesa_sales:,}. Balance: KES {new_mpesa_balance:,}. Deductions: KES {fin_mpesa_deductions:,}.',
                 'difference': difference,
                 'status': 'adjusted',
                 'new_amounts': {
-                    'total_sales': counted_amount,
+                    'total_sales': new_total_mpesa_sales,
                     'mpesa_balance': new_mpesa_balance
                 }
             })
