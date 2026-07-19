@@ -1602,9 +1602,8 @@ def financial_summary(request):
 @api_view(['POST'])
 def surplus_adjust(request):
     """
-    Surplus adjustment.
-    CASH: If counted(y) > system(x): x=y, total_sales(z) = z + (y-x). If y < x: REJECT.
-    MPESA: Admin enters TOTAL M-Pesa Sales. Balance = Sales - Deductions. Allows any value.
+    CASH: If counted > system: adds difference to cash sales. If counted < system: REJECTS.
+    MPESA: Admin enters TOTAL M-Pesa Sales. Overrides current total. Balance = Sales - Deductions.
     """
     try:
         data = request.data
@@ -1620,8 +1619,10 @@ def surplus_adjust(request):
         fin_entries = get_fin_entries_for_date(business_date)
         cashier_expenses = SupabaseDB.get_exp(business_date) or []
         
+        # ============================================================
+        # CASH: Only allow surplus (counted > system)
+        # ============================================================
         if payment_method == 'cash':
-            # === CASH: Only allow surplus (counted > system) ===
             cash_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'cash')
             fin_cash_deductions = sum(e.get('amount', 0) for e in fin_entries if e.get('payment_method') == 'cash')
             cashier_exp_deductions = sum(e.get('amount', 0) for e in cashier_expenses)
@@ -1632,7 +1633,7 @@ def surplus_adjust(request):
             if difference < 0:
                 return Response({
                     'success': False,
-                    'message': f'⚠️ MONEY LOST: KES {abs(difference):,} missing in cash. System: KES {system_amount:,}, Counted: KES {counted_amount:,}. REJECTED.',
+                    'message': f'⚠️ MONEY LOST: KES {abs(difference):,} missing. System: KES {system_amount:,}, Counted: KES {counted_amount:,}. REJECTED.',
                     'difference': difference,
                     'status': 'loss'
                 })
@@ -1644,6 +1645,7 @@ def surplus_adjust(request):
                     'status': 'match'
                 })
             
+            # Surplus: Add to cash sales
             now = datetime.now()
             correction_items = [{'name': 'Cash Surplus Correction', 'price': difference, 'qty': 1}]
             
@@ -1696,19 +1698,18 @@ def surplus_adjust(request):
                 }
             })
         
+        # ============================================================
+        # MPESA: Admin enters TOTAL M-Pesa Sales (overrides current)
+        # ============================================================
         else:
-            # === MPESA: Admin enters TOTAL M-Pesa Sales ===
-            # Balance = Total Sales - Deductions (deductions remain unchanged)
             mpesa_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'mpesa')
             fin_mpesa_deductions = sum(e.get('amount', 0) for e in fin_entries if e.get('payment_method') == 'mpesa')
             
-            # Admin entered the TOTAL M-Pesa Sales
+            # Admin wants total mpesa sales to be exactly this amount
             new_total_mpesa_sales = counted_amount
             
-            # Calculate what the current total mpesa sales are
-            current_total_mpesa_sales = mpesa_sales
-            
-            difference = new_total_mpesa_sales - current_total_mpesa_sales
+            # Calculate correction needed (can be negative)
+            difference = new_total_mpesa_sales - mpesa_sales
             
             if difference == 0:
                 return Response({
@@ -1720,29 +1721,34 @@ def surplus_adjust(request):
             
             now = datetime.now()
             
-            # Create correction transaction for the difference
-            correction_items = [{'name': 'M-Pesa Sales Adjustment', 'price': abs(difference), 'qty': 1}]
+            # Create correction transaction (difference can be negative to reduce sales)
+            correction_items = [{
+                'name': 'M-Pesa Sales Correction',
+                'price': difference,
+                'qty': 1
+            }]
             
             correction_tx = {
                 'date': business_date,
                 'time': now.strftime('%H:%M'),
-                'total': abs(difference),
+                'total': difference,  # NEGATIVE if reducing
                 'method': 'mpesa',
                 'cash_amount': 0,
-                'mpesa_amount': abs(difference),
+                'mpesa_amount': difference if difference > 0 else 0,
                 'items': json.dumps(correction_items),
                 'cashier_id': '00000000-0000-0000-0000-000000000000',
-                'cashier_name': 'System (M-Pesa Adjustment)',
+                'cashier_name': 'System (M-Pesa Correction)',
                 'shift': 'day',
                 'created_at': now.isoformat()
             }
             
             saved = SupabaseDB.save_tx(correction_tx)
+            print(f"🔧 M-Pesa correction TX: difference={difference}, saved={saved}")
             
             surplus_entry = {
                 'business_date': business_date,
                 'entry_type': 'surplus_adjustment',
-                'description': f'M-Pesa Adjustment: KES {difference:,}',
+                'description': f'M-Pesa: Total set to KES {new_total_mpesa_sales:,} (diff: {difference:,})',
                 'person_name': 'System',
                 'amount': abs(difference),
                 'payment_method': 'mpesa',
@@ -1757,13 +1763,14 @@ def surplus_adjust(request):
                 headers['Prefer'] = 'return=representation'
                 requests.post(url, headers=headers, json=surplus_entry)
             
-            # New Total M-Pesa Sales = What admin entered
-            # New M-Pesa Balance = Total Sales - Deductions
+            # After correction:
+            # Total M-Pesa Sales = exactly what admin entered
+            # M-Pesa Balance = Total Sales - Deductions
             new_mpesa_balance = new_total_mpesa_sales - fin_mpesa_deductions
             
             return Response({
                 'success': True,
-                'message': f'✅ M-Pesa updated! Total Sales: KES {new_total_mpesa_sales:,}. Balance: KES {new_mpesa_balance:,}. Deductions: KES {fin_mpesa_deductions:,}.',
+                'message': f'✅ M-Pesa updated! Total Sales: KES {new_total_mpesa_sales:,}. Balance: KES {new_mpesa_balance:,}.',
                 'difference': difference,
                 'status': 'adjusted',
                 'new_amounts': {
