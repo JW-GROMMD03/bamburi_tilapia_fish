@@ -1603,7 +1603,7 @@ def financial_summary(request):
 def surplus_adjust(request):
     """
     CASH: If counted > system: adds difference to cash sales. If counted < system: REJECTS.
-    MPESA: Admin enters TOTAL M-Pesa Sales. Overrides current total. Balance = Sales - Deductions.
+    MPESA: Admin enters TOTAL M-Pesa Sales. OVERRIDES current total (not add to it).
     """
     try:
         data = request.data
@@ -1683,35 +1683,49 @@ def surplus_adjust(request):
                 headers['Prefer'] = 'return=representation'
                 requests.post(url, headers=headers, json=surplus_entry)
             
-            new_cash_sales = cash_sales + difference
+            # Recalculate to verify
+            updated_transactions = SupabaseDB.get_tx(business_date) or []
+            new_cash_sales = sum(t.get('total', 0) for t in updated_transactions if t.get('method') == 'cash')
             new_cash_at_hand = new_cash_sales - fin_cash_deductions - cashier_exp_deductions
             
             return Response({
                 'success': True,
-                'message': f'✅ Cash updated! Cash at Hand: KES {counted_amount:,}. Total Cash Sales: KES {new_cash_sales:,}.',
+                'message': f'✅ Cash updated! Cash at Hand: KES {new_cash_at_hand:,}. Total Cash Sales: KES {new_cash_sales:,}.',
                 'difference': difference,
                 'status': 'surplus',
                 'new_amounts': {
-                    'system_amount': counted_amount,
+                    'system_amount': new_cash_at_hand,
                     'total_sales': new_cash_sales,
                     'cash_at_hand': new_cash_at_hand
                 }
             })
         
         # ============================================================
-        # MPESA: Admin enters TOTAL M-Pesa Sales (overrides current)
+        # MPESA: Admin enters TOTAL M-Pesa Sales - OVERRIDES current
+        # Deletes all previous M-Pesa correction transactions first,
+        # then creates ONE correction to make total = entered amount
         # ============================================================
         else:
+            # Get current M-Pesa sales (excluding previous corrections)
             mpesa_sales = sum(t.get('total', 0) for t in transactions if t.get('method') == 'mpesa')
+            
+            # Get only REAL transactions (not system corrections)
+            real_mpesa_sales = sum(
+                t.get('total', 0) for t in transactions 
+                if t.get('method') == 'mpesa' and 'System' not in str(t.get('cashier_name', ''))
+            )
+            
             fin_mpesa_deductions = sum(e.get('amount', 0) for e in fin_entries if e.get('payment_method') == 'mpesa')
             
             # Admin wants total mpesa sales to be exactly this amount
-            new_total_mpesa_sales = counted_amount
+            target_sales = counted_amount
             
-            # Calculate correction needed (can be negative)
-            difference = new_total_mpesa_sales - mpesa_sales
+            # The correction needed = target - real sales
+            correction_needed = target_sales - real_mpesa_sales
             
-            if difference == 0:
+            print(f"🔧 MPESA OVERRIDE: Real sales={real_mpesa_sales:,}, Current total={mpesa_sales:,}, Target={target_sales:,}, Correction={correction_needed:+,}")
+            
+            if correction_needed == 0:
                 return Response({
                     'success': True,
                     'message': '✅ M-Pesa amounts match perfectly!',
@@ -1721,20 +1735,35 @@ def surplus_adjust(request):
             
             now = datetime.now()
             
-            # Create correction transaction (difference can be negative to reduce sales)
+            # STEP 1: Delete ALL previous M-Pesa system correction transactions
+            system_corrections = [
+                t for t in transactions 
+                if t.get('method') == 'mpesa' and 'System' in str(t.get('cashier_name', ''))
+            ]
+            
+            deleted_count = 0
+            for old_tx in system_corrections:
+                tx_id = old_tx.get('id')
+                if tx_id:
+                    SupabaseDB.del_tx(tx_id)
+                    deleted_count += 1
+            
+            print(f"🔧 Deleted {deleted_count} old M-Pesa corrections")
+            
+            # STEP 2: Create ONE new correction transaction
             correction_items = [{
-                'name': 'M-Pesa Sales Correction',
-                'price': difference,
+                'name': 'M-Pesa Sales Adjustment',
+                'price': correction_needed,
                 'qty': 1
             }]
             
             correction_tx = {
                 'date': business_date,
                 'time': now.strftime('%H:%M'),
-                'total': difference,  # NEGATIVE if reducing
+                'total': correction_needed,  # Can be negative to reduce
                 'method': 'mpesa',
                 'cash_amount': 0,
-                'mpesa_amount': difference if difference > 0 else 0,
+                'mpesa_amount': max(correction_needed, 0),  # Don't set negative
                 'items': json.dumps(correction_items),
                 'cashier_id': '00000000-0000-0000-0000-000000000000',
                 'cashier_name': 'System (M-Pesa Correction)',
@@ -1743,14 +1772,15 @@ def surplus_adjust(request):
             }
             
             saved = SupabaseDB.save_tx(correction_tx)
-            print(f"🔧 M-Pesa correction TX: difference={difference}, saved={saved}")
+            print(f"🔧 New M-Pesa correction: {correction_needed:+,}, saved={saved}")
             
+            # Save surplus record
             surplus_entry = {
                 'business_date': business_date,
                 'entry_type': 'surplus_adjustment',
-                'description': f'M-Pesa: Total set to KES {new_total_mpesa_sales:,} (diff: {difference:,})',
+                'description': f'M-Pesa Override: Total set to KES {target_sales:,} (correction: {correction_needed:+,}, deleted {deleted_count} old)',
                 'person_name': 'System',
-                'amount': abs(difference),
+                'amount': abs(correction_needed),
                 'payment_method': 'mpesa',
                 'shift': 'day',
                 'created_by': str(data.get('created_by', 'admin')),
@@ -1763,19 +1793,20 @@ def surplus_adjust(request):
                 headers['Prefer'] = 'return=representation'
                 requests.post(url, headers=headers, json=surplus_entry)
             
-            # After correction:
-            # Total M-Pesa Sales = exactly what admin entered
-            # M-Pesa Balance = Total Sales - Deductions
-            new_mpesa_balance = new_total_mpesa_sales - fin_mpesa_deductions
+            # STEP 3: Recalculate from database to verify
+            updated_transactions = SupabaseDB.get_tx(business_date) or []
+            actual_mpesa_sales = sum(t.get('total', 0) for t in updated_transactions if t.get('method') == 'mpesa')
+            actual_mpesa_balance = actual_mpesa_sales - fin_mpesa_deductions
             
             return Response({
                 'success': True,
-                'message': f'✅ M-Pesa updated! Total Sales: KES {new_total_mpesa_sales:,}. Balance: KES {new_mpesa_balance:,}.',
-                'difference': difference,
+                'message': f'✅ M-Pesa updated! Total Sales: KES {actual_mpesa_sales:,}. Balance: KES {actual_mpesa_balance:,}.',
+                'difference': correction_needed,
+                'old_corrections_deleted': deleted_count,
                 'status': 'adjusted',
                 'new_amounts': {
-                    'total_sales': new_total_mpesa_sales,
-                    'mpesa_balance': new_mpesa_balance
+                    'total_sales': actual_mpesa_sales,
+                    'mpesa_balance': actual_mpesa_balance
                 }
             })
             
