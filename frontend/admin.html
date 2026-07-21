@@ -989,6 +989,7 @@ flex-wrap:wrap;
   <button class="nav-btn" onclick="switchPanel('credit', this)">💳 Credit Sales</button>
   <button class="nav-btn" onclick="switchPanel('expenses', this)">🧾 Expenses</button>
   <button class="nav-btn" onclick="switchPanel('analytics', this)">📈 Analytics</button>
+    <button class="nav-btn" onclick="switchPanel('greensMonitor', this)">🥬 Greens Monitor</button>
   <button class="nav-btn" onclick="switchPanel('qrScanner', this)">📷 QR Scanner</button>
   <button class="nav-btn" onclick="switchPanel('glovoItems', this)">🛵 Glovo Menu</button>
   <button class="nav-btn" onclick="switchPanel('glovo', this)">🛵 Glovo Orders</button>
@@ -1210,6 +1211,43 @@ flex-wrap:wrap;
         </table>
       </div>
     </div>
+
+    <!-- GREENS MONITOR PANEL -->
+<div class="panel" id="greensMonitor">
+  <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-bottom: 20px;">
+    <div><label>Start Date:</label><input type="date" id="greensStartDate" style="padding: 8px; border-radius: 8px; border: 1px solid var(--border);"></div>
+    <div><label>End Date:</label><input type="date" id="greensEndDate" style="padding: 8px; border-radius: 8px; border: 1px solid var(--border);"></div>
+    <button class="btn" onclick="loadGreensMonitor()" style="background: #10b981;">🔍 Load</button>
+  </div>
+  
+  <div class="cards" style="margin-bottom:20px;">
+    <div class="card" style="background: linear-gradient(135deg, #dcfce7, #f0fdf4);">
+      <h3>🥬 Total Greens Revenue</h3>
+      <p id="greensTotalRevenue" style="font-size:28px;">KES 0</p>
+    </div>
+    <div class="card" style="background: linear-gradient(135deg, #fef3c7, #fffbeb);">
+      <h3>📦 Total Plates Sold</h3>
+      <p id="greensTotalQuantity" style="font-size:28px;">0</p>
+    </div>
+    <div class="card" style="background: linear-gradient(135deg, #dbeafe, #eff6ff);">
+      <h3>🌿 Variety Count</h3>
+      <p id="greensVarietyCount" style="font-size:28px;">0</p>
+    </div>
+  </div>
+
+  <div class="table-wrapper" style="margin-bottom:20px;">
+    <h3 style="padding:15px;">🥬 Individual Vegetable Performance</h3>
+    <table>
+      <thead><tr><th>Vegetable</th><th>Plates Sold</th><th>Revenue (KES)</th><th>Avg Price</th><th>Transactions</th><th>Status</th></tr></thead>
+      <tbody id="greensTableBody"><tr><td colspan="6" class="loading">Loading greens data...</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="chart-box" style="margin-bottom:20px;">
+    <h3>📈 Greens Daily Revenue Trend</h3>
+    <canvas id="greensTrendChart" height="200"></canvas>
+  </div>
+</div>
 
     <!-- QR SCANNER PANEL -->
     <div class="panel" id="qrScanner">
@@ -2577,6 +2615,9 @@ function switchPanel(panel, btn) {
   if (panel === 'analytics') {
   initAnalytics();
 }
+  if (panel === 'greensMonitor') {
+    loadGreensMonitor();
+  }
   if (panel === 'analytics') {
     loadAnalytics();
   }
@@ -4499,6 +4540,106 @@ async function sendReportWhatsApp() {
     const result = await apiRequest('financial/report/whatsapp/', 'POST', { date: businessDate });
     if (result.whatsapp_url) { window.open(result.whatsapp_url, '_blank'); toast('📱 Opening WhatsApp...'); }
   } catch (error) { toast('Failed: ' + error.message, 'error'); }
+}
+
+// ============ GREENS MONITOR PANEL ============
+let greensTrendChart = null;
+
+async function loadGreensMonitor() {
+  const today = new Date();
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  
+  if (!document.getElementById('greensStartDate').value) {
+    document.getElementById('greensStartDate').value = weekAgo.toISOString().split('T')[0];
+  }
+  if (!document.getElementById('greensEndDate').value) {
+    document.getElementById('greensEndDate').value = today.toISOString().split('T')[0];
+  }
+  
+  const startDate = document.getElementById('greensStartDate').value;
+  const endDate = document.getElementById('greensEndDate').value;
+  
+  try {
+    const data = await apiRequest(`analytics/greens/?start_date=${startDate}&end_date=${endDate}`);
+    
+    // Update summary cards
+    document.getElementById('greensTotalRevenue').textContent = 'KES ' + (data.totals?.total_revenue || 0).toLocaleString();
+    document.getElementById('greensTotalQuantity').textContent = (data.totals?.total_quantity || 0).toLocaleString();
+    document.getElementById('greensVarietyCount').textContent = (data.totals?.variety_count || 0);
+    
+    // Update table
+    const vegetables = data.vegetables || [];
+    const container = document.getElementById('greensTableBody');
+    
+    if (vegetables.length === 0) {
+      container.innerHTML = '<tr><td colspan="6" class="loading">No greens sold in this period</td></tr>';
+    } else {
+      container.innerHTML = vegetables.map(v => `
+        <tr>
+          <td><strong>🥬 ${escapeHtml(v.name)}</strong></td>
+          <td>${(v.quantity || 0).toLocaleString()} plates</td>
+          <td><strong>KES ${(v.revenue || 0).toLocaleString()}</strong></td>
+          <td>KES ${(v.avg_price || 0).toLocaleString()}</td>
+          <td>${v.transactions || 0}</td>
+          <td><span class="badge ${v.revenue > 0 ? 'success' : 'danger'}">${v.revenue > 0 ? '✅ Active' : '⚠️ No Sales'}</span></td>
+        </tr>
+      `).join('');
+    }
+    
+    // Update chart
+    updateGreensTrendChart(data.daily_trend || []);
+    
+  } catch (error) {
+    console.error('Greens monitor error:', error);
+    toast('Failed to load greens data', 'error');
+  }
+}
+
+function updateGreensTrendChart(dailyTrend) {
+  const ctx = document.getElementById('greensTrendChart');
+  if (!ctx) return;
+  
+  if (greensTrendChart) greensTrendChart.destroy();
+  
+  // Collect all vegetable names
+  const allVeggies = new Set();
+  dailyTrend.forEach(d => {
+    Object.keys(d.vegetables || {}).forEach(v => allVeggies.add(v));
+  });
+  
+  const colors = ['#10b981', '#059669', '#047857', '#065f46', '#064e3b', '#34d399', '#6ee7b7', '#a7f3d0'];
+  
+  const datasets = Array.from(allVeggies).map((veg, i) => ({
+    label: veg.charAt(0).toUpperCase() + veg.slice(1),
+    data: dailyTrend.map(d => (d.vegetables?.[veg]?.revenue || 0)),
+    borderColor: colors[i % colors.length],
+    backgroundColor: 'transparent',
+    tension: 0.4,
+    borderWidth: 2
+  }));
+  
+  greensTrendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: dailyTrend.map(d => d.date),
+      datasets: datasets
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.dataset.label}: KES ${ctx.raw.toLocaleString()}`
+          }
+        }
+      },
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: 'Revenue (KES)' } }
+      }
+    }
+  });
 }
 
 </script>

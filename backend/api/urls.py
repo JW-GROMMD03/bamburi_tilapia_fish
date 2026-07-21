@@ -102,4 +102,6 @@ urlpatterns = [
     path('financial/analytics/', views.financial_analytics, name='financial-analytics'),
     path('financial/report/', views.financial_report, name='financial-report'),
     path('financial/report/whatsapp/', views.send_report_whatsapp, name='send-report-whatsapp'),
+    
+    path('analytics/greens/', views.greens_analytics, name='greens-analytics'),
 ]

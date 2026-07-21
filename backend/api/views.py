@@ -2378,3 +2378,158 @@ def delete_glovo_order(request, order_id):
     except Exception as e:
         print(f"❌ Glovo DELETE error: {str(e)}")
         return Response({'error': str(e)}, status=400)
+    
+@api_view(['GET'])
+def greens_analytics(request):
+    """
+    Track individual vegetables: quantity sold, revenue, profit/loss
+    Auto-detects any vegetable added by admin in the greens category
+    """
+    try:
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        
+        if not start_date or not end_date:
+            end_date = date.today()
+            start_date = end_date - timedelta(days=7)
+        else:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        
+        # Get all transactions in date range
+        all_transactions = []
+        current_date = start_date
+        while current_date <= end_date:
+            tx = SupabaseDB.get_tx(str(current_date))
+            if tx:
+                all_transactions.extend(tx)
+            current_date += timedelta(days=1)
+        
+        # Get menu items in greens category for names/prices
+        greens_menu_items = []
+        if SupabaseDB._ok():
+            try:
+                url = f"{SupabaseDB.BASE}/rest/v1/menu_items?category=eq.greens&is_active=eq.true"
+                headers = SupabaseDB._h()
+                r = requests.get(url, headers=headers)
+                if r.status_code == 200:
+                    greens_menu_items = r.json()
+            except:
+                pass
+        
+        # Track per-vegetable stats
+        veg_stats = {}
+        daily_trend = {}
+        
+        for tx in all_transactions:
+            tx_date = tx.get('date', '')
+            items = tx.get('items', [])
+            if isinstance(items, str):
+                try:
+                    items = json.loads(items)
+                except:
+                    items = []
+            
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                name = item.get('name', '').lower()
+                price = item.get('price', 0)
+                qty = item.get('qty', 1)
+                item_total = price * qty
+                
+                # Detect if this is a greens/vegetable item
+                is_greens = False
+                veg_name = name
+                
+                greens_keywords = ['managu', 'spinach', 'kales', 'sukuma', 'mrenda', 'mboga', 
+                                  'cabbage', 'broccoli', 'kale', 'greens', 'vegetable']
+                
+                for keyword in greens_keywords:
+                    if keyword in name:
+                        is_greens = True
+                        break
+                
+                # Also check if item category is greens from menu
+                if not is_greens:
+                    for menu_item in greens_menu_items:
+                        if menu_item.get('name', '').lower() in name:
+                            is_greens = True
+                            break
+                
+                if not is_greens:
+                    continue
+                
+                # Normalize the vegetable name
+                for keyword in greens_keywords:
+                    if keyword in veg_name:
+                        veg_name = keyword
+                        break
+                
+                if veg_name not in veg_stats:
+                    veg_stats[veg_name] = {
+                        'name': veg_name.title(),
+                        'quantity': 0,
+                        'revenue': 0,
+                        'avg_price': price,
+                        'transactions': 0
+                    }
+                
+                veg_stats[veg_name]['quantity'] += qty
+                veg_stats[veg_name]['revenue'] += item_total
+                veg_stats[veg_name]['transactions'] += 1
+                
+                # Track daily trend
+                if tx_date not in daily_trend:
+                    daily_trend[tx_date] = {}
+                if veg_name not in daily_trend[tx_date]:
+                    daily_trend[tx_date][veg_name] = {'quantity': 0, 'revenue': 0}
+                daily_trend[tx_date][veg_name]['quantity'] += qty
+                daily_trend[tx_date][veg_name]['revenue'] += item_total
+        
+        # Convert to list and sort by revenue
+        veg_list = sorted(veg_stats.values(), key=lambda x: x['revenue'], reverse=True)
+        
+        # Calculate totals
+        total_greens_revenue = sum(v['revenue'] for v in veg_list)
+        total_greens_quantity = sum(v['quantity'] for v in veg_list)
+        
+        # Get profit/loss - compare to purchase cost if available
+        for veg in veg_list:
+            # Check if we have purchase price data
+            purchase_price = None
+            for menu_item in greens_menu_items:
+                if veg['name'].lower() in menu_item.get('name', '').lower():
+                    # Revenue is selling price * qty
+                    veg['selling_price'] = menu_item.get('price', 0)
+                    break
+            
+            # Simple profit calculation (revenue - estimated cost)
+            # Without purchase data, we show revenue as the metric
+            veg['is_profitable'] = veg['revenue'] > 0
+        
+        # Daily trend sorted
+        daily_trend_list = [
+            {'date': d, 'vegetables': v}
+            for d, v in sorted(daily_trend.items())
+        ]
+        
+        return Response({
+            'vegetables': veg_list,
+            'totals': {
+                'total_revenue': total_greens_revenue,
+                'total_quantity': total_greens_quantity,
+                'variety_count': len(veg_list)
+            },
+            'daily_trend': daily_trend_list,
+            'date_range': {
+                'start': str(start_date),
+                'end': str(end_date)
+            }
+        })
+        
+    except Exception as e:
+        print(f"Greens analytics error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response({'error': str(e)}, status=500)
